@@ -95,49 +95,122 @@ import { rightHalves } from './split';
 
 /** A change to the Timeline, as the intent sent to the API. */
 export type Edit =
+  /** A whole Beat placed on a Track, after its last Clip, or at 0:00. */
   | { kind: 'addBeat'; trackId: number; beatId: number }
+  /** A Track added, by default empty at the bottom of the Timeline. */
   | { kind: 'addTrack'; track: NewTrack }
+  /** A Track renamed, or its volume, mute or solo set. */
   | { kind: 'updateTrack'; trackId: number; changes: TrackChanges }
+  /** The Tracks put in this order of ids, top to bottom; their Clips go with them. */
   | { kind: 'reorderTracks'; order: number[] }
+  /**
+   * A Track and its Clips removed; their Beats stay in the Beat Library.
+   * Refused for the last Track.
+   */
   | { kind: 'deleteTrack'; trackId: number }
+  /**
+   * A stretch of a Beat, or detached Takes, placed on a Track. Refused if it
+   * would overlap a Clip there.
+   */
   | { kind: 'placeClip'; trackId: number; clip: NewClip }
-  /** Clips placed at once, some perhaps on Tracks added for them at the bottom. */
+  /**
+   * Clips placed at once, some perhaps on Tracks added for them at the
+   * bottom. Refused whole if any would overlap a Clip there, or another of them.
+   */
   | { kind: 'placeClips'; clips: PlacedClip[]; newTracks?: TrackToAdd[] }
+  /**
+   * A Clip copied, name, Gain, Tempo, Pitch, Fades and all, right after
+   * itself, or after its Track's last Clip if that's taken.
+   */
   | { kind: 'duplicateClip'; clipId: number }
-  /** Clips pasted from the Clipboard, as new Clips, some perhaps on Tracks added for them at the bottom. */
+  /**
+   * Clips pasted from the Clipboard, as new Clips, some perhaps on Tracks
+   * added for them at the bottom: a Clip of Takes gets copies of its Takes,
+   * sharing their audio. Refused whole if any would overlap a Clip there, or
+   * another of them.
+   */
   | { kind: 'pasteClips'; clips: PastedClip[]; newTracks: TrackToAdd[] }
+  /**
+   * A Clip moved to start at a time on a Track, keeping its trim. Refused if
+   * it would overlap a Clip there.
+   */
   | { kind: 'moveClip'; clipId: number; trackId: number; start: number }
+  /**
+   * Several Clips moved at once, each checked where it lands against the
+   * Timeline as the whole move leaves it. Refused whole if any would overlap
+   * a Clip there.
+   */
   | { kind: 'moveClips'; moves: ClipMove[] }
-  /** With fades given, it sets them too, e.g. to undo a trim that shortened them. */
+  /**
+   * A Clip set to play length seconds of its source from offset. The audio
+   * stays in place on the Timeline, so trimming the start moves where the
+   * Clip starts. With fades given, it sets them too, e.g. to undo a trim that
+   * shortened them.
+   */
   | { kind: 'trimClip'; clipId: number; offset: number; length: number; fades?: ClipFades }
-  /** A blank name clears the Clip's. */
+  /** A blank name clears the Clip's, and it goes by its source's name again. */
   | { kind: 'renameClip'; clipId: number; name: string }
-  /** In dB. */
+  /** In dB, from minGain to maxGain. */
   | { kind: 'setClipGain'; clipId: number; gain: number }
   /** In seconds; 0 for none. */
   | { kind: 'setClipFades'; clipId: number; fadeIn: number; fadeOut: number }
-  /** Each a ratio of as recorded, all in one step. */
+  /**
+   * Each a ratio of as recorded, all in one step, from minTempo to maxTempo.
+   * Each Clip keeps its start and the audio it plays, so its length and Fades
+   * scale; one slowed into the next Clip on its Track moves onto a new Track
+   * right below its own, shared by those from that Track that fit together.
+   */
   | { kind: 'setClipTempos'; tempos: ClipTempo[] }
-  /** Each in whole semitones, all in one step. */
+  /**
+   * Each in whole semitones, all in one step, from minPitch to maxPitch.
+   * Nothing else about the Clips changes.
+   */
   | { kind: 'setClipPitches'; pitches: ClipPitch[] }
+  /**
+   * A Clip removed from the Timeline; its Beat stays in the Beat Library, and
+   * its Takes are detached.
+   */
   | { kind: 'deleteClip'; clipId: number }
-  /** Clips deleted at once, and Tracks with them, e.g. those a paste added. */
+  /**
+   * Clips deleted at once, and Tracks with them, e.g. those a paste added,
+   * with whatever is left on them; refused whole if any Clip isn't on the
+   * Timeline.
+   */
   | { kind: 'deleteClips'; clipIds: number[]; trackIds?: number[] }
   /**
    * Clips deleted, then Tracks, and others placed in their place, some
    * perhaps on Tracks added for them where they say, in one step, e.g. by a
-   * Merge.
+   * Merge. Refused whole if any can't be.
    */
   | { kind: 'replaceClips'; clipIds: number[]; clips: PlacedClip[]; trackIds?: number[]; newTracks?: TrackAt[] }
-  /** Clips cut in two at a time on the Timeline, in seconds, which crosses each. */
+  /**
+   * Clips cut in two at a time on the Timeline, in seconds, which crosses
+   * each: each Clip keeps its id as the left half, ending there, and a new
+   * Clip is the right half, which for a Clip of Takes plays copies of its
+   * Takes. Refused whole if any can't be.
+   */
   | { kind: 'splitClips'; clipIds: number[]; at: number }
+  /** A Clip's Takes, active Take and placement set, detaching the Takes it no longer holds. */
   | { kind: 'setTakes'; clipId: number; takes: ClipTakes }
+  /** One of a Clip's Takes made the one it plays. */
   | { kind: 'chooseTake'; clipId: number; takeId: number }
+  /**
+   * One of a Clip's Takes moved to be nudge seconds from where it was
+   * recorded, later if positive. The Clip's window stays where it is.
+   */
   | { kind: 'nudgeTake'; clipId: number; takeId: number; nudge: number }
+  /**
+   * One of a Clip's Takes detached. If it was active, the most recent one
+   * left is; if it was the last, the Clip is deleted.
+   */
   | { kind: 'deleteTake'; clipId: number; takeId: number }
+  /** All of a Clip's Takes but the active one detached. */
   | { kind: 'clearInactiveTakes'; clipId: number }
+  /** The Song's Loop set, replacing any it had. */
   | { kind: 'setLoop'; loop: TimelineLoop }
+  /** The Song's Loop switched on or off, keeping its stretch. */
   | { kind: 'switchLoop'; on: boolean }
+  /** The Song's Loop removed. */
   | { kind: 'clearLoop' };
 
 /** Cues set back to given values, to undo or redo a Cue edit. */

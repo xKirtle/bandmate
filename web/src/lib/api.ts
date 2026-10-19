@@ -875,7 +875,16 @@ export class ApiError extends Error {
 const timeZone = () => Intl.DateTimeFormat().resolvedOptions().timeZone;
 const zoneHeaders = (): Record<string, string> => ({ 'Bandmate-Time-Zone': timeZone() });
 
-async function request<T>(method: string, path: string, body?: unknown, at?: SongAt): Promise<T> {
+/**
+ * Sends a request to the API and reads its answer: the method, the path
+ * under /api, the body as JSON unless it's a form or a file, and, for a
+ * write to a Song, the version it's based on, which the server refuses the
+ * write against if the Song has since changed.
+ *
+ * It's the primitive every call to the server goes through, the song server
+ * (songServer.ts) building its own requests with it.
+ */
+export async function request<T>(method: string, path: string, body?: unknown, at?: SongAt): Promise<T> {
   const headers = zoneHeaders();
   // The browser sets a form's Content-Type itself, with its boundary, and a
   // file's from its type. Either is sent as it is.
@@ -954,17 +963,19 @@ function cropForm(from: number, cover: CroppedCover): FormData {
   return form;
 }
 
-/** An audio file with its details as a JSON part, as the server expects uploads. */
-function audioForm(file: File, details: object): FormData {
+/**
+ * Audio with its details as a JSON part, as the server expects uploads: a
+ * file under its own name, or audio the browser made under the name given,
+ * as a recorded Take's or a Merge's is.
+ */
+export function audioForm(audio: File, details: object): FormData;
+export function audioForm(audio: Blob, details: object, name: string): FormData;
+export function audioForm(audio: Blob, details: object, name?: string): FormData {
   const form = new FormData();
   form.append('details', JSON.stringify(details));
-  form.append('file', file);
+  if (name === undefined) form.append('file', audio);
+  else form.append('file', audio, name);
   return form;
-}
-
-/** Clips to place or paste as the API takes them: each with the Track it goes on. */
-function onTracks(clips: readonly (PlacedClip | PastedClip)[]) {
-  return clips.map(({ clip, ...on }) => ({ ...on, ...clip }));
 }
 
 export const api = {
@@ -1092,7 +1103,6 @@ export const api = {
     const query = params.toString();
     return request<SongSummary[]>('GET', query ? `/songs?${query}` : '/songs');
   },
-  getSong: (id: number) => request<Song>('GET', `/songs/${id}`),
   /** Puts the Demo back as built into Bandmate, replacing the one there, and answers with the Demo Song. */
   putDemoBack: () => request<Song>('POST', '/demo'),
   /** Creates a Song, titled "Untitled Song" by the server, in the Folder with folderId, or in none. */
@@ -1132,87 +1142,6 @@ export const api = {
   deleteTag: (id: number) => request<null>('DELETE', `/tags/${id}`),
   updateSong: (at: SongAt, changes: SongChanges) => request<Song>('PATCH', `/songs/${at.id}`, changes, at),
   deleteSong: (at: SongAt) => request<null>('DELETE', `/songs/${at.id}`, undefined, at),
-  /** Adds a Section at position in the Arrangement, or at the end. */
-  addSection: (at: SongAt, section: { label?: string; position?: number }) =>
-    request<Song>('POST', `/songs/${at.id}/sections`, section, at),
-  /**
-   * Puts a Scrapbook Section back into the Arrangement at position, or at the end. A Section already in the
-   * Arrangement is refused: it appears at most once, so Duplicate it instead.
-   */
-  addToArrangement: (at: SongAt, sectionId: number, position?: number) =>
-    request<Song>('POST', `/songs/${at.id}/arrangement`, { sectionId, position }, at),
-  /**
-   * Puts a Duplicate of a Section at position in the Arrangement, or at the end: an independent copy with every
-   * Alternate, the same one active, but none of its Cues.
-   */
-  duplicateSection: (at: SongAt, sectionId: number, position?: number) =>
-    request<Song>('POST', `/songs/${at.id}/sections/${sectionId}/duplicate`, { position }, at),
-  /** Creates a Section in the Scrapbook, outside the Arrangement. */
-  addToScrapbook: (at: SongAt, label = '') => request<Song>('POST', `/songs/${at.id}/scrapbook`, { label }, at),
-  /**
-   * Adds a Section, from the Scrapbook or the Lyric Sheet, to another Section
-   * in the Lyric Sheet: its Alternates join that Section's, inactive, an
-   * unnamed one taking its Label as its name, their Lines' Cues coming along
-   * dormant, and it's gone from wherever it was. Adding one to itself is
-   * refused.
-   */
-  addToSection: (at: SongAt, addedId: number, sectionId: number) =>
-    request<Song>('POST', `/songs/${at.id}/sections/${addedId}/add-to-section`, { sectionId }, at),
-  /** Permanently deletes a Section; only one in the Scrapbook can be. */
-  deleteSection: (at: SongAt, sectionId: number) =>
-    request<Song>('DELETE', `/songs/${at.id}/sections/${sectionId}`, undefined, at),
-  /**
-   * Takes a Section out of the Arrangement, from its actions or dropped on the Scrapbook, with its Cues. It goes to
-   * the end of the Scrapbook, or is deleted if nothing is written in it.
-   */
-  removeFromArrangement: (at: SongAt, sectionId: number) =>
-    request<Song>('DELETE', `/songs/${at.id}/arrangement/${sectionId}`, undefined, at),
-  /** Gives a Line a Cue, in seconds; it may lie past the last Clip. */
-  setLineCue: (at: SongAt, lineId: number, cue: number) =>
-    request<Song>('PUT', `/songs/${at.id}/lines/${lineId}/cue`, { cue }, at),
-  /** Removes a Line's Cue. */
-  clearLineCue: (at: SongAt, lineId: number) =>
-    request<Song>('DELETE', `/songs/${at.id}/lines/${lineId}/cue`, undefined, at),
-  /** Removes the Cues of all a Section's Lines, dormant ones included. */
-  clearSectionCues: (at: SongAt, sectionId: number) =>
-    request<Song>('DELETE', `/songs/${at.id}/sections/${sectionId}/cues`, undefined, at),
-  /** Removes every Cue in the Song. */
-  clearCues: (at: SongAt) => request<Song>('DELETE', `/songs/${at.id}/cues`, undefined, at),
-  /** Sets each Cue given to its value, or clears it, as they were before another Cue edit. */
-  restoreCues: (at: SongAt, cues: CueValue[]) => request<Song>('PATCH', `/songs/${at.id}/cues`, { cues }, at),
-  /** Moves every Cue from start up to end, in seconds, dormant ones included, by the seconds given; refused if any would go below zero. */
-  shiftCues: (at: SongAt, start: number, end: number, by: number) =>
-    request<Song>('POST', `/songs/${at.id}/cues/shift`, { start, end, by }, at),
-  setSectionLabel: (at: SongAt, sectionId: number, label: string) =>
-    request<Song>('PATCH', `/songs/${at.id}/sections/${sectionId}`, { label }, at),
-  /** Replaces an Alternate's Lines with the lines of text. */
-  replaceAlternateText: (at: SongAt, alternateId: number, text: string) =>
-    request<Song>('PUT', `/songs/${at.id}/alternates/${alternateId}/text`, { text }, at),
-  /** Creates an inactive Alternate of a Section, starting as a copy of the active one's Lines. */
-  addAlternate: (at: SongAt, sectionId: number, name = '') =>
-    request<Song>('POST', `/songs/${at.id}/sections/${sectionId}/alternates`, { name }, at),
-  /** Names an Alternate; "" removes its name. */
-  renameAlternate: (at: SongAt, alternateId: number, name: string) =>
-    request<Song>('PATCH', `/songs/${at.id}/alternates/${alternateId}`, { name }, at),
-  /** Makes an Alternate the only active one of its Section. */
-  activateAlternate: (at: SongAt, alternateId: number) =>
-    request<Song>('POST', `/songs/${at.id}/alternates/${alternateId}/activate`, undefined, at),
-  /**
-   * Moves an inactive Alternate out of its Section into a new Scrapbook Section
-   * of its own, with its Cues.
-   */
-  moveAlternateToScrapbook: (at: SongAt, alternateId: number) =>
-    request<Song>('POST', `/songs/${at.id}/alternates/${alternateId}/scrapbook`, undefined, at),
-  /**
-   * Moves an inactive Alternate out of its Section into a Section of its own
-   * at position in the Arrangement, labelled as moving it to the Scrapbook
-   * does, with its Cues, now live.
-   */
-  moveAlternateToArrangement: (at: SongAt, alternateId: number, position: number) =>
-    request<Song>('POST', `/songs/${at.id}/alternates/${alternateId}/arrangement`, { position }, at),
-  /** Permanently deletes an inactive Alternate. */
-  deleteAlternate: (at: SongAt, alternateId: number) =>
-    request<Song>('DELETE', `/songs/${at.id}/alternates/${alternateId}`, undefined, at),
   /** A Song's Snapshots, newest first, without their sheets. */
   listSnapshots: (songId: number) => request<SnapshotSummary[]>('GET', `/songs/${songId}/snapshots`),
   /** One of a Song's Snapshots, with the Lyric Sheet and Scrapbook it holds. */
@@ -1221,17 +1150,6 @@ export const api = {
   /** Keeps a Snapshot, so it's never thinned, or un-keeps it; this changes nothing of the Song. */
   keepSnapshot: (songId: number, snapshotId: number, kept: boolean) =>
     request<SnapshotSummary>('PATCH', `/songs/${songId}/snapshots/${snapshotId}`, { kept }),
-  /**
-   * Makes the Lyric Sheet and Scrapbook a Snapshot's, taking a Snapshot of them first. Lines still there keep their
-   * Cues as they are; Lines brought back get the Cues they had.
-   */
-  restoreSnapshot: (at: SongAt, snapshotId: number) =>
-    request<Song>('POST', `/songs/${at.id}/snapshots/${snapshotId}/restore`, undefined, at),
-  /**
-   * Makes the Lyric Sheet and Scrapbook the copy given, as Undo and Redo put them back, taking no Snapshot of its own.
-   * Rows still there keep their ids, and Lines their Cues as they are; rows brought back get their ids and Cues back.
-   */
-  putSheetBack: (at: SongAt, sheet: SheetCopy) => request<Song>('PUT', `/songs/${at.id}/sheet`, sheet, at),
   /** Attaches a finished recording; the Song's first Master is its main one. */
   addMaster: (at: SongAt, file: File, decoded: DecodedAudio) =>
     request<Song>('POST', `/songs/${at.id}/masters`, audioForm(file, decoded), at),
@@ -1265,197 +1183,33 @@ export const api = {
   masterAudioUrl: (songId: number, masterId: number) => `/api/songs/${songId}/masters/${masterId}/audio`,
   /** Downloads a Master's original file under its uploaded name. */
   masterDownloadUrl: (songId: number, masterId: number) => `/api/songs/${songId}/masters/${masterId}/audio?download`,
-  getTimeline: (songId: number) => request<Timeline>('GET', `/songs/${songId}/timeline`),
-  /** Places a whole Beat on a Track, after its last Clip or at 0:00. */
-  addBeatToTimeline: (at: SongAt, trackId: number, beatId: number) =>
-    request<Timeline>('POST', `/songs/${at.id}/timeline/beats`, { trackId, beatId }, at),
-  /** Adds a Track, by default empty at the bottom of the Timeline. */
-  addTrack: (at: SongAt, track: NewTrack) => request<Timeline>('POST', `/songs/${at.id}/timeline/tracks`, track, at),
-  /** Renames a Track or sets its volume, mute or solo. */
-  updateTrack: (at: SongAt, trackId: number, changes: TrackChanges) =>
-    request<Timeline>('PATCH', `/songs/${at.id}/timeline/tracks/${trackId}`, changes, at),
-  /** Puts the Tracks in this order of ids, top to bottom; their Clips go with them. */
-  reorderTracks: (at: SongAt, tracks: number[]) =>
-    request<Timeline>('PUT', `/songs/${at.id}/timeline/tracks`, { tracks }, at),
-  /** Removes a Track and its Clips; their Beats stay in the Beat Library. Refused for the last Track. */
-  deleteTrack: (at: SongAt, trackId: number) =>
-    request<Timeline>('DELETE', `/songs/${at.id}/timeline/tracks/${trackId}`, undefined, at),
-  /** Moves a Clip to start at a time on a Track, keeping its trim. Refused if it would overlap a Clip there. */
-  moveClip: (at: SongAt, clipId: number, trackId: number, start: number) =>
-    request<Timeline>('POST', `/songs/${at.id}/timeline/clips/${clipId}/move`, { trackId, start }, at),
-  /**
-   * Moves several Clips at once, each checked where it lands against the
-   * Timeline as the whole move leaves it. Refused whole if any would overlap
-   * a Clip there.
-   */
-  moveClips: (at: SongAt, clips: ClipMove[]) =>
-    request<Timeline>('POST', `/songs/${at.id}/timeline/clips/move`, { clips }, at),
-  /**
-   * Has a Clip play length seconds of its source from offset. The audio stays
-   * in place on the Timeline, so trimming the start moves where the Clip starts.
-   */
-  trimClip: (at: SongAt, clipId: number, offset: number, length: number, fades?: ClipFades) =>
-    request<Timeline>('POST', `/songs/${at.id}/timeline/clips/${clipId}/trim`, { offset, length, ...fades }, at),
-  /** Places a stretch of a Beat, or detached Takes, on a Track. Refused if it would overlap a Clip there. */
-  placeClip: (at: SongAt, trackId: number, clip: NewClip) =>
-    request<Timeline>('POST', `/songs/${at.id}/timeline/clips`, { trackId, ...clip }, at),
-  /**
-   * Places several Clips at once, e.g. to bring back Clips deleted together.
-   * Refused whole if any would overlap a Clip there, or another of them.
-   */
-  placeClips: (at: SongAt, clips: PlacedClip[], newTracks: TrackToAdd[] = []) =>
-    request<Timeline>('POST', `/songs/${at.id}/timeline/clips/place`, { newTracks, clips: onTracks(clips) }, at),
-  /**
-   * Pastes Clips as they were copied, each a new Clip, adding newTracks at
-   * the bottom first for those that go on new Tracks: a Clip of Takes gets
-   * copies of its Takes, sharing their audio. Refused whole if any would
-   * overlap a Clip there, or another of them.
-   */
-  pasteClips: (at: SongAt, clips: PastedClip[], newTracks: TrackToAdd[]) =>
-    request<Timeline>('POST', `/songs/${at.id}/timeline/clips/paste`, { newTracks, clips: onTracks(clips) }, at),
-  /** Gives a Clip a name of its own; a blank one clears it, and the Clip goes by its source's name again. */
-  renameClip: (at: SongAt, clipId: number, name: string) =>
-    request<Timeline>('PUT', `/songs/${at.id}/timeline/clips/${clipId}/name`, { name }, at),
-  /** Sets how much louder or quieter a Clip plays, in dB, from minGain to maxGain. */
-  setClipGain: (at: SongAt, clipId: number, gain: number) =>
-    request<Timeline>('PUT', `/songs/${at.id}/timeline/clips/${clipId}/gain`, { gain }, at),
-  /**
-   * Sets how fast each of several Clips plays its audio, in one step, from
-   * minTempo to maxTempo. Each keeps its start and the audio it plays, so its
-   * length and Fades scale; one slowed into the next Clip on its Track moves
-   * onto a new Track right below its own, shared by those from that Track
-   * that fit together.
-   */
-  setClipTempos: (at: SongAt, clips: ClipTempo[]) =>
-    request<Timeline>('POST', `/songs/${at.id}/timeline/clips/tempo`, { clips }, at),
-  /** Sets how long a Clip fades in from its start and out to its end, in seconds; 0 for none. */
-  setClipFades: (at: SongAt, clipId: number, fades: ClipFades) =>
-    request<Timeline>('PUT', `/songs/${at.id}/timeline/clips/${clipId}/fades`, fades, at),
-  /**
-   * Sets how many semitones each of several Clips' audio is moved up or
-   * down, in one step, from minPitch to maxPitch. Nothing else about them
-   * changes.
-   */
-  setClipPitches: (at: SongAt, clips: ClipPitch[]) =>
-    request<Timeline>('POST', `/songs/${at.id}/timeline/clips/pitch`, { clips }, at),
-  /** Copies a Clip, name, Gain, Tempo, Pitch, Fades and all, right after itself, or after its Track's last Clip if that's taken. */
-  duplicateClip: (at: SongAt, clipId: number) =>
-    request<Timeline>('POST', `/songs/${at.id}/timeline/clips/${clipId}/duplicate`, undefined, at),
-  /** Removes a Clip from the Timeline; its Beat stays in the Beat Library, and its Takes are detached. */
-  deleteClip: (at: SongAt, clipId: number) =>
-    request<Timeline>('DELETE', `/songs/${at.id}/timeline/clips/${clipId}`, undefined, at),
-  /**
-   * Removes several Clips at once, as deleteClip does each, then the Tracks
-   * trackIds with whatever is left on them, e.g. to undo a paste that added
-   * Tracks; refused whole if any isn't on the Timeline.
-   */
-  deleteClips: (at: SongAt, clipIds: number[], trackIds: number[] = []) =>
-    request<Timeline>('POST', `/songs/${at.id}/timeline/clips/delete`, { clipIds, trackIds }, at),
-  /**
-   * Deletes Clips, then the Tracks trackIds, adds newTracks, in order, and
-   * places other Clips in their place, on the Timeline's Tracks or those
-   * added, in one step, e.g. to undo or redo a Merge. Refused whole if any
-   * can't be.
-   */
-  replaceClips: (
-    at: SongAt,
-    clipIds: number[],
-    clips: PlacedClip[],
-    trackIds: number[] = [],
-    newTracks: TrackAt[] = [],
-  ) =>
-    request<Timeline>(
-      'POST',
-      `/songs/${at.id}/timeline/clips/replace`,
-      { clipIds, trackIds, newTracks, clips: onTracks(clips) },
-      at,
-    ),
-  /**
-   * Splits Clips in two at a time on the Timeline, which must cross each:
-   * each Clip keeps its id as the left half, ending there, and a new Clip
-   * is the right half, which for a Clip of Takes plays copies of its
-   * Takes. Refused whole if any can't be.
-   */
-  splitClips: (at: SongAt, clipIds: number[], time: number) =>
-    request<Timeline>('POST', `/songs/${at.id}/timeline/clips/split`, { clipIds, at: time }, at),
-  /**
-   * Merges two or more Clips, on any Tracks, into one Clip of a new Sound,
-   * "Merged Clip", from their audio rendered together: a 24-bit WAV running
-   * from the earliest one's start to the latest one's end. It goes on the
-   * Track merge names, or a new one added where it says.
-   */
-  mergeClips: (at: SongAt, wav: Blob, merge: ClipMerge) => {
-    const form = new FormData();
-    form.append('details', JSON.stringify(merge));
-    form.append('file', wav, 'merged.wav');
-    return request<Timeline>('POST', `/songs/${at.id}/timeline/clips/merge`, form, at);
-  },
   /**
    * Places a Take just recorded, a mono 24-bit WAV, in a new Clip at start.
    * Refused if it would overlap a Clip there.
    */
-  recordTake: (at: SongAt, wav: Blob, placement: TakePlacement) => {
-    const form = new FormData();
-    form.append('details', JSON.stringify(placement));
-    form.append('file', wav, 'take.wav');
-    return request<Timeline>('POST', `/songs/${at.id}/timeline/takes`, form, at);
-  },
+  recordTake: (at: SongAt, wav: Blob, placement: TakePlacement) =>
+    request<Timeline>('POST', `/songs/${at.id}/timeline/takes`, audioForm(wav, placement, 'take.wav'), at),
   /**
    * Records a Take just recorded, a mono 24-bit WAV, into a Clip of Takes, as
    * its active Take. The Clip grows to fit it, up to the next Clip.
    */
-  retake: (at: SongAt, clipId: number, wav: Blob, captured: Captured) => {
-    const form = new FormData();
-    form.append('details', JSON.stringify(captured));
-    form.append('file', wav, 'take.wav');
-    return request<Timeline>('POST', `/songs/${at.id}/timeline/clips/${clipId}/takes`, form, at);
-  },
-  /** Sets a Clip's Takes, active Take and placement, detaching the Takes it no longer holds. */
-  setTakes: (at: SongAt, clipId: number, takes: ClipTakes) =>
-    request<Timeline>('PUT', `/songs/${at.id}/timeline/clips/${clipId}/takes`, takes, at),
-  /** Makes one of a Clip's Takes the one it plays. */
-  chooseTake: (at: SongAt, clipId: number, takeId: number) =>
-    request<Timeline>('PUT', `/songs/${at.id}/timeline/clips/${clipId}/active-take`, { takeId }, at),
-  /**
-   * Detaches one of a Clip's Takes. If it was active, the most recent one left
-   * is; if it was the last, the Clip is deleted.
-   */
-  deleteTake: (at: SongAt, clipId: number, takeId: number) =>
-    request<Timeline>('DELETE', `/songs/${at.id}/timeline/clips/${clipId}/takes/${takeId}`, undefined, at),
-  /** Detaches all of a Clip's Takes but the active one. */
-  clearInactiveTakes: (at: SongAt, clipId: number) =>
-    request<Timeline>('DELETE', `/songs/${at.id}/timeline/clips/${clipId}/inactive-takes`, undefined, at),
-  /**
-   * Nudges one of a Clip's Takes to be nudge seconds from where it was
-   * recorded, later if positive. The Clip's window stays where it is.
-   */
-  nudgeTake: (at: SongAt, clipId: number, takeId: number, nudge: number) =>
-    request<Timeline>('PUT', `/songs/${at.id}/timeline/clips/${clipId}/takes/${takeId}/nudge`, { nudge }, at),
+  retake: (at: SongAt, clipId: number, wav: Blob, captured: Captured) =>
+    request<Timeline>(
+      'POST',
+      `/songs/${at.id}/timeline/clips/${clipId}/takes`,
+      audioForm(wav, captured, 'take.wav'),
+      at,
+    ),
   /** One of a Song's Takes, with its peaks. */
   getTake: (songId: number, takeId: number) => request<Take>('GET', `/songs/${songId}/takes/${takeId}`),
   /** Where a Take's audio streams from, exactly as recorded. A Take's file never changes. */
   takeAudioUrl: (songId: number, takeId: number) => `/api/songs/${songId}/takes/${takeId}/audio`,
   /** Where a Take's file downloads from, as recorded, named after the Song and the Take. */
   takeDownloadUrl: (songId: number, takeId: number) => `/api/songs/${songId}/takes/${takeId}/audio?download`,
-  /**
-   * Imports an audio file, unchanged, as one of the Song's Sounds, placed
-   * whole in a new Clip after the Track's last Clip, or at 0:00.
-   */
-  importSound: (at: SongAt, file: File, details: SoundImport) =>
-    request<Timeline>('POST', `/songs/${at.id}/timeline/sounds`, audioForm(file, details), at),
   /** One of a Song's Sounds, with its peaks. */
   getSound: (songId: number, soundId: number) => request<Sound>('GET', `/songs/${songId}/sounds/${soundId}`),
   /** Where a Sound's audio streams from, with seeking. */
   soundAudioUrl: (songId: number, soundId: number) => `/api/songs/${songId}/sounds/${soundId}/audio`,
   /** Where a Sound's file downloads from, as uploaded, under its original name. */
   soundDownloadUrl: (songId: number, soundId: number) => `/api/songs/${songId}/sounds/${soundId}/audio?download`,
-  /** Sets the Song's Loop, replacing any it had. */
-  setLoop: (at: SongAt, loop: TimelineLoop) => request<Timeline>('PUT', `/songs/${at.id}/timeline/loop`, loop, at),
-  /** Switches the Song's Loop on or off, keeping its stretch. */
-  switchLoop: (at: SongAt, on: boolean) => request<Timeline>('PATCH', `/songs/${at.id}/timeline/loop`, { on }, at),
-  /** Removes the Song's Loop. */
-  clearLoop: (at: SongAt) => request<Timeline>('DELETE', `/songs/${at.id}/timeline/loop`, undefined, at),
-  /** Puts the Arrangement in this order of Section ids. */
-  reorderArrangement: (at: SongAt, sections: number[]) =>
-    request<Song>('PUT', `/songs/${at.id}/arrangement`, { sections }, at),
 };

@@ -10,15 +10,18 @@ import { maxCue, type CuedLine, type CuedSong } from './cues';
 
 /** A change to the Cues, as the intent sent to the API. */
 export type CueChange =
-  /** A Line's Cue set, in seconds, or cleared with null. */
+  /** A Line's Cue set, in seconds, which may lie past the last Clip, or cleared with null. */
   | { kind: 'setLineCue'; lineId: number; cue: number | null }
   /** The Cues of all a Section's Lines cleared, dormant ones included. */
   | { kind: 'clearSectionCues'; sectionId: number }
   /** Every Cue in the Song cleared. */
   | { kind: 'clearCues' }
-  /** Every Cue from start up to end moved by the seconds given, dormant ones included. */
+  /**
+   * Every Cue from start up to end moved by the seconds given, dormant ones
+   * included; refused if any would go below zero.
+   */
   | { kind: 'shiftCues'; start: number; end: number; by: number }
-  /** Each Cue given set to its value, or cleared. */
+  /** Each Cue given set to its value, or cleared, as they were before another Cue edit. */
   | { kind: 'restoreCues'; cues: CueValue[] };
 
 /** The Song with a Cue change made, as the server would make it; the Song given stays as it was. */

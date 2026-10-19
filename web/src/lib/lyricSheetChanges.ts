@@ -6,13 +6,25 @@ import type { Sheet, SheetCopy, Song } from './api';
 export type LyricSheetChange =
   /** A new, empty Section in the Arrangement, at position, or at the end. */
   | { kind: 'addSection'; position?: number }
-  /** A copy of a Section, Alternates and all, in the Arrangement at position, or at the end. */
+  /**
+   * A copy of a Section, Alternates and all, in the Arrangement at position,
+   * or at the end: independent of it, the same Alternate active, and none of
+   * its Cues.
+   */
   | { kind: 'duplicateSection'; sectionId: number; position?: number }
   /** The Arrangement put in the order given, of Section ids. */
   | { kind: 'reorderArrangement'; order: number[] }
-  /** A Section taken out of the Arrangement, to the Scrapbook, or deleted if nothing's written in it. */
+  /**
+   * A Section taken out of the Arrangement, with its Cues, to the end of the
+   * Scrapbook, or deleted if nothing's written in it.
+   */
   | { kind: 'removeFromArrangement'; sectionId: number }
-  /** A Section's Alternates made anew in another Section in the Arrangement, inactive; the Section added goes. */
+  /**
+   * A Section's Alternates made anew in another Section in the Arrangement,
+   * inactive, an unnamed one taking its Label as its name, their Lines' Cues
+   * coming along dormant; the Section added goes from wherever it was. Adding
+   * one to itself is refused.
+   */
   | { kind: 'addToSection'; sectionId: number; targetId: number }
   /** A Section in the Scrapbook deleted, after a Snapshot of the sheet as it was. */
   | { kind: 'deleteSection'; sectionId: number }
@@ -26,19 +38,36 @@ export type LyricSheetChange =
   | { kind: 'activateAlternate'; alternateId: number }
   /** An inactive Alternate deleted, after a Snapshot of the sheet as it was. */
   | { kind: 'deleteAlternate'; alternateId: number }
-  /** An inactive Alternate made anew as a Section of its own, in the Scrapbook. */
+  /** An inactive Alternate made anew as a Section of its own, with its Cues, in the Scrapbook. */
   | { kind: 'moveAlternateToScrapbook'; alternateId: number }
-  /** An inactive Alternate made anew as a Section of its own, in the Arrangement at position. */
+  /**
+   * An inactive Alternate made anew as a Section of its own, in the
+   * Arrangement at position, labelled as moving it to the Scrapbook does,
+   * with its Cues, now live.
+   */
   | { kind: 'moveAlternateToArrangement'; alternateId: number; position: number }
   /** A new, empty Section in the Scrapbook. */
   | { kind: 'addToScrapbook' }
-  /** A Section in the Scrapbook put back into the Arrangement, at position. */
+  /**
+   * A Section in the Scrapbook put back into the Arrangement, at position, or
+   * at the end. One already in the Arrangement is refused: it appears there at
+   * most once, so Duplicate it instead.
+   */
   | { kind: 'addToArrangement'; sectionId: number; position?: number }
   /** An Alternate's Lines replaced with the lines of text. */
   | { kind: 'replaceAlternateText'; alternateId: number; text: string }
-  /** The Lyric Sheet and Scrapbook made a Snapshot's, once a Snapshot of them is taken. */
+  /**
+   * The Lyric Sheet and Scrapbook made a Snapshot's, once a Snapshot of them
+   * is taken. Lines still there keep their Cues as they are; Lines brought
+   * back get the Cues they had.
+   */
   | { kind: 'restoreSnapshot'; snapshotId: number }
-  /** The Lyric Sheet and Scrapbook made a copy of them as they were, as Undo and Redo put them back. */
+  /**
+   * The Lyric Sheet and Scrapbook made a copy of them as they were, as Undo
+   * and Redo put them back, taking no Snapshot of its own. Rows still there
+   * keep their ids, and Lines their Cues as they are; rows brought back get
+   * their ids and Cues back.
+   */
   | { kind: 'putSheetBack'; sheet: SheetCopy };
 
 const lyricSheetChangeKinds: ReadonlySet<string> = new Set<LyricSheetChange['kind']>([
