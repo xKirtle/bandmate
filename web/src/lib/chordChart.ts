@@ -76,8 +76,8 @@ export function chartVoicing(
 /**
  * What a Chord's popover steps through: every Voicing of the Chord as shown
  * in the tuning, the preferred one first, else the top-ranked, as the Chord
- * Finder lists them. With the Chord's name as the Chord Finder reads it,
- * which preferring one names it by, and whether the first is preferred. Or
+ * Finder lists them. With the Chord's name as the Chord Finder reads it, the
+ * name preferring one names it by, and whether the first is preferred. Or
  * why there are none to step through: the Chord or the tuning can't be read.
  */
 export type ChartVoicings =

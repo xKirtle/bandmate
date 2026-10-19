@@ -6,7 +6,7 @@
 // same and are played the same, so they share the one preference. Only the
 // guitar for now. None until preferred here.
 
-import { chordSpelling, type Frets } from './chordFinder';
+import { oneSpellingOf, type Frets } from './chordFinder';
 
 /**
  * Each Chord's preferred Voicing in one tuning, by the Chord's name in the
@@ -22,7 +22,13 @@ export function preferredVoicingsKey(tuning: readonly number[]): string {
   return `bandmate.preferredVoicings.guitar.${tuning.join('-')}`;
 }
 
-/** The preferred Voicings kept on this device for a tuning, leaving out any that have gone wrong. */
+/**
+ * The preferred Voicings kept on this device for a tuning, leaving out any
+ * that have gone wrong. One kept under a Chord as it was spelled, before a
+ * preference followed the Chord itself, is read under its one spelling, so
+ * it still applies; where a device kept both spellings of a Chord, the last
+ * of them wins.
+ */
 export function readPreferredVoicings(storage: Storage | undefined, tuning: readonly number[]): PreferredVoicings {
   try {
     const kept: unknown = JSON.parse(storage?.getItem(preferredVoicingsKey(tuning)) ?? '{}');
@@ -30,7 +36,7 @@ export function readPreferredVoicings(storage: Storage | undefined, tuning: read
     return Object.fromEntries(
       Object.entries(kept)
         .filter(([, frets]) => fitsTuning(frets, tuning))
-        .map(([chord, frets]) => [chordSpelling(chord) ?? chord, frets]),
+        .map(([chord, frets]) => [spelledOneWay(chord), frets]),
     );
   } catch {
     return {};
@@ -61,10 +67,15 @@ export function storePreferredVoicing(
 /** Preferred Voicings with a Chord's preference set to a Voicing's frets, or cleared with null, by the Chord's one spelling. */
 export function withPreference(preferred: PreferredVoicings, chord: string, frets: Frets | null): PreferredVoicings {
   const changed: Record<string, Frets> = { ...preferred };
-  const spelled = chordSpelling(chord) ?? chord;
-  if (frets) changed[spelled] = frets;
-  else delete changed[spelled];
+  const kept = spelledOneWay(chord);
+  if (frets) changed[kept] = frets;
+  else delete changed[kept];
   return changed;
+}
+
+/** The name a Chord's preference is kept by: its one spelling, or the name as written if it can't be read. */
+function spelledOneWay(chord: string): string {
+  return oneSpellingOf(chord) ?? chord;
 }
 
 /** Whether a kept value is a fret, or muted, for each of the tuning's strings. */

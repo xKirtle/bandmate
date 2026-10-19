@@ -205,8 +205,9 @@ export function readChord(text: string): Chord | null {
  * A Chord's name in the one spelling: its root and slash bass written as the
  * common spellings write them, so every spelling of one Chord gives one name
  * (Dbmaj7 and C#maj7 both give C#maj7). Two spellings are one sound, played
- * the same way, so what's kept per Chord is kept by this. Reading the name
- * back gives the same Chord, so spelling it again leaves it as it is.
+ * the same way, so what's kept per Chord is kept by this. The name it gives
+ * reads back as the same root, quality and bass, so spelling it again leaves
+ * it as it is.
  */
 export function oneSpelling(chord: Chord): string {
   return common[chord.root] + chord.quality.suffix + (chord.bass === null ? '' : '/' + common[chord.bass]);

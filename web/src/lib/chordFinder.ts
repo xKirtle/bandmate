@@ -66,7 +66,7 @@ export interface FinderContext {
   tuning: readonly number[];
   /**
    * The user's preferred Voicing of each Chord in this tuning, by the Chord's
-   * name in the one spelling (see chordSpelling), as its frets low string to
+   * name in the one spelling (see oneSpellingOf), as its frets low string to
    * high.
    */
   preferred?: Readonly<Record<string, Frets>>;
@@ -133,7 +133,7 @@ export function chordName(text: string): string | null {
  * since Dbmaj7 and C#maj7 are one sound with one set of Voicings. What's
  * kept per Chord on this device is kept by it. Null if it can't be read.
  */
-export function chordSpelling(text: string): string | null {
+export function oneSpellingOf(text: string): string | null {
   const chord = readChord(text);
   return chord && oneSpelling(chord);
 }
