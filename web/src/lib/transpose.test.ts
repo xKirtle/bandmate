@@ -64,7 +64,8 @@ describe("transposeChord with the Song's key", () => {
     // G up 3 is Bb major, with flats; G up 2 is A major, with sharps.
     expect(transposeChord('A#m', 3, 'G')).toBe('Dbm');
     expect(transposeChord('F#m7/C#', 2, 'G')).toBe('G#m7/D#');
-    expect(transposeChord('C/G', 1, 'C')).toBe('Db/Ab');
+    // C up 1 is C# major, with sharps: a key takes sharps wherever it has the choice.
+    expect(transposeChord('C/G', 1, 'C')).toBe('C#/G#');
     expect(transposeChord('C', 1, 'D#')).toBe('C#');
     expect(transposeChord('D', -1, 'F#')).toBe('Db');
   });
@@ -114,14 +115,14 @@ describe("transposeChord with the Song's key", () => {
 });
 
 describe('a signature spelled by letter', () => {
-  it('is the plain one but where the key has spent the letter: only F# major, whose F is E#', () => {
+  it('is the plain one but where the key has spent the letter: C# major, whose C is B#, and F# major', () => {
     const changed = Array.from({ length: 12 }, (_, tonic) => {
       const plain = plainSignature(tonic, false);
       return signature(tonic, false).flatMap((spelling, semitone) =>
         spelling === plain[semitone] ? [] : [`${plain[tonic]} major: ${plain[semitone]} is ${spelling}`],
       );
     }).flat();
-    expect(changed).toEqual(['F# major: F is E#']);
+    expect(changed).toEqual(['C# major: C is B#', 'C# major: F is E#', 'F# major: F is E#']);
   });
 
   it('never needs a double accidental for a key offered', () => {
@@ -147,11 +148,11 @@ describe('transposeKey', () => {
 
   it("spells the shown key's note from its signature", () => {
     expect(transposeKey('G', 1)).toBe('Ab');
-    expect(transposeKey('G', 6)).toBe('Db');
+    expect(transposeKey('G', 6)).toBe('C#');
     expect(transposeKey('C', 6)).toBe('F#');
     expect(transposeKey('Gm', 1)).toBe('G#m');
     expect(transposeKey('Gm', 6)).toBe('C#m');
-    expect(transposeKey('Am', 1)).toBe('Bbm');
+    expect(transposeKey('Am', 1)).toBe('A#m');
     expect(transposeKey('Dm', 1)).toBe('D#m');
   });
 
@@ -172,7 +173,7 @@ describe('the keys offered', () => {
     expect(keys).toEqual([
       'C',
       'Cm',
-      'Db',
+      'C#',
       'C#m',
       'D',
       'Dm',
@@ -191,7 +192,7 @@ describe('the keys offered', () => {
       'A',
       'Am',
       'Bb',
-      'Bbm',
+      'A#m',
       'B',
       'Bm',
     ]);
