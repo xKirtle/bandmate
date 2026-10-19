@@ -54,23 +54,15 @@ func (s *Store) RecordTake(ctx context.Context, songID int64, based songversion.
 		return Timeline{}, err
 	}
 	start := max(rec.Start, 0)
-	// The span's origin is the Take's start, or the Clip's if the Take
-	// starts later, so the Clip never starts before its source.
-	offset := max(0, start-take.start)
-	length := take.end() - start
-	if length <= tolerance {
-		return Timeline{}, errTakeTooEarly
-	}
-	return s.addTake(ctx, songID, based, file, func(tx *sql.Tx, before Timeline) (int64, error) {
-		if err := before.findTrackToPlaceOn(rec.TrackID); err != nil {
-			return 0, err
-		}
-		takeID, err := take.insert(ctx, tx, songID, 1, take.start-(start-offset))
+	return s.addTake(ctx, songID, based, file, func(ctx context.Context, tx *sql.Tx, _ Timeline) (Take, edit, error) {
+		// It's the first Take of its Clip, so it's Take 1.
+		stored, err := take.insert(ctx, tx, songID, 1)
 		if err != nil {
-			return 0, err
+			return Take{}, nil, err
 		}
-		c := NewClip{TakeIDs: []int64{takeID}, ActiveTakeID: &takeID, ClipPlayback: asRecorded(), Start: start, Offset: offset, Length: length}
-		return takeID, addClip(ctx, tx, songID, rec.TrackID, c)
+		return stored, func(tl Timeline, ids *ids) (Timeline, error) {
+			return tl.recording(rec.TrackID, stored, take.start, start, ids.clip())
+		}, nil
 	})
 }
 
@@ -132,37 +124,48 @@ func readTake(file *audio.Received, c Captured) (newTake, error) {
 		start: c.CaptureStart - c.LatencyOffset}, nil
 }
 
-// insert stores the Take, numbered and at a position in a source span, in
-// no Clip yet, and returns its id.
-func (t newTake) insert(ctx context.Context, tx *sql.Tx, songID int64, number int, position float64) (int64, error) {
+// insert stores the Take, numbered, with its audio, in no Clip and at the
+// origin of no span yet, and returns it as the Timeline holds it: the edit
+// that places it says which Clip it goes in and where it starts in its
+// span, and the writer writes that (write.go).
+func (t newTake) insert(ctx context.Context, tx *sql.Tx, songID int64, number int) (Take, error) {
 	peaks, err := json.Marshal(t.Peaks)
 	if err != nil {
-		return 0, err
+		return Take{}, err
 	}
+	recorded := time.Now().UTC()
 	res, err := tx.ExecContext(ctx, `INSERT INTO takes (song_id, number, size, duration, sample_rate, peaks,
 			latency_offset, position, recorded_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		songID, number, t.size, t.duration, t.wav.SampleRate, string(peaks), t.LatencyOffset, position,
-		time.Now().UTC().Format(domain.TimeFormat))
+		VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?)`,
+		songID, number, t.size, t.duration, t.wav.SampleRate, string(peaks), t.LatencyOffset,
+		recorded.Format(domain.TimeFormat))
 	if err != nil {
-		return 0, fmt.Errorf("adding take: %w", err)
+		return Take{}, fmt.Errorf("adding take: %w", err)
 	}
-	return res.LastInsertId()
+	id, err := res.LastInsertId()
+	if err != nil {
+		return Take{}, err
+	}
+	return Take{ID: id, Number: number, Size: t.size, Duration: t.duration, SampleRate: int(t.wav.SampleRate),
+		LatencyOffset: t.LatencyOffset, RecordedAt: recorded}, nil
 }
 
-// addTake runs a change to the Song's Timeline that adds a Take uploaded
-// as file, and keeps the file under the id the change gives it, if it's
-// made. Otherwise the file is discarded.
+// addTake makes one change to the Song's Timeline that places a Take
+// uploaded as file: add stores the Take's row, with its audio, and returns
+// it and the pure edit that puts it in a Clip. The file is kept under the
+// Take's id if the change is made, and discarded otherwise, so a refusal
+// leaves nothing behind.
 func (s *Store) addTake(ctx context.Context, songID int64, based songversion.Version, file *audio.Received,
-	add func(tx *sql.Tx, before Timeline) (int64, error)) (Timeline, error) {
-	return s.changeFrom(ctx, songID, based, func(tx *sql.Tx, changes *audio.FileChanges, before Timeline) error {
-		takeID, err := add(tx, before)
-		if err != nil {
-			return err
-		}
-		changes.Keep(file, takeID)
-		return nil
-	})
+	add func(ctx context.Context, tx *sql.Tx, before Timeline) (Take, edit, error)) (Timeline, error) {
+	return s.editTimelineReading(ctx, songID, based,
+		func(ctx context.Context, tx *sql.Tx, changes *audio.FileChanges, before Timeline) (edit, error) {
+			take, place, err := add(ctx, tx, before)
+			if err != nil {
+				return nil, err
+			}
+			changes.Keep(file, take.ID)
+			return place, nil
+		})
 }
 
 // Retake records another Take into a Clip of Takes, numbered after the
@@ -179,74 +182,21 @@ func (s *Store) Retake(ctx context.Context, songID int64, based songversion.Vers
 	if err != nil {
 		return Timeline{}, err
 	}
-	return s.addTake(ctx, songID, based, file, func(tx *sql.Tx, before Timeline) (int64, error) {
-		track, clip, err := before.findClip(clipID)
+	return s.addTake(ctx, songID, based, file, func(ctx context.Context, tx *sql.Tx, before Timeline) (Take, edit, error) {
+		// Its number comes from the Clip the Timeline holds, so the Take is
+		// stored numbered before the edit places it.
+		_, clip, err := before.findClip(clipID)
 		if err != nil {
-			return 0, err
+			return Take{}, nil, err
 		}
-		p := placementOf(track.ID, clip)
-		if !p.source.activeTakeID.Valid {
-			return 0, domain.Invalid("only a Clip of Takes can be retaken")
-		}
-		// A Take is recorded as it's sung, so it only lines up in a Clip
-		// that plays its audio as recorded, in time and in tune.
-		if p.Tempo != 1 {
-			return 0, domain.Invalid("set the Clip's Tempo back to 100% to retake it")
-		}
-		if p.Pitch != 0 {
-			return 0, domain.Invalid("set the Clip's Pitch back to 0 to retake it")
-		}
-		if take.end() <= p.start+tolerance {
-			return 0, errTakeTooEarly
-		}
-		if err := startSpanEarlier(ctx, tx, clipID, &p, -p.sourceAt(take.start)); err != nil {
-			return 0, err
-		}
-		p.length = grownTo(track, clip, take.end())
-		number, err := nextTakeNumber(ctx, tx, clipID)
+		stored, err := take.insert(ctx, tx, songID, nextTakeNumber(clip))
 		if err != nil {
-			return 0, err
+			return Take{}, nil, err
 		}
-		takeID, err := take.insert(ctx, tx, songID, number, p.sourceAt(take.start))
-		if err != nil {
-			return 0, err
-		}
-		if err := attachTakes(ctx, tx, clipID, []int64{takeID}); err != nil {
-			return 0, err
-		}
-		if _, err := tx.ExecContext(ctx, `UPDATE clips SET active_take_id = ? WHERE id = ?`,
-			takeID, clipID); err != nil {
-			return 0, fmt.Errorf("retaking clip: %w", err)
-		}
-		return takeID, store(ctx, tx, clipID, p)
+		return stored, func(tl Timeline, _ *ids) (Timeline, error) {
+			return tl.retaking(clipID, stored, take.start)
+		}, nil
 	})
-}
-
-// nextTakeNumber is the number a new Take in a Clip gets: the one after
-// the highest still in it, so deleting the latest Take frees its number,
-// while a gap left lower down stays.
-func nextTakeNumber(ctx context.Context, tx *sql.Tx, clipID int64) (int, error) {
-	var number int
-	if err := tx.QueryRowContext(ctx, `SELECT COALESCE(MAX(number), 0) + 1 FROM takes WHERE clip_id = ?`,
-		clipID).Scan(&number); err != nil {
-		return 0, fmt.Errorf("numbering the take: %w", err)
-	}
-	return number, nil
-}
-
-// startSpanEarlier has a Clip of Takes' source span start earlier by some
-// seconds, if any, its Takes and its window staying where they are on the
-// Timeline.
-func startSpanEarlier(ctx context.Context, tx *sql.Tx, clipID int64, p *placement, earlier float64) error {
-	if earlier <= 0 {
-		return nil
-	}
-	if _, err := tx.ExecContext(ctx, `UPDATE takes SET position = position + ? WHERE clip_id = ?`,
-		earlier, clipID); err != nil {
-		return fmt.Errorf("moving takes: %w", err)
-	}
-	p.offset += earlier
-	return nil
 }
 
 // ClipTakes is how a Clip of Takes is to be: its Takes, each where it
@@ -278,7 +228,7 @@ type TakeAt struct {
 // Clip or detached, and those it isn't given leave it, detached. It keeps
 // its Track, and must stay within its Takes and clear of its neighbours.
 func (s *Store) SetTakes(ctx context.Context, songID int64, based songversion.Version, clipID int64, ct ClipTakes) (Timeline, error) {
-	ids, err := checkTakesAt(ct.Takes, ct.ActiveTakeID)
+	takeIDs, err := checkTakesAt(ct.Takes, ct.ActiveTakeID)
 	if err != nil {
 		return Timeline{}, err
 	}
@@ -286,39 +236,21 @@ func (s *Store) SetTakes(ctx context.Context, songID int64, based songversion.Ve
 	if err != nil {
 		return Timeline{}, err
 	}
-	return s.changeFrom(ctx, songID, based, func(tx *sql.Tx, _ *audio.FileChanges, before Timeline) error {
-		p, err := before.takeClip(clipID)
-		if err != nil {
-			return err
-		}
-		if err := checkTakes(ctx, tx, songID, clipID, ids); err != nil {
-			return err
-		}
-		if _, err := tx.ExecContext(ctx, `UPDATE takes SET clip_id = NULL WHERE clip_id = ?`, clipID); err != nil {
-			return fmt.Errorf("detaching takes: %w", err)
-		}
-		for _, t := range ct.Takes {
-			if _, err := tx.ExecContext(ctx, `UPDATE takes SET clip_id = ?, position = ?, nudge = ?, detached_at = NULL
-				WHERE id = ?`, clipID, max(t.Position, 0), t.Nudge, t.ID); err != nil {
-				return fmt.Errorf("attaching take: %w", err)
+	return s.editTimelineReading(ctx, songID, based,
+		func(ctx context.Context, tx *sql.Tx, _ *audio.FileChanges, before Timeline) (edit, error) {
+			if _, _, err := before.findClipOfTakes(clipID); err != nil {
+				return nil, err
 			}
-		}
-		if err := markDetached(ctx, tx, songID); err != nil {
-			return err
-		}
-		if _, err := tx.ExecContext(ctx, `UPDATE clips SET active_take_id = ? WHERE id = ?`,
-			*ct.ActiveTakeID, clipID); err != nil {
-			return fmt.Errorf("setting takes: %w", err)
-		}
-		p.start, p.offset, p.length = ct.Start, ct.Offset, ct.Length
-		if fades != nil {
-			if err := fades.check(ct.Length); err != nil {
-				return err
+			// The Takes it's given may be detached, which the Timeline
+			// doesn't hold, so they're read and checked here.
+			takes, err := readTakes(ctx, tx, songID, clipID, takeIDs)
+			if err != nil {
+				return nil, err
 			}
-			p.setFades(*fades)
-		}
-		return store(ctx, tx, clipID, p)
-	})
+			return func(tl Timeline, _ *ids) (Timeline, error) {
+				return tl.settingTakes(clipID, ct, takes, fades)
+			}, nil
+		})
 }
 
 // checkTakesAt checks the Takes a Clip of Takes is to have, each where it
@@ -359,29 +291,9 @@ func (s *Store) NudgeTake(ctx context.Context, songID int64, based songversion.V
 		}
 		return nil
 	}
-	return s.changeRewording(ctx, songID, based, reword, func(tx *sql.Tx, _ *audio.FileChanges, before Timeline) error {
-		p, err := before.takeClip(clipID)
-		if err != nil {
-			return err
-		}
-		if !slices.Contains(p.source.takeIDs, takeID) {
-			return domain.ErrNotFound
-		}
-		var position, previous float64
-		if err := tx.QueryRowContext(ctx, `SELECT position, nudge FROM takes WHERE id = ?`, takeID).
-			Scan(&position, &previous); err != nil {
-			return fmt.Errorf("reading take: %w", err)
-		}
-		position += nudge - previous
-		if err := startSpanEarlier(ctx, tx, clipID, &p, -position); err != nil {
-			return err
-		}
-		if _, err := tx.ExecContext(ctx, `UPDATE takes SET position = MAX(0, ?), nudge = ? WHERE id = ?`,
-			position, nudge, takeID); err != nil {
-			return fmt.Errorf("nudging take: %w", err)
-		}
-		return store(ctx, tx, clipID, p)
-	})
+	return s.editTimelineRewording(ctx, songID, based, reword, always(func(tl Timeline, _ *ids) (Timeline, error) {
+		return tl.nudgingTake(clipID, takeID, nudge)
+	}))
 }
 
 // checkNudge checks how far a Take is nudged.
@@ -392,111 +304,31 @@ func checkNudge(nudge float64) error {
 	return nil
 }
 
-// takeClip is where one of tl's Clips of Takes is and what it plays,
-// refusing a Clip that has no Takes.
-func (tl Timeline) takeClip(clipID int64) (placement, error) {
-	p, err := tl.placement(clipID)
-	if err != nil {
-		return placement{}, err
-	}
-	if !p.source.activeTakeID.Valid {
-		return placement{}, domain.Invalid("only a Clip of Takes has Takes")
-	}
-	return p, nil
-}
-
 // ChooseTake makes one of a Clip's Takes the one it plays, through the same
 // window.
 func (s *Store) ChooseTake(ctx context.Context, songID int64, based songversion.Version, clipID, takeID int64) (Timeline, error) {
-	return s.changeFrom(ctx, songID, based, func(tx *sql.Tx, _ *audio.FileChanges, before Timeline) error {
-		p, err := before.takeClip(clipID)
-		if err != nil {
-			return err
-		}
-		if !slices.Contains(p.source.takeIDs, takeID) {
-			return domain.Invalid("a Clip of Takes plays one of them")
-		}
-		return setActiveTake(ctx, tx, clipID, takeID)
+	return s.editTimeline(ctx, songID, based, func(tl Timeline, _ *ids) (Timeline, error) {
+		return tl.choosingTake(clipID, takeID)
 	})
-}
-
-// setActiveTake makes a Take the one its Clip plays.
-func setActiveTake(ctx context.Context, tx *sql.Tx, clipID, takeID int64) error {
-	if _, err := tx.ExecContext(ctx, `UPDATE clips SET active_take_id = ? WHERE id = ?`, takeID, clipID); err != nil {
-		return fmt.Errorf("choosing take: %w", err)
-	}
-	return nil
 }
 
 // DeleteTake detaches one of a Clip's Takes, to be brought back by setting
 // the Clip's Takes. Deleting the active Take makes the most recent one left
 // active, and deleting the last deletes the Clip. The Clip's window shrinks
-// to the Takes left, as for keepTakes.
+// to the Takes left, as keepingTakes shrinks it.
 func (s *Store) DeleteTake(ctx context.Context, songID int64, based songversion.Version, clipID, takeID int64) (Timeline, error) {
-	return s.changeFrom(ctx, songID, based, func(tx *sql.Tx, _ *audio.FileChanges, before Timeline) error {
-		p, err := before.takeClip(clipID)
-		if err != nil {
-			return err
-		}
-		if !slices.Contains(p.source.takeIDs, takeID) {
-			return domain.ErrNotFound
-		}
-		if len(p.source.takeIDs) == 1 {
-			return deleteClip(ctx, tx, songID, clipID)
-		}
-		keep := slices.DeleteFunc(slices.Clone(p.source.takeIDs), func(id int64) bool { return id == takeID })
-		return keepTakes(ctx, tx, songID, clipID, p, keep)
+	return s.editTimeline(ctx, songID, based, func(tl Timeline, _ *ids) (Timeline, error) {
+		return tl.deletingTake(clipID, takeID)
 	})
 }
 
 // ClearInactiveTakes detaches all of a Clip's Takes but the active one, to
 // be brought back by setting the Clip's Takes. The Clip's window shrinks to
-// the Take left, as for keepTakes.
+// the Take left, as keepingTakes shrinks it.
 func (s *Store) ClearInactiveTakes(ctx context.Context, songID int64, based songversion.Version, clipID int64) (Timeline, error) {
-	return s.changeFrom(ctx, songID, based, func(tx *sql.Tx, _ *audio.FileChanges, before Timeline) error {
-		p, err := before.takeClip(clipID)
-		if err != nil {
-			return err
-		}
-		return keepTakes(ctx, tx, songID, clipID, p, []int64{p.source.activeTakeID.Int64})
+	return s.editTimeline(ctx, songID, based, func(tl Timeline, _ *ids) (Timeline, error) {
+		return tl.keepingActiveTake(clipID)
 	})
-}
-
-// keepTakes detaches the Takes of a Clip, placed at p, but those in keep,
-// ids of some of them in the order of their numbers. If its active Take
-// goes, the most recent one kept is active. The Clip's window shrinks to end
-// where the Takes kept do, and if they all end before it starts, it moves
-// back to end there, its audio staying where it is on the Timeline.
-func keepTakes(ctx context.Context, tx *sql.Tx, songID, clipID int64, p placement, keep []int64) error {
-	for _, id := range p.source.takeIDs {
-		if slices.Contains(keep, id) {
-			continue
-		}
-		if _, err := tx.ExecContext(ctx, `UPDATE takes SET clip_id = NULL WHERE id = ?`, id); err != nil {
-			return fmt.Errorf("detaching take: %w", err)
-		}
-	}
-	if err := markDetached(ctx, tx, songID); err != nil {
-		return err
-	}
-	p.source.takeIDs = keep
-	if !slices.Contains(keep, p.source.activeTakeID.Int64) {
-		p.source.activeTakeID.Int64 = keep[len(keep)-1]
-	}
-	end, err := p.source.duration(ctx, tx)
-	if err != nil {
-		return err
-	}
-	if end <= p.offset+tolerance {
-		// Its audio stays where it is on the Timeline.
-		offset := max(0, end-p.sourceLength(p.length))
-		p.start, p.offset = p.timelineAt(offset), offset
-	}
-	p.length = min(p.length, p.timelineLength(end-p.offset))
-	if err := setActiveTake(ctx, tx, clipID, p.source.activeTakeID.Int64); err != nil {
-		return err
-	}
-	return store(ctx, tx, clipID, p)
 }
 
 // SweepDetachedTakes removes the Takes detached before a time, of every

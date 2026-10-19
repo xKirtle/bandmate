@@ -572,47 +572,14 @@ type placement struct {
 }
 
 // source is what a Clip plays: a Beat, a Sound, or Takes, of which it
-// plays the active one. Operations ask it how long it is rather than
-// reaching for a Clip's Beat, Sound or Takes.
+// plays the active one. How long a source is, however a Clip trims it, is
+// answered on the Timeline instead (sourceDuration).
 type source struct {
 	beatID  sql.NullInt64
 	soundID sql.NullInt64
 	// activeTakeID is set for a Clip of Takes, and takeIDs are all of them.
 	activeTakeID sql.NullInt64
 	takeIDs      []int64
-}
-
-// duration reads how long the source is, in seconds, however a Clip trims
-// it: a Beat's or a Sound's file, or the span up to where the last of the
-// Takes ends, whichever is active.
-func (src source) duration(ctx context.Context, tx *sql.Tx) (float64, error) {
-	if src.activeTakeID.Valid {
-		takes := make([]Take, len(src.takeIDs))
-		for i, id := range src.takeIDs {
-			t := &takes[i]
-			if err := tx.QueryRowContext(ctx, `SELECT position, duration, nudge FROM takes WHERE id = ?`, id).
-				Scan(&t.Position, &t.Duration, &t.Nudge); err != nil {
-				return 0, fmt.Errorf("reading take: %w", err)
-			}
-		}
-		return takesEnd(takes), nil
-	}
-	var duration float64
-	if src.soundID.Valid {
-		if err := tx.QueryRowContext(ctx, `SELECT duration FROM sounds WHERE id = ?`, src.soundID.Int64).
-			Scan(&duration); err != nil {
-			return 0, fmt.Errorf("reading sound: %w", err)
-		}
-		return duration, nil
-	}
-	err := tx.QueryRowContext(ctx, `SELECT duration FROM beats WHERE id = ?`, src.beatID.Int64).Scan(&duration)
-	if errors.Is(err, sql.ErrNoRows) {
-		return 0, domain.Invalid("there's no such Beat in the Beat Library")
-	}
-	if err != nil {
-		return 0, fmt.Errorf("reading beat: %w", err)
-	}
-	return duration, nil
 }
 
 // MoveClip moves a Clip to start at a time on a Track of the same Timeline,
@@ -938,10 +905,11 @@ func newSource(ctx context.Context, tx *sql.Tx, songID int64, c NewClip) (source
 	case given != 1:
 		return source{}, domain.Invalid("a Clip plays one of a Beat, a Sound or Takes")
 	case c.BeatID != nil:
-		src := source{beatID: sql.NullInt64{Int64: *c.BeatID, Valid: true}}
-		// Only a Beat in the Beat Library has a duration.
-		_, err := src.duration(ctx, tx)
-		return src, err
+		// Only a Beat in the Beat Library can be placed.
+		if _, err := readBeat(ctx, tx, *c.BeatID); err != nil {
+			return source{}, err
+		}
+		return source{beatID: sql.NullInt64{Int64: *c.BeatID, Valid: true}}, nil
 	case c.SoundID != nil:
 		if err := findSound(ctx, tx, songID, *c.SoundID); err != nil {
 			return source{}, err
@@ -1411,20 +1379,12 @@ func (s *Store) changeWithFiles(ctx context.Context, songID int64, based songver
 
 // changeFrom is changeWithFiles for a change that looks at the Timeline it
 // starts from, before, e.g. to find room for a Clip.
+//
+// It's the path the changes that haven't moved onto the edit path take: the
+// Timeline is read before fn runs, which is handed it, and after, and
+// checkLayout checks what fn left.
 func (s *Store) changeFrom(ctx context.Context, songID int64, based songversion.Version,
 	fn func(tx *sql.Tx, changes *audio.FileChanges, before Timeline) error) (Timeline, error) {
-	return s.changeRewording(ctx, songID, based, nil, fn)
-}
-
-// changeRewording is changeFrom, its refusal for breaking a placement rule
-// in reword's words, unless reword is nil or gives nil, when it's in the
-// rule's own.
-//
-// It's the one path every change to a Timeline takes: the Timeline is read
-// before fn runs, which is handed it, and after, and checkLayout checks
-// what fn left.
-func (s *Store) changeRewording(ctx context.Context, songID int64, based songversion.Version,
-	reword func(violation) error, fn func(tx *sql.Tx, changes *audio.FileChanges, before Timeline) error) (Timeline, error) {
 	var tl Timeline
 	if err := songversion.Change(ctx, s.db, songID, based, func(tx *sql.Tx, changes *audio.FileChanges) error {
 		before, err := read(ctx, tx, songID)
@@ -1442,11 +1402,6 @@ func (s *Store) changeRewording(ctx context.Context, songID int64, based songver
 			return err
 		}
 		if v := checkLayout(before, tl); v != nil {
-			if reword != nil {
-				if err := reword(*v); err != nil {
-					return err
-				}
-			}
 			return v.err()
 		}
 		return nil
