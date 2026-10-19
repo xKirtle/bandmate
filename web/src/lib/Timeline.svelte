@@ -24,7 +24,7 @@
   import { chosenTrack, readChosen, storeChosen, type ChoiceEvent } from './chosenTrack';
   import { ClipDrag, type ClipGrip, type ClipMeasure, type DragAt } from './clipDrag.svelte';
   import { LoopDrag } from './loopDrag.svelte';
-  import { PointerFollow, type EdgeScroll, type PointerAt } from './pointerFollow';
+  import { PointerFollow, type PointerAt } from './pointerFollow';
   import { BoxDrag, type BoxAt } from './boxDrag.svelte';
   import { guideLanes, reachAt } from './snapping';
   import { clipSources, clipTitle, playing } from './clipSource';
@@ -80,20 +80,8 @@
   import { audioContext, clipAudioKey, TimelinePlayer, type PlayableClip } from './timelinePlayer';
   import { stretches } from './stretch';
   import { Transport } from './transport.svelte';
-  import {
-    edgeSpeed,
-    fitScale,
-    follow,
-    scrollThumb,
-    shownSpan,
-    thumbScroll,
-    ticks as rulerTicks,
-    timeAt as viewTimeAt,
-    view as timelineView,
-    waveWindow,
-    zoom,
-    type View,
-  } from './timelineView';
+  import { shownSpan, ticks as rulerTicks, timeAt as viewTimeAt, waveWindow } from './timelineView';
+  import { TimelineViewing } from './timelineViewing.svelte';
   import { barWidth } from './waveform';
   import { clipping, tileBars } from './liveWave';
   import { browserKeeping, capturedInput, TakeRecorder } from './takeRecorder.svelte';
@@ -171,7 +159,7 @@
     onError: (message) => showError(message),
     onFollow: (at) => {
       // Not while a Clip or the Loop is dragged, which would jump with the page.
-      if (!clipDrag.clip && !loopDrag.pressed) reveal(at);
+      if (!clipDrag.clip && !loopDrag.pressed) viewing.reveal(at);
     },
   });
   const playerState = $derived(transport.state);
@@ -285,6 +273,28 @@
   const span = $derived(
     shownSpan({ end: length, loopEnd: timeline.loop?.end, recordingAt: capturing ? position : undefined }),
   );
+  // What part of the Timeline is on screen: how far it's zoomed in and
+  // scrolled along, the scroll bar's thumb, pinching, scrolling a time into
+  // view, and the scrolling at the lanes' edges a drag asks for, all
+  // through TimelineViewing (see timelineViewing.svelte.ts), which is the
+  // only writer of the lanes' own scroll. The Timeline measures its
+  // elements for it, hands over the gestures it hears, and draws the view
+  // it shows.
+  const viewing = new TimelineViewing({
+    span: () => span,
+    lanes: () => lanesElement,
+    onHandScroll: (dragging) => {
+      // A scrub scrolling along at the lanes' edges keeps up with the
+      // playhead, so it goes on being followed; anything else scrolled the
+      // view away from it.
+      if (!dragging || !transport.scrubbing) transport.stopFollowing();
+    },
+  });
+  /** The stretch of the Timeline on screen, which it draws. */
+  const view = $derived(viewing.view);
+  /** Where the scroll bar's thumb is, or null with the whole Timeline in view and no bar. */
+  const thumb = $derived(viewing.thumb);
+
   const loopOn = $derived(timeline.loop?.on ?? false);
   // The Loop playback repeats, while it's on.
   const playingLoop = $derived<Loop | null>(loopOn ? { start: timeline.loop!.start, end: timeline.loop!.end } : null);
@@ -501,48 +511,8 @@
 
   /** The time under a point across the lanes, which may be past the end. */
   function spanTimeAt(clientX: number): number {
-    return viewTimeAt(view, xIn(clientX));
+    return viewTimeAt(view, viewing.xIn(clientX));
   }
-
-  /** How far a point is from the left of the lanes' window, in pixels. */
-  function xIn(clientX: number): number {
-    return clientX - lanesElement!.getBoundingClientRect().left;
-  }
-
-  // Dragging the playhead, a Clip or the Loop near an edge of the lanes
-  // scrolls them along, faster the nearer, and what's dragged goes with
-  // them. Taking a Clip or the Loop out of view scrolls away from the
-  // playhead, so it stops being followed.
-  let dragScroll: { at: Point; move: (at: Point) => void } | null = null;
-  let dragFrame = 0;
-
-  /** Notes where something's dragged to, scrolling if it's near an edge. */
-  function dragAt(at: Point, move: (at: Point) => void) {
-    dragScroll = { at: { clientX: at.clientX, clientY: at.clientY }, move };
-    if (dragFrame) return;
-    let last = performance.now();
-    dragFrame = requestAnimationFrame(function step(now) {
-      if (!dragScroll) return;
-      const speed = edgeSpeed(view, xIn(dragScroll.at.clientX));
-      if (speed !== 0) {
-        show(timelineView({ ...view, scroll: view.scroll + (speed * (now - last)) / 1000 }));
-        if (!transport.scrubbing) transport.stopFollowing();
-        dragScroll.move(dragScroll.at);
-      }
-      last = now;
-      dragFrame = requestAnimationFrame(step);
-    });
-  }
-
-  function dragDone() {
-    dragScroll = null;
-    cancelAnimationFrame(dragFrame);
-    dragFrame = 0;
-  }
-  onDestroy(dragDone);
-
-  /** Scrolling along at the edges, for the drags that follow the pointer (see pointerFollow.ts). */
-  const edgeScroll: EdgeScroll = { along: dragAt, done: dragDone };
 
   function pointerDown(event: PointerEvent) {
     // A second finger is pinching.
@@ -556,12 +526,12 @@
   function pointerMove(event: Point) {
     if (!transport.scrubbing) return;
     transport.scrubTo(timeAt(event));
-    dragAt(event, pointerMove);
+    viewing.edgeScroll.along(event, pointerMove);
   }
 
   function pointerUp(event: PointerEvent) {
     if (!transport.scrubbing) return;
-    dragDone();
+    viewing.edgeScroll.done();
     transport.endScrub(timeAt(event));
   }
 
@@ -569,7 +539,7 @@
   function pointerCancel() {
     if (!transport.scrubbing) return;
     transport.cancelScrub();
-    dragDone();
+    viewing.edgeScroll.done();
   }
 
   function rulerKey(event: KeyboardEvent) {
@@ -584,7 +554,7 @@
   /** Seeks as asked by hand, bringing the playhead into view. */
   function seekTo(to: number) {
     transport.seek(clamp(to));
-    reveal(position);
+    viewing.reveal(position);
   }
 
   /**
@@ -595,7 +565,7 @@
     // Nor while a recording starts or saves, stopped meanwhile.
     if (recording) return;
     transport.playFrom(clamp(at));
-    reveal(position);
+    viewing.reveal(position);
   }
 
   /** Where the playhead is, playing or paused, in seconds to the millisecond, e.g. to cue a Line at. */
@@ -1033,7 +1003,7 @@
       // A box given up, e.g. for a pinch or a scroll on touch, selects what was selected before it.
       cancel: boxCancel,
     },
-    edgeScroll,
+    viewing.edgeScroll,
   );
 
   // Held still, a finger draws a box from under it, with a buzz where the
@@ -1346,7 +1316,7 @@
         clipDrag.cancel();
       },
     },
-    edgeScroll,
+    viewing.edgeScroll,
   );
 
   /**
@@ -1566,7 +1536,7 @@
       up: loopUp,
       cancel: () => loopDrag.cancel(),
     },
-    edgeScroll,
+    viewing.edgeScroll,
   );
   onDestroy(() => loopFollow.stop());
 
@@ -1594,56 +1564,20 @@
     return { left: `${percent(from)}%`, width: `${Math.max(0, percent(Math.min(to, span) - from))}%` };
   }
 
-  // Zooming and scrolling: Mod+wheel (Ctrl or ⌘) or pinching zooms in and
-  // out around the pointer or the pinch, and the lanes scroll along when
-  // zoomed in.
-  // Zoomed all the way out (scale 0), the whole Timeline fits, however long.
-  let scale = $state(0);
-  let scroll = $state(0);
-  let width = $state(0);
-  const view = $derived(timelineView({ span, width, scale, scroll }));
-  // Where the lanes were last scrolled to from here, to tell scrolling by
-  // hand, which stops the playhead being followed.
-  let scrolledTo = 0;
-
-  /** Shows the Timeline zoomed and scrolled as v has it. */
-  async function show(v: View) {
-    // Zoomed all the way out, it keeps fitting as the Timeline or window changes.
-    scale = v.scale > fitScale(v.span, v.width) ? v.scale : 0;
-    scroll = scrolledTo = v.scroll;
-    // Once the lanes are as wide as zoomed to.
-    await tick();
-    if (lanesElement) lanesElement.scrollLeft = v.scroll;
-  }
-
-  /** Scrolls the playhead into view, if it isn't. */
-  function reveal(time: number) {
-    // Not while the Timeline's hidden, with no view to scroll.
-    if (width === 0) return;
-    const next = follow(view, time);
-    if (next.scroll !== view.scroll) show(next);
-  }
-
+  // The gestures that zoom and scroll: Mod+wheel (Ctrl or ⌘) or pinching
+  // zooms in and out around the pointer or the pinch, and the lanes scroll
+  // along when zoomed in. What they leave is the view's (see viewing
+  // above); here they're heard and measured.
+  //
   // The browser's own scroll bar is hidden, as it took height on zooming
   // in and shifted the Timeline. This one lies over the lanes' bottom edge
   // instead, taking none, and shows where the view is along the Timeline.
-  // Dragging the thumb or clicking beside it scrolls the lanes by hand, so
-  // the playhead stops being followed, as scrolled() tells.
-  /** The narrowest the thumb gets, in pixels, to stay easy to grab. */
-  const leastThumb = 32;
-  const thumb = $derived(scrollThumb(view, leastThumb));
+  // Its points are measured along the bar, which the Timeline draws.
   let barElement = $state<HTMLElement>();
-  /** The pointer dragging the thumb, and how far into it it grabbed, in pixels. */
-  let thumbDrag = $state<{ pointerId: number; grip: number } | null>(null);
 
   /** How far a point is from the left of the scroll bar, in pixels. */
   function xInBar(clientX: number): number {
     return clientX - barElement!.getBoundingClientRect().left;
-  }
-
-  /** Scrolls the lanes so the thumb starts left pixels along the bar. */
-  function scrollThumbTo(left: number) {
-    lanesElement!.scrollLeft = thumbScroll(view, leastThumb, left).scroll;
   }
 
   function thumbDown(event: PointerEvent) {
@@ -1652,27 +1586,17 @@
     // Not a click on the bar beside it.
     event.stopPropagation();
     (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
-    thumbDrag = { pointerId: event.pointerId, grip: xInBar(event.clientX) - thumb.left };
+    viewing.thumbDown(event.pointerId, xInBar(event.clientX));
   }
 
   function thumbMove(event: PointerEvent) {
-    if (event.pointerId !== thumbDrag?.pointerId) return;
-    scrollThumbTo(xInBar(event.clientX) - thumbDrag.grip);
+    viewing.thumbMove(event.pointerId, xInBar(event.clientX));
   }
-
-  function thumbUp() {
-    thumbDrag = null;
-  }
-
-  // Zoomed out while dragging, e.g. by pinching, the bar goes and the drag with it.
-  $effect(() => {
-    if (!thumb) thumbDrag = null;
-  });
 
   /** A click beside the thumb centres it there, and so the view. */
   function barDown(event: PointerEvent) {
     if (event.button !== 0 || !event.isPrimary || !thumb) return;
-    scrollThumbTo(xInBar(event.clientX) - thumb.width / 2);
+    viewing.barDown(xInBar(event.clientX));
   }
 
   // Over the bar, the wheel scrolls the lanes as it would over them: the
@@ -1680,31 +1604,7 @@
   function barWheel(event: WheelEvent) {
     if (zooms(event)) return;
     const along = event.deltaX || (event.shiftKey ? event.deltaY : 0);
-    lanesElement!.scrollLeft += event.deltaMode === WheelEvent.DOM_DELTA_PIXEL ? along : along * 33;
-  }
-
-  function scrolled() {
-    scroll = lanesElement!.scrollLeft;
-    // Scrolled by hand, rather than to where it was shown.
-    if (Math.abs(scroll - timelineView({ ...view, scroll: scrolledTo }).scroll) > 1) transport.stopFollowing();
-    scrolledTo = scroll;
-  }
-
-  // Hidden or shown again, the lanes lose where they were scrolled to.
-  // Resized, they may need to go back within the Timeline.
-  $effect(() => {
-    if (!lanesElement || width === 0) return;
-    untrack(() => show(view));
-  });
-
-  // Once the Timeline fits without zooming out, e.g. after deleting a long
-  // Clip, it stays fitted rather than zooming back in as it grows again.
-  $effect(() => {
-    if (scale > 0 && scale <= fitScale(span, width)) scale = 0;
-  });
-
-  function zoomAt(factor: number, clientX: number) {
-    show(zoom(view, factor, xIn(clientX)));
+    viewing.scrollBy(event.deltaMode === WheelEvent.DOM_DELTA_PIXEL ? along : along * 33);
   }
 
   // Listened to directly: Svelte's own wheel and touch listeners are
@@ -1721,35 +1621,24 @@
       // zoomed 1.65x each, however hard it's flicked. A trackpad's pinch
       // comes as many small steps.
       const pixels = event.deltaMode === WheelEvent.DOM_DELTA_PIXEL ? event.deltaY : event.deltaY * 33;
-      zoomAt(Math.exp(-Math.max(-100, Math.min(100, pixels)) * 0.005), event.clientX);
+      viewing.zoomAt(Math.exp(-Math.max(-100, Math.min(100, pixels)) * 0.005), event.clientX);
     };
-    let pinch: { distance: number; x: number } | null = null;
-    const pinchOf = ({ touches: [a, b] }: TouchEvent) => ({
-      distance: Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY),
-      x: (a.clientX + b.clientX) / 2,
-    });
     const touchStart = (event: TouchEvent) => {
       if (event.touches.length !== 2) return;
-      pinch = pinchOf(event);
       // The first finger may have started dragging the playhead, the Loop or the thumb.
-      thumbDrag = null;
+      viewing.pinchStart(event.touches[0], event.touches[1]);
       transport.cancelScrub();
-      dragDone();
       loopCancel();
     };
     const touchMove = (event: TouchEvent) => {
       // A finger drawing a box draws it, rather than panning the lanes.
       if (touchBoxing()) event.preventDefault();
-      if (!pinch || event.touches.length !== 2) return;
+      if (!viewing.pinching || event.touches.length !== 2) return;
       event.preventDefault();
-      const now = pinchOf(event);
-      // Zoomed around the pinch, and moved along with it.
-      const zoomed = zoom(view, now.distance / pinch.distance, xIn(now.x));
-      show(timelineView({ ...zoomed, scroll: zoomed.scroll - (now.x - pinch.x) }));
-      pinch = now;
+      viewing.pinchMove(event.touches[0], event.touches[1]);
     };
     const touchEnd = (event: TouchEvent) => {
-      if (event.touches.length < 2) pinch = null;
+      if (event.touches.length < 2) viewing.pinchEnd();
     };
     lanes.addEventListener('wheel', wheel, { passive: false });
     lanes.addEventListener('touchstart', touchStart);
@@ -2109,9 +1998,9 @@
           class="lanes"
           bind:this={lanesElement}
           tabindex="-1"
-          bind:clientWidth={width}
+          bind:clientWidth={viewing.width}
           bind:offsetHeight={lanesHeight}
-          onscroll={scrolled}
+          onscroll={() => viewing.scrolled()}
         >
           <div class="content" style:width="{span * view.scale}px">
             <!-- Pointer only, like dragging Clips; the Loop is switched on and off with its button. -->
@@ -2448,13 +2337,13 @@
           <div class="scrollbar" bind:this={barElement} onpointerdown={barDown} onwheel={barWheel} aria-hidden="true">
             <div
               class="scroll-thumb"
-              class:dragging={thumbDrag !== null}
+              class:dragging={viewing.thumbDragging}
               style:left="{thumb.left}px"
               style:width="{thumb.width}px"
               onpointerdown={thumbDown}
               onpointermove={thumbMove}
-              onpointerup={thumbUp}
-              onpointercancel={thumbUp}
+              onpointerup={() => viewing.thumbUp()}
+              onpointercancel={() => viewing.thumbUp()}
             ></div>
           </div>
         {/if}
