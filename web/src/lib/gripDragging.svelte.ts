@@ -27,6 +27,12 @@ import { untrack } from 'svelte';
 /** Where a row runs down the page, as getBoundingClientRect gives it. */
 export type Span = { top: number; bottom: number };
 
+/**
+ * A row that isn't on the page, for a rule that wants a span for every row:
+ * above any pointer, so the gaps either side of it are counted above it.
+ */
+export const offPage: Span = { top: -Infinity, bottom: -Infinity };
+
 /** Where the pointer is on the page, in the units the rows are measured in. */
 export type At = { x: number; y: number };
 
@@ -63,10 +69,13 @@ export abstract class GripDragging<Dragged, Target, Drop> {
     $effect(() => {
       if (!this.on) untrack(() => this.cancel());
     });
-    $effect(() => {
-      void this.#order;
-      untrack(() => this.cancel());
-    });
+    // Nothing to watch where nothing moves the rows under a drag.
+    if (options.order)
+      $effect(() => {
+        void this.#order;
+        untrack(() => this.cancel());
+      });
+    // Nor does a drag outlive what it was dragged on.
     $effect(() => () => this.cancel());
   }
 
@@ -94,7 +103,11 @@ export abstract class GripDragging<Dragged, Target, Drop> {
     };
   }
 
-  /** Aims the drag at where the pointer is, e.g. again as the rows scroll under it. */
+  /**
+   * Aims the drag at where the pointer is, or, given neither, again at where
+   * it last was, e.g. as the rows scroll under it. Does nothing without a
+   * drag under way.
+   */
   aim(x = this.current?.x, y = this.current?.y) {
     if (!this.current || x === undefined || y === undefined) return;
     this.current = { ...this.current, target: this.#aimedAt(this.current.dragged, x, y), x, y };

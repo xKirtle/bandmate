@@ -1,5 +1,5 @@
-import { GripDragging, type At, type Span } from './gripDragging.svelte';
-import { dropFor, dropTarget, type Box, type Dragged, type Drop, type Target } from './sectionDrag';
+import { GripDragging, offPage, type At, type Span } from './gripDragging.svelte';
+import { dropFor as sectionDrop, dropTarget, type Box, type Dragged, type Drop, type Target } from './sectionDrag';
 
 // On desktop in Write mode, a Section is dragged by the grip on its header:
 // within the Arrangement, from it to the Scrapbook or onto another Section in
@@ -65,7 +65,7 @@ export class SectionDragging extends GripDragging<Dragged, Target, Drop> {
     const arrangement = this.#arrangement?.getBoundingClientRect();
     if (!arrangement) return null;
     // A Section not on the page has its gaps counted above the pointer.
-    const spans = rows.map((row) => row ?? { top: -Infinity, bottom: -Infinity });
+    const spans = rows.map((row) => row ?? offPage);
     // A Section drops onto any Section in the Arrangement but itself: over
     // itself, it's still in the gaps either side. An Alternate only drops
     // between Sections, to be one of its own.
@@ -75,7 +75,7 @@ export class SectionDragging extends GripDragging<Dragged, Target, Drop> {
   }
 
   protected dropFor(dragged: Dragged, target: Target | null): Drop | null {
-    return dropFor(dragged, target);
+    return sectionDrop(dragged, target);
   }
 
   // Only the part of the Scrapbook in view in its column can be dropped on.

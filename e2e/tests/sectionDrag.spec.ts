@@ -29,8 +29,8 @@ async function threeSections(page: Page, bandmate: Bandmate) {
 }
 
 /**
- * Takes the grip of a Section, scrolling it into the Lyric Sheet's view
- * first, which moves the Sections under it.
+ * Takes the grip of a Section. Hovering it brings it into the Lyric Sheet's
+ * view, which moves the Sections, so where to drop is measured after this.
  */
 async function takeGrip(page: Page, target: Locator) {
   await grip(target).hover();

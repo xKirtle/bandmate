@@ -1,4 +1,4 @@
-import { GripDragging, type At, type Span } from './gripDragging.svelte';
+import { GripDragging, offPage, type At, type Span } from './gripDragging.svelte';
 import { trackDrop, type TrackDrop } from './trackDrag';
 
 // On desktop, a Track is dragged by the grip along its header's left edge
@@ -28,8 +28,9 @@ export class TrackDragging extends GripDragging<number, TrackDrop, TrackDrop> {
   }
 }
 
-// Where the middle of a Track's header is, down the page. A Track not on the
-// page has the gaps either side of it counted above the pointer.
+// Where the middle of a Track's header is, down the page; one not on the
+// page counts above the pointer, as offPage says.
 function middleOf(row: Span | null): number {
-  return row ? (row.top + row.bottom) / 2 : -Infinity;
+  const { top, bottom } = row ?? offPage;
+  return (top + bottom) / 2;
 }
