@@ -51,33 +51,42 @@ func (s *Store) ImportSound(ctx context.Context, songID int64, based songversion
 	if msg := a.Problem(); msg != "" {
 		return Timeline{}, domain.Invalid(msg)
 	}
-	name := a.Name(imp.Name, "Sound")
-	peaks, err := json.Marshal(a.Peaks)
+	imported := Sound{Name: a.Name(imp.Name, "Sound"), FileName: a.FileName, Size: file.Size, Duration: a.Duration}
+	return s.editTimelineReading(ctx, songID, based,
+		func(ctx context.Context, tx *sql.Tx, changes *audio.FileChanges, _ Timeline) (edit, error) {
+			snd, err := insertSound(ctx, tx, songID, imported, a.MediaType(), a.Peaks)
+			if err != nil {
+				return nil, err
+			}
+			changes.Keep(file, snd.ID)
+			return func(tl Timeline, ids *ids) (Timeline, error) {
+				return tl.importingSound(imp.TrackID, snd, ids.clip())
+			}, nil
+		})
+}
+
+// insertSound stores an audio file as one of the Song's Sounds, with its
+// media type and the waveform the browser computed, and returns it as the
+// Timeline holds it, with the id it was stored under. The edit that places
+// it says which Clip plays it, and the writer writes that (write.go).
+func insertSound(ctx context.Context, tx *sql.Tx, songID int64, snd Sound, mediaType string,
+	peaks []float64) (Sound, error) {
+	encoded, err := json.Marshal(peaks)
 	if err != nil {
-		return Timeline{}, err
+		return Sound{}, err
 	}
-	return s.changeFrom(ctx, songID, based, func(tx *sql.Tx, changes *audio.FileChanges, before Timeline) error {
-		if err := findTrack(ctx, tx, songID, imp.TrackID); errors.Is(err, domain.ErrNotFound) {
-			return domain.Invalid("there's no such Track on this Timeline")
-		} else if err != nil {
-			return err
-		}
-		res, err := tx.ExecContext(ctx, `INSERT INTO sounds (song_id, name, file_name, content_type, size, duration,
-				peaks, added_at)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-			songID, name, a.FileName, a.MediaType(), file.Size, a.Duration, string(peaks),
-			time.Now().UTC().Format(domain.TimeFormat))
-		if err != nil {
-			return fmt.Errorf("adding sound: %w", err)
-		}
-		soundID, err := res.LastInsertId()
-		if err != nil {
-			return err
-		}
-		changes.Keep(file, soundID)
-		start := trackEnd(before.track(imp.TrackID))
-		return addClip(ctx, tx, songID, imp.TrackID, NewClip{SoundID: &soundID, ClipPlayback: asRecorded(), Start: start, Length: a.Duration})
-	})
+	res, err := tx.ExecContext(ctx, `INSERT INTO sounds (song_id, name, file_name, content_type, size, duration,
+			peaks, added_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		songID, snd.Name, snd.FileName, mediaType, snd.Size, snd.Duration, string(encoded),
+		time.Now().UTC().Format(domain.TimeFormat))
+	if err != nil {
+		return Sound{}, fmt.Errorf("adding sound: %w", err)
+	}
+	if snd.ID, err = res.LastInsertId(); err != nil {
+		return Sound{}, err
+	}
+	return snd, nil
 }
 
 // soundsInUse selects the ids of the Sounds some Clip uses.

@@ -2,11 +2,9 @@ package timeline
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"slices"
 
-	"github.com/xKirtle/bandmate/internal/audio"
 	"github.com/xKirtle/bandmate/internal/domain"
 	"github.com/xKirtle/bandmate/internal/songversion"
 )
@@ -40,74 +38,25 @@ func (s *Store) SetClipTempos(ctx context.Context, songID int64, based songversi
 			return Timeline{}, err
 		}
 	}
-	return s.changeFrom(ctx, songID, based, func(tx *sql.Tx, _ *audio.FileChanges, before Timeline) error {
-		scaled := make(map[int64]placement, len(tempos))
-		for _, t := range tempos {
-			p, err := before.placement(t.ClipID)
-			if err != nil {
-				return err
-			}
-			scaled[t.ClipID] = p.atTempo(t.Tempo)
-		}
-		// The new Tracks added below each Track, top to bottom.
-		added := map[int64][]int64{}
-		for _, m := range tempoMoves(before, tempos) {
-			if m.newTrack == len(added[m.from]) {
-				trackID, err := addTrackBelow(ctx, tx, songID, lastOr(added[m.from], m.from))
-				if err != nil {
-					return err
-				}
-				added[m.from] = append(added[m.from], trackID)
-			}
-			p := scaled[m.clipID]
-			p.trackID = added[m.from][m.newTrack]
-			scaled[m.clipID] = p
-		}
-		for _, t := range tempos {
-			if err := store(ctx, tx, t.ClipID, scaled[t.ClipID]); err != nil {
-				return err
-			}
-		}
-		return nil
+	return s.editTimeline(ctx, songID, based, func(tl Timeline, ids *ids) (Timeline, error) {
+		return tl.settingTempos(tempos, ids)
 	})
 }
 
-// atTempo is p played at another Tempo: from the same start, the same
+// atTempo is c played at another Tempo: from the same start, the same
 // stretch of its source, so its length, and its Fades, scale.
-func (p placement) atTempo(tempo float64) placement {
-	scale := tempoScale(p.Tempo, tempo)
-	p.Tempo = tempo
-	p.length *= scale
-	p.setFades(Fades{In: p.FadeIn * scale, Out: p.FadeOut * scale})
-	return p
+func atTempo(c Clip, tempo float64) Clip {
+	scale := tempoScale(c.Tempo, tempo)
+	c.Tempo = tempo
+	c.Length *= scale
+	c.setFades(Fades{In: c.FadeIn * scale, Out: c.FadeOut * scale})
+	return c
 }
 
 // tempoScale is how much a Clip's length scales by, playing the same
 // stretch of its source, when its Tempo goes from one to another.
 func tempoScale(from, to float64) float64 {
 	return from / to
-}
-
-// addTrackBelow adds an empty Track right below one of the Song's, named
-// as a Merge names the Track it adds, "Track" and the number of Tracks with
-// it, returning its id.
-func addTrackBelow(ctx context.Context, tx *sql.Tx, songID, trackID int64) (int64, error) {
-	var count, above int
-	if err := tx.QueryRowContext(ctx, `SELECT COUNT(*),
-			COALESCE(SUM(position < (SELECT position FROM tracks WHERE id = ?1)
-				OR (position = (SELECT position FROM tracks WHERE id = ?1) AND id <= ?1)), 0)
-		FROM tracks WHERE song_id = ?2`, trackID, songID).Scan(&count, &above); err != nil {
-		return 0, fmt.Errorf("reading tracks: %w", err)
-	}
-	return insertTrackAt(ctx, tx, songID, fmt.Sprintf("Track %d", count+1), &above, 0, false, false)
-}
-
-// lastOr is the last of ids, or else id.
-func lastOr(ids []int64, id int64) int64 {
-	if len(ids) == 0 {
-		return id
-	}
-	return ids[len(ids)-1]
 }
 
 // checkTempo checks that a Clip's Tempo is from MinTempo to MaxTempo.

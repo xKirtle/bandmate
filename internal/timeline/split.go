@@ -28,39 +28,35 @@ func (s *Store) SplitClips(ctx context.Context, songID int64, based songversion.
 			return Timeline{}, domain.Invalid("each Clip can only be split once")
 		}
 	}
-	return s.changeFrom(ctx, songID, based, func(tx *sql.Tx, changes *audio.FileChanges, before Timeline) error {
-		for _, id := range clipIDs {
-			if err := s.splitClip(ctx, tx, changes, before, id, at); err != nil {
-				return err
+	return s.editTimelineReading(ctx, songID, based,
+		func(ctx context.Context, tx *sql.Tx, changes *audio.FileChanges, before Timeline) (edit, error) {
+			// The right half of a Clip of Takes gets copies of its Takes,
+			// stored with their files before the edit places them.
+			copied := make([]splitTakes, len(clipIDs))
+			for i, id := range clipIDs {
+				_, c, err := before.findClip(id)
+				if err != nil {
+					return nil, err
+				}
+				if copied[i].takes, copied[i].active, err = s.copyTakesOf(ctx, tx, changes, c); err != nil {
+					return nil, err
+				}
 			}
-		}
-		return nil
-	})
+			return func(tl Timeline, ids *ids) (Timeline, error) {
+				var err error
+				for i, id := range clipIDs {
+					if tl, err = tl.splitting(id, at, ids.clip(), copied[i]); err != nil {
+						return Timeline{}, err
+					}
+				}
+				return tl, nil
+			}, nil
+		})
 }
 
-// splitClip cuts one of the Clips of the Timeline a split starts from in
-// two at a time, as SplitClips does, with the Take files to link added to
-// changes.
-func (s *Store) splitClip(ctx context.Context, tx *sql.Tx, changes *audio.FileChanges, before Timeline,
-	clipID int64, at float64) error {
-	p, err := before.placement(clipID)
-	if err != nil {
-		return err
-	}
-	cut := at - p.start
-	if cut <= tolerance || cut >= p.length-tolerance {
-		return domain.Invalid("a Clip is only split where the playhead crosses it")
-	}
-	right := p
-	right.start, right.offset, right.length = at, p.sourceAt(at), p.length-cut
-	right.setFades(Fades{In: 0, Out: min(p.FadeOut, right.length)})
-	left := p
-	left.length = cut
-	left.setFades(Fades{In: min(p.FadeIn, cut), Out: 0})
-	// The left half only shrinks, so it's clear of the others, and the
-	// right half plays where the Clip did.
-	if err := store(ctx, tx, clipID, left); err != nil {
-		return err
-	}
-	return s.insertCopy(ctx, tx, changes, right)
+// splitTakes are the copies of a Clip of Takes' Takes that its right half
+// gets, and the one of them it plays: none for a Clip of a Beat or a Sound.
+type splitTakes struct {
+	takes  []Take
+	active *int64
 }

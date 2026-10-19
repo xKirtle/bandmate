@@ -3,11 +3,8 @@ package timeline
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"errors"
-	"fmt"
 	"slices"
-	"time"
 
 	"github.com/xKirtle/bandmate/internal/audio"
 	"github.com/xKirtle/bandmate/internal/domain"
@@ -79,45 +76,18 @@ func (s *Store) MergeClips(ctx context.Context, songID int64, based songversion.
 	if msg := (audio.Upload{Duration: duration, Peaks: m.Peaks}).Problem(); msg != "" {
 		return Timeline{}, domain.Invalid(msg)
 	}
-	peaks, err := json.Marshal(m.Peaks)
-	if err != nil {
-		return Timeline{}, err
-	}
-	return s.changeFrom(ctx, songID, based, func(tx *sql.Tx, changes *audio.FileChanges, before Timeline) error {
-		start, end, err := before.mergedSpan(m.ClipIDs)
-		if err != nil {
-			return err
-		}
-		// Rendered to whole samples, it may fall short by part of one.
-		length := end - start
-		if duration < length-1/float64(wav.SampleRate) {
-			return domain.Invalid("the merged audio must last as long as the Clips merged")
-		}
-		length = min(length, duration)
-		for _, id := range m.ClipIDs {
-			if err := deleteClip(ctx, tx, songID, id); err != nil {
-				return err
+	merged := Sound{Name: MergedName, FileName: MergedName + ".wav", Size: file.Size, Duration: duration}
+	return s.editTimelineReading(ctx, songID, based,
+		func(ctx context.Context, tx *sql.Tx, changes *audio.FileChanges, _ Timeline) (edit, error) {
+			snd, err := insertSound(ctx, tx, songID, merged, takeMediaType, m.Peaks)
+			if err != nil {
+				return nil, err
 			}
-		}
-		trackID, err := m.landingTrack(ctx, tx, songID, before)
-		if err != nil {
-			return err
-		}
-		res, err := tx.ExecContext(ctx, `INSERT INTO sounds (song_id, name, file_name, content_type, size, duration,
-				peaks, added_at)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-			songID, MergedName, MergedName+".wav", takeMediaType, file.Size, duration, string(peaks),
-			time.Now().UTC().Format(domain.TimeFormat))
-		if err != nil {
-			return fmt.Errorf("adding sound: %w", err)
-		}
-		soundID, err := res.LastInsertId()
-		if err != nil {
-			return err
-		}
-		changes.Keep(file, soundID)
-		return addClip(ctx, tx, songID, trackID, NewClip{SoundID: &soundID, ClipPlayback: asRecorded(), Start: start, Length: length})
-	})
+			changes.Keep(file, snd.ID)
+			return func(tl Timeline, ids *ids) (Timeline, error) {
+				return tl.merging(m, snd, float64(wav.SampleRate), ids)
+			}, nil
+		})
 }
 
 // mergedSpan is where on the Timeline the earliest of tl's Clips merged
@@ -137,26 +107,13 @@ func (tl Timeline) mergedSpan(clipIDs []int64) (start, end float64, err error) {
 	return start, end, nil
 }
 
-// landingTrack is the id of the Track a merged Clip goes on: the Track m
-// names, of the Timeline the Merge starts from, or the new one, which it
-// adds where m says.
-func (m ClipMerge) landingTrack(ctx context.Context, tx *sql.Tx, songID int64, before Timeline) (int64, error) {
-	if m.NewTrack == nil {
-		return *m.TrackID, before.findTrackToPlaceOn(*m.TrackID)
-	}
-	added, err := insertTracksAt(ctx, tx, songID, []TrackAt{*m.NewTrack})
-	if err != nil {
-		return 0, err
-	}
-	return added[0], nil
-}
-
 // ReplaceClips deletes Clips from the Timeline and places others on its
 // Tracks in one step, as DeleteClips and PlaceClips do: e.g. to undo a
 // Merge by placing back the Clips it merged, or to redo it by placing its
-// Clip back. The Tracks trackIDs are deleted after the Clips, and newTracks
-// added, in order, before the Clips are placed, for them to go on: e.g. the
-// Track a Merge added for its Clip. If any can't be deleted, added or
+// Clip back. The Tracks trackIDs go too, with any Clips left on them, and
+// an empty Track of each of newTracks is added where it says, for the Clips
+// to go on: e.g. the Track a Merge added for its Clip. A Clip it places can
+// have the Takes of one it takes off. If any can't be deleted, added or
 // placed, nothing changes.
 func (s *Store) ReplaceClips(ctx context.Context, songID int64, based songversion.Version, clipIDs, trackIDs []int64,
 	newTracks []TrackAt, clips []PlacedClip) (Timeline, error) {
@@ -169,30 +126,16 @@ func (s *Store) ReplaceClips(ctx context.Context, songID int64, based songversio
 	if err := checkDeletedOnce(clipIDs); err != nil {
 		return Timeline{}, err
 	}
-	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
-		for _, id := range clipIDs {
-			if err := deleteClip(ctx, tx, songID, id); err != nil {
-				return err
-			}
-		}
-		for _, id := range trackIDs {
-			if err := deleteTrack(ctx, tx, songID, id); err != nil {
-				return err
-			}
-		}
-		added, err := insertTracksAt(ctx, tx, songID, newTracks)
-		if err != nil {
-			return err
-		}
-		for _, c := range clips {
-			trackID, err := c.trackOf(added)
+	return s.editTimelineReading(ctx, songID, based,
+		func(ctx context.Context, tx *sql.Tx, _ *audio.FileChanges, before Timeline) (edit, error) {
+			// The Clips it takes off the Timeline give their Takes up, so
+			// one of them can go in a Clip it places back.
+			sources, err := readPlacedSources(ctx, tx, songID, clips, before.clipsLeaving(clipIDs, trackIDs))
 			if err != nil {
-				return err
+				return nil, err
 			}
-			if err := placeOnTrack(ctx, tx, songID, trackID, c.NewClip); err != nil {
-				return err
-			}
-		}
-		return nil
-	})
+			return func(tl Timeline, ids *ids) (Timeline, error) {
+				return tl.replacingClips(clipIDs, trackIDs, newTracks, clips, sources, ids)
+			}, nil
+		})
 }

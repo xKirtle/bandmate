@@ -479,6 +479,13 @@ func TestDeleting(t *testing.T) {
 			wantTracks: []int64{1},
 		},
 		{
+			name:       "a Track with Clips left on it, as deleting a Track does",
+			tracks:     [][]Clip{{beatClip(1, 0, 10)}, {beatClip(2, 0, 10), beatClip(3, 20, 10)}},
+			trackIDs:   []int64{2},
+			want:       []where{{clipID: 1, trackID: 1, start: 0, length: 10}},
+			wantTracks: []int64{1},
+		},
+		{
 			name:     "the Song's last Track",
 			tracks:   [][]Clip{{beatClip(1, 0, 10)}},
 			clipIDs:  []int64{1},
@@ -532,12 +539,8 @@ func TestAddingTracks(t *testing.T) {
 	if want := []int64{2, 3}; !reflect.DeepEqual(added, want) {
 		t.Errorf("the Tracks added = %v, want %v", added, want)
 	}
-	var names []string
-	for _, t := range after.Tracks {
-		names = append(names, t.Name)
-	}
-	if want := []string{"", "Harmony", "Bass"}; !reflect.DeepEqual(names, want) {
-		t.Errorf("the Tracks = %v, want %v", names, want)
+	if want := []string{"", "Harmony", "Bass"}; !reflect.DeepEqual(trackNames(after), want) {
+		t.Errorf("the Tracks = %v, want %v", trackNames(after), want)
 	}
 }
 
@@ -1215,6 +1218,311 @@ func TestNudgingTake(t *testing.T) {
 			}
 			if got := c.Takes[0].Nudge; tt.takeID == 7 && got != tt.nudge {
 				t.Errorf("the Take is nudged by %g, want %g", got, tt.nudge)
+			}
+		})
+	}
+}
+
+// trackNames are the names of tl's Tracks, top to bottom.
+func trackNames(tl Timeline) []string {
+	var names []string
+	for _, t := range tl.Tracks {
+		names = append(names, t.Name)
+	}
+	return names
+}
+
+func TestReordering(t *testing.T) {
+	tracks := [][]Clip{{beatClip(1, 0, 10)}, {beatClip(2, 0, 10)}, {beatClip(3, 0, 10)}}
+	tests := []struct {
+		name    string
+		order   []int64
+		want    []where
+		refusal string
+	}{
+		{
+			name:  "the bottom Track moved into the middle, its Clips with it",
+			order: []int64{1, 3, 2},
+			want: []where{
+				{clipID: 1, trackID: 1, length: 10},
+				{clipID: 3, trackID: 3, length: 10},
+				{clipID: 2, trackID: 2, length: 10},
+			},
+		},
+		{
+			name:  "the top Track moved to the bottom",
+			order: []int64{2, 3, 1},
+			want: []where{
+				{clipID: 2, trackID: 2, length: 10},
+				{clipID: 3, trackID: 3, length: 10},
+				{clipID: 1, trackID: 1, length: 10},
+			},
+		},
+		{
+			name:    "an order leaving a Track out",
+			order:   []int64{1, 2},
+			refusal: "the new order must list every Track exactly once",
+		},
+		{
+			name:    "an order naming a Track twice",
+			order:   []int64{1, 2, 2},
+			refusal: "the new order must list every Track exactly once",
+		},
+		{
+			name:    "an order naming a Track that isn't on the Timeline",
+			order:   []int64{1, 2, 9},
+			refusal: "the new order must list every Track exactly once",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tl := timelineOf(tracks...)
+			after, err := edited(tl, func(tl Timeline, _ *ids) (Timeline, error) {
+				return tl.reordering(tt.order)
+			})
+			if tt.refusal != "" {
+				refused(t, err, tt.refusal)
+				return
+			}
+			if err != nil {
+				t.Fatalf("reordering error = %v", err)
+			}
+			if got := clipsIn(after); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("the Tracks, top to bottom = %+v, want %+v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestSettingTempos(t *testing.T) {
+	tests := []struct {
+		name       string
+		tracks     [][]Clip
+		tempos     []ClipTempo
+		want       []where
+		wantTracks []string
+		refusal    string
+	}{
+		{
+			name:   "one Clip sped up and another slowed, both still fitting",
+			tracks: [][]Clip{{beatClip(1, 0, 10), beatClip(2, 20, 10)}},
+			tempos: []ClipTempo{{ClipID: 1, Tempo: 2}, {ClipID: 2, Tempo: 0.5}},
+			want: []where{
+				{clipID: 1, trackID: 1, length: 5},
+				{clipID: 2, trackID: 1, start: 20, length: 20},
+			},
+			wantTracks: []string{""},
+		},
+		{
+			name:   "a Clip slowed into the next spills onto a Track added below its own",
+			tracks: [][]Clip{{beatClip(1, 0, 10), beatClip(2, 15, 10)}},
+			tempos: []ClipTempo{{ClipID: 1, Tempo: 0.5}},
+			want: []where{
+				{clipID: 2, trackID: 1, start: 15, length: 10},
+				{clipID: 1, trackID: 2, length: 20},
+			},
+			wantTracks: []string{"", "Track 2"},
+		},
+		{
+			name:   "slowed Clips from one Track share the Track added for them",
+			tracks: [][]Clip{{beatClip(1, 0, 10), beatClip(2, 11, 10), beatClip(3, 30, 10), beatClip(4, 41, 10)}},
+			tempos: []ClipTempo{{ClipID: 1, Tempo: 0.5}, {ClipID: 3, Tempo: 0.5}},
+			want: []where{
+				{clipID: 2, trackID: 1, start: 11, length: 10},
+				{clipID: 4, trackID: 1, start: 41, length: 10},
+				{clipID: 1, trackID: 2, length: 20},
+				{clipID: 3, trackID: 2, start: 30, length: 20},
+			},
+			wantTracks: []string{"", "Track 2"},
+		},
+		{
+			name:    "a Clip that isn't on the Timeline",
+			tracks:  [][]Clip{{beatClip(1, 0, 10)}},
+			tempos:  []ClipTempo{{ClipID: 9, Tempo: 2}},
+			refusal: "not found",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tl := timelineOf(tt.tracks...)
+			after, err := edited(tl, func(tl Timeline, ids *ids) (Timeline, error) {
+				return tl.settingTempos(tt.tempos, ids)
+			})
+			if tt.refusal != "" {
+				refused(t, err, tt.refusal)
+				return
+			}
+			if err != nil {
+				t.Fatalf("settingTempos error = %v", err)
+			}
+			if got := clipsIn(after); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("the Clips = %+v, want %+v", got, tt.want)
+			}
+			if got := trackNames(after); !reflect.DeepEqual(got, tt.wantTracks) {
+				t.Errorf("the Tracks = %v, want %v", got, tt.wantTracks)
+			}
+		})
+	}
+}
+
+func TestSplitting(t *testing.T) {
+	// The Clip plays 0:10 to 0:20 of its Beat, from 0:10 on the Timeline.
+	clip := beatClip(1, 10, 10)
+	clip.Offset = 10
+	refusal := "a Clip is only split where the playhead crosses it"
+	tests := []struct {
+		name    string
+		at      float64
+		want    []where
+		refusal string
+	}{
+		{
+			name: "a cut in the middle, the halves playing across it as before",
+			at:   15,
+			want: []where{
+				{clipID: 1, trackID: 1, start: 10, offset: 10, length: 5},
+				{clipID: 2, trackID: 1, start: 15, offset: 15, length: 5},
+			},
+		},
+		{
+			name: "a cut just inside its start",
+			at:   10.5,
+			want: []where{
+				{clipID: 1, trackID: 1, start: 10, offset: 10, length: 0.5},
+				{clipID: 2, trackID: 1, start: 10.5, offset: 10.5, length: 9.5},
+			},
+		},
+		{
+			name: "a cut just inside its end",
+			at:   19.5,
+			want: []where{
+				{clipID: 1, trackID: 1, start: 10, offset: 10, length: 9.5},
+				{clipID: 2, trackID: 1, start: 19.5, offset: 19.5, length: 0.5},
+			},
+		},
+		{name: "a cut at its start", at: 10, refusal: refusal},
+		{name: "a cut at its end", at: 20, refusal: refusal},
+		{name: "a cut nowhere near it", at: 40, refusal: refusal},
+		{name: "a cut before the Timeline's start", at: -1, refusal: refusal},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tl := timelineOf([]Clip{clip})
+			after, err := edited(tl, func(tl Timeline, ids *ids) (Timeline, error) {
+				return tl.splitting(1, tt.at, ids.clip(), splitTakes{})
+			})
+			if tt.refusal != "" {
+				refused(t, err, tt.refusal)
+				return
+			}
+			if err != nil {
+				t.Fatalf("splitting error = %v", err)
+			}
+			if got := clipsIn(after); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("the halves = %+v, want %+v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestSplittingAClipThatIsntOnTheTimeline(t *testing.T) {
+	tl := timelineOf([]Clip{beatClip(1, 0, 10)})
+	_, err := edited(tl, func(tl Timeline, ids *ids) (Timeline, error) {
+		return tl.splitting(9, 5, ids.clip(), splitTakes{})
+	})
+	refused(t, err, "not found")
+}
+
+func TestMerging(t *testing.T) {
+	// Clips 1 and 2 are on Track 1, from 0:10 to 0:15 and 0:30 to 0:35, and
+	// Clip 3 on Track 2, from 0:00 to 0:04.
+	tracks := [][]Clip{{beatClip(1, 10, 5), beatClip(2, 30, 5)}, {beatClip(3, 0, 4)}}
+	// The merged audio is rendered to whole samples, so it may fall a part
+	// of one short of the span.
+	const sampleRate = 48000
+	aHairShort := 25 - 1.0/(2*sampleRate)
+	landing, missing := int64(2), int64(9)
+	tests := []struct {
+		name       string
+		merge      ClipMerge
+		duration   float64
+		want       []where
+		wantTracks []string
+		refusal    string
+	}{
+		{
+			name:     "two Clips on one Track, merged onto a Track of the Timeline",
+			merge:    ClipMerge{ClipIDs: []int64{1, 2}, TrackID: &landing},
+			duration: 25,
+			want: []where{
+				{clipID: 3, trackID: 2, length: 4},
+				{clipID: 4, trackID: 2, start: 10, length: 25},
+			},
+			wantTracks: []string{"", ""},
+		},
+		{
+			name:     "three Clips, across Tracks, merged onto a Track added for the Clip",
+			merge:    ClipMerge{ClipIDs: []int64{1, 2, 3}, NewTrack: &TrackAt{Name: "Merged", Position: 1}},
+			duration: 35,
+			want: []where{
+				{clipID: 4, trackID: 3, length: 35},
+			},
+			wantTracks: []string{"", "Merged", ""},
+		},
+		{
+			name:     "audio a part of a sample short of the span, which the Clip plays all of",
+			merge:    ClipMerge{ClipIDs: []int64{1, 2}, TrackID: &landing},
+			duration: aHairShort,
+			want: []where{
+				{clipID: 3, trackID: 2, length: 4},
+				{clipID: 4, trackID: 2, start: 10, length: aHairShort},
+			},
+			wantTracks: []string{"", ""},
+		},
+		{
+			name:     "audio shorter than the Clips merged",
+			merge:    ClipMerge{ClipIDs: []int64{1, 2}, TrackID: &landing},
+			duration: 20,
+			refusal:  "the merged audio must last as long as the Clips merged",
+		},
+		{
+			name:     "a Clip that isn't on the Timeline",
+			merge:    ClipMerge{ClipIDs: []int64{1, 9}, TrackID: &landing},
+			duration: 25,
+			refusal:  "not found",
+		},
+		{
+			name:     "a Track that isn't on the Timeline",
+			merge:    ClipMerge{ClipIDs: []int64{1, 2}, TrackID: &missing},
+			duration: 25,
+			refusal:  "there's no such Track on this Timeline",
+		},
+		{
+			name:     "a new Track without a name",
+			merge:    ClipMerge{ClipIDs: []int64{1, 2}, NewTrack: &TrackAt{Name: " ", Position: 0}},
+			duration: 25,
+			refusal:  "a Track's name is required",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tl := timelineOf(tracks...)
+			snd := Sound{Name: MergedName, FileName: MergedName + ".wav", Duration: tt.duration}
+			after, err := edited(tl, func(tl Timeline, ids *ids) (Timeline, error) {
+				return tl.merging(tt.merge, snd, sampleRate, ids)
+			})
+			if tt.refusal != "" {
+				refused(t, err, tt.refusal)
+				return
+			}
+			if err != nil {
+				t.Fatalf("merging error = %v", err)
+			}
+			if got := clipsIn(after); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("the Clips = %+v, want %+v", got, tt.want)
+			}
+			if got := trackNames(after); !reflect.DeepEqual(got, tt.wantTracks) {
+				t.Errorf("the Tracks = %v, want %v", got, tt.wantTracks)
 			}
 		})
 	}
