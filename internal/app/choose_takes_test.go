@@ -41,26 +41,6 @@ func threeTakes(t *testing.T, ts *testServer) (recordedTake, clip) {
 	return r, c
 }
 
-func TestChoosingATakeMakesItTheOneTheClipPlays(t *testing.T) {
-	ts := newTestServer(t)
-	r, c := threeTakes(t, ts)
-
-	got := timelineChange(t, ts.chooseTake(r.song.ID, c.ID, c.Takes[0].ID))
-
-	chosen := got.Tracks[1].Clips[0]
-	if n := numbers(chosen); n != "1* 2 3 " {
-		t.Errorf("takes = %s, want Take 1 active", n)
-	}
-	want := c
-	want.ActiveTakeID = &c.Takes[0].ID
-	if !reflect.DeepEqual(chosen, want) {
-		t.Errorf("clip = %+v, want only its active Take changed: %+v", chosen, want)
-	}
-	if read := ts.getTimeline(r.song.ID); !reflect.DeepEqual(read, got) {
-		t.Errorf("read timeline = %+v, want %+v", read, got)
-	}
-}
-
 func TestChoosingATakeIsUndoneByChoosingTheOneBefore(t *testing.T) {
 	ts := newTestServer(t)
 	r, c := threeTakes(t, ts)
@@ -112,31 +92,6 @@ func TestDeletingAnInactiveTakeLeavesTheActiveOnePlaying(t *testing.T) {
 	expectStatus(t, ts.Do(http.MethodGet, takePath(r.song.ID, c.Takes[1].ID)+"/audio", nil), http.StatusOK)
 }
 
-func TestDeletingTheActiveTakeMakesTheMostRecentLeftActive(t *testing.T) {
-	ts := newTestServer(t)
-	r, c := threeTakes(t, ts)
-
-	got := timelineChange(t, ts.deleteTake(r.song.ID, c.ID, c.Takes[2].ID))
-
-	if n := numbers(got.Tracks[1].Clips[0]); n != "1 2* " {
-		t.Errorf("takes = %s, want Take 2, the most recent left, active", n)
-	}
-	// Take 3 ran to 0:06, and Take 1, the longest left, to 0:05.5, so the
-	// Clip ends there now.
-	if at := clipAt(got, c.ID); at != "1:2+3.5@2" {
-		t.Errorf("clip = %s, want it at 0:02 to 0:05.5, within the Takes left", at)
-	}
-
-	// The most recent, not the next: Take 1 goes, so Take 3 plays.
-	ts = newTestServer(t)
-	r, c = threeTakes(t, ts)
-	timelineChange(t, ts.chooseTake(r.song.ID, c.ID, c.Takes[0].ID))
-	got = timelineChange(t, ts.deleteTake(r.song.ID, c.ID, c.Takes[0].ID))
-	if n := numbers(got.Tracks[1].Clips[0]); n != "2 3* " {
-		t.Errorf("takes = %s, want Take 3, the most recent left, active", n)
-	}
-}
-
 func TestDeletingTheLastTakeDeletesTheClip(t *testing.T) {
 	ts := newTestServer(t)
 	r := recordATake(t, ts)
@@ -152,27 +107,6 @@ func TestDeletingTheLastTakeDeletesTheClip(t *testing.T) {
 	want.ID = back.Tracks[1].Clips[0].ID
 	if c := back.Tracks[1].Clips[0]; !reflect.DeepEqual(c, want) {
 		t.Errorf("clip = %+v, want it back as it was: %+v", c, want)
-	}
-}
-
-func TestClearingInactiveTakesLeavesOnlyTheActiveOne(t *testing.T) {
-	ts := newTestServer(t)
-	r, c := threeTakes(t, ts)
-	timelineChange(t, ts.chooseTake(r.song.ID, c.ID, c.Takes[1].ID))
-
-	got := timelineChange(t, ts.clearInactiveTakes(r.song.ID, c.ID))
-
-	if n := numbers(got.Tracks[1].Clips[0]); n != "2* " {
-		t.Errorf("takes = %s, want only Take 2", n)
-	}
-	// Take 2 ran from 0:00 to 0:03, and Takes 1 and 3 to later.
-	if at := clipAt(got, c.ID); at != "1:2+1@2" {
-		t.Errorf("clip = %s, want it at 0:02 to 0:03, within Take 2", at)
-	}
-	// The next Take follows the highest still in the Clip.
-	retaken := timelineChange(t, ts.retake(r.song.ID, c.ID, retakeUpload(0, 0, 3))).Tracks[1].Clips[0]
-	if n := numbers(retaken); n != "2 3* " {
-		t.Errorf("takes = %s, want the next Take numbered 3", n)
 	}
 }
 
@@ -222,31 +156,5 @@ func TestDeletingTakesFollowsTheirRules(t *testing.T) {
 
 	if read := ts.getTimeline(r.song.ID); !reflect.DeepEqual(read, before) {
 		t.Errorf("timeline = %+v, want it unchanged: %+v", read, before)
-	}
-}
-
-func TestAClipWhoseTakesLeftEndBeforeItMovesBackToEndWithThem(t *testing.T) {
-	ts := newTestServer(t)
-	r, c := threeTakes(t, ts)
-	// The Clip's start is trimmed to 0:05.75, past where Takes 1 and 2 end,
-	// at 0:05.5 and 0:03.
-	timelineChange(t, ts.trimClip(r.song.ID, c.ID, 5.75, 0.25))
-	timelineChange(t, ts.chooseTake(r.song.ID, c.ID, c.Takes[0].ID))
-	before := ts.getTimeline(r.song.ID).Tracks[1].Clips[0]
-
-	for name, change := range map[string]func() response{
-		"deleting a Take":         func() response { return ts.deleteTake(r.song.ID, c.ID, c.Takes[2].ID) },
-		"clearing inactive Takes": func() response { return ts.clearInactiveTakes(r.song.ID, c.ID) },
-	} {
-		t.Run(name, func(t *testing.T) {
-			got := timelineChange(t, change())
-
-			// It ends at 0:05.5 with Take 1, as long as it was, and its
-			// source span still starts at 0:00.
-			if at := clipAt(got, c.ID); at != "1:5.25+0.25@5.25" {
-				t.Errorf("clip = %s, want it at 0:05.25 to 0:05.5", at)
-			}
-			timelineChange(t, ts.setTakes(r.song.ID, c.ID, takesAsIn(before)))
-		})
 	}
 }

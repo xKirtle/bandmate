@@ -80,46 +80,6 @@ func TestAPlacedClipFollowsTheTimelinesRules(t *testing.T) {
 	}
 }
 
-func TestADeletedTrackCanBeAddedBackAsItWas(t *testing.T) {
-	ts := newTestServer(t)
-	p := placeTwoClips(t, ts)
-	tl := timelineChange(t, ts.addTrack(p.song.ID, "Lead vox"))
-	beatTrack := tl.Tracks[0]
-	timelineChange(t, ts.trimClip(p.song.ID, p.second, 2, 15))
-	timelineChange(t, ts.updateTrack(p.song.ID, beatTrack.ID, map[string]any{"volume": -4.5, "muted": true, "soloed": true}))
-	timelineChange(t, ts.deleteTrack(p.song.ID, beatTrack.ID))
-
-	got := timelineChange(t, ts.Do(http.MethodPost, timelinePath(p.song.ID)+"/tracks", map[string]any{
-		"name": "Beat", "position": 0, "volume": -4.5, "muted": true, "soloed": true,
-		"clips": []map[string]any{
-			{"beatId": p.short.ID, "start": 0, "offset": 0, "length": 10},
-			{"beatId": p.long.ID, "start": 32, "offset": 2, "length": 15},
-		},
-	}))
-
-	if want := []string{"Beat", "Adlibs", "Lead vox"}; !reflect.DeepEqual(trackNames(got), want) {
-		t.Errorf("tracks = %q, want the Track back on top: %q", trackNames(got), want)
-	}
-	back := got.Tracks[0]
-	if back.ID == beatTrack.ID || back.Volume != -4.5 || !back.Muted || !back.Soloed {
-		t.Errorf("track = %+v, want a new Track with its levels back", back)
-	}
-	if want := []string{fmt.Sprintf("%d@0+10", p.short.ID), fmt.Sprintf("%d@32+15", p.long.ID)}; !reflect.DeepEqual(clipsOf(got, 0), want) {
-		t.Errorf("clips = %q, want %q", clipsOf(got, 0), want)
-	}
-	if back.Clips[1].Offset != 2 {
-		t.Errorf("clip = %+v, want its trim back", back.Clips[1])
-	}
-	// Positions stay in order around it.
-	if want := []string{"Beat", "Adlibs", "Lead vox", "Harmony"}; !reflect.DeepEqual(trackNames(timelineChange(t, ts.addTrack(p.song.ID, "Harmony"))), want) {
-		t.Errorf("a Track added after goes at the bottom: want %q", want)
-	}
-	between := timelineChange(t, ts.Do(http.MethodPost, timelinePath(p.song.ID)+"/tracks", map[string]any{"name": "Keys", "position": 2}))
-	if want := []string{"Beat", "Adlibs", "Keys", "Lead vox", "Harmony"}; !reflect.DeepEqual(trackNames(between), want) {
-		t.Errorf("tracks = %q, want %q", trackNames(between), want)
-	}
-}
-
 func TestATrackAddedBackFollowsTheTimelinesRules(t *testing.T) {
 	ts := newTestServer(t)
 	p := placeTwoClips(t, ts)

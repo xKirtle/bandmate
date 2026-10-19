@@ -10,13 +10,18 @@ import (
 	"github.com/xKirtle/bandmate/internal/songversion"
 )
 
-// A change to a Song's Tracks and Clips is a pure change to the whole
+// Every change to a Song's Tracks and Clips is a pure change to the whole
 // Timeline, checked by checkLayout (ADR 0023) and written by writeTimeline,
 // as every change to a Lyric Sheet is (ADR 0024), so no operation says
-// anything about the order its rows are written in. The Loop, which is the
-// Song's rather than a Track's or a Clip's, and the operations that haven't
-// moved onto this path yet (a paste, and a Clip renamed), still write their
-// own rows, through the change helpers in timeline.go.
+// anything about the order its rows are written in, and none writes those
+// rows itself (ADR 0025). The one change outside the path is the Loop,
+// which is the Song's own rather than a Track's or a Clip's (changeLoop).
+//
+// What a change brings with it is still read and written here, before the
+// pure part: a Take recorded with its audio, a Sound imported, and the
+// copies a Duplicate or a paste makes of a Clip of Takes' Takes. The pure
+// edit is handed those rows and only works out placement; the writer puts
+// each Take in its Clip and where its span starts it.
 
 // edit is a pure change to the whole Timeline: it's handed a copy to change
 // as it likes, and ids for any rows it adds, and returns the Timeline it

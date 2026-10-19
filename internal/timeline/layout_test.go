@@ -149,6 +149,10 @@ func TestCheckLayoutClips(t *testing.T) {
 		{"a Clip starting before its source", offset(beatClip(1, 0, 10), -1), ruleBeforeSource},
 		{"a Clip playing nothing", beatClip(1, 0, 0), ruleNoLength},
 		{"a slowed Clip playing all its Beat", slowed, 0},
+		// At half speed it covers twice as much of the Timeline, so it's
+		// its source it must stay within, not its length.
+		{"a slowed Clip playing past its Beat",
+			func() Clip { c := slowed; c.Length = 121; return c }(), rulePastSource},
 		{"a Clip playing all its Sound", soundClip, 0},
 		{"a Clip playing past its Sound", func() Clip { c := soundClip; c.Length = 6; return c }(), rulePastSource},
 		{"a Clip playing up to where its last Take ends",

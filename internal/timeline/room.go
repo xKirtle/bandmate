@@ -44,35 +44,6 @@ func (tl Timeline) findClip(id int64) (Track, Clip, error) {
 	return t, c, nil
 }
 
-// placement is where one of tl's Clips is and what it plays, as stored: the
-// value an operation changes and writes back, taken from the Timeline in
-// hand rather than read back a Clip at a time.
-func (tl Timeline) placement(clipID int64) (placement, error) {
-	t, c, err := tl.findClip(clipID)
-	if err != nil {
-		return placement{}, err
-	}
-	return placementOf(t.ID, c), nil
-}
-
-// placementOf is where c, on the Track with the id given, is and what it
-// plays, as stored.
-func placementOf(trackID int64, c Clip) placement {
-	p := placement{
-		trackID:      trackID,
-		source:       source{beatID: nullID(c.BeatID), soundID: nullID(c.SoundID), activeTakeID: nullID(c.ActiveTakeID)},
-		name:         clipName(c.Name),
-		ClipPlayback: c.ClipPlayback,
-		start:        c.Start,
-		offset:       c.Offset,
-		length:       c.Length,
-	}
-	for _, take := range c.Takes {
-		p.source.takeIDs = append(p.source.takeIDs, take.ID)
-	}
-	return p
-}
-
 // findTrackToPlaceOn refuses a Track a Clip is to go on that isn't one of
 // tl's, in the same words as the findTrackToPlaceOn that asks the database.
 func (tl Timeline) findTrackToPlaceOn(id int64) error {

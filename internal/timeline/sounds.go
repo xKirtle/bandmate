@@ -153,19 +153,6 @@ func (s *Store) removeSoundFiles(ids []int64) {
 	}
 }
 
-// findSound checks that a Sound is one of the Song's.
-func findSound(ctx context.Context, tx *sql.Tx, songID, soundID int64) error {
-	var found int
-	err := tx.QueryRowContext(ctx, `SELECT 1 FROM sounds WHERE id = ? AND song_id = ?`, soundID, songID).Scan(&found)
-	if errors.Is(err, sql.ErrNoRows) {
-		return domain.Invalid("there's no such Sound in this Song")
-	}
-	if err != nil {
-		return fmt.Errorf("reading sound: %w", err)
-	}
-	return nil
-}
-
 // GetSound returns one of a Song's Sounds, with its peaks.
 func (s *Store) GetSound(ctx context.Context, songID, soundID int64) (Sound, error) {
 	var snd Sound

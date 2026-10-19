@@ -51,6 +51,60 @@ func (tl Timeline) addingTracks(names []string, ids *ids) (Timeline, []int64) {
 	return tl, added
 }
 
+// pasting is tl with a new Clip of each of those copied on its Track, as it
+// was copied, with an empty Track of each of newTracks added at the bottom
+// first for the Clips that run past the last Track: what PasteClips leaves.
+// The names must be checked. srcs are what those Clips play, one for each,
+// in the order clips gives them, a Clip of Takes' being the copies of its
+// Takes in the order it holds them.
+func (tl Timeline) pasting(newTracks []string, clips []ClipCopy, srcs []clipSource, ids *ids) (Timeline, error) {
+	tl, added := tl.addingTracks(newTracks, ids)
+	for i, c := range clips {
+		trackID, err := c.trackOf(added)
+		if err != nil {
+			return Timeline{}, err
+		}
+		src := srcs[i]
+		if len(src.takes) > 0 {
+			src.takes = takesAt(src.takes, c.Takes)
+		}
+		if tl, err = tl.placingNew(trackID, c.pasted(), src, ids.clip()); err != nil {
+			return Timeline{}, err
+		}
+	}
+	return tl, nil
+}
+
+// pasted is c as a Clip to place, playing what it was copied playing.
+func (c ClipCopy) pasted() NewClip {
+	return NewClip{BeatID: c.BeatID, SoundID: c.SoundID, Name: c.Name, ClipPlayback: c.ClipPlayback,
+		Start: c.Start, Offset: c.Offset, Length: c.Length}
+}
+
+// takesAt are the Takes of a Clip of Takes being placed, each where at says
+// it starts in the Clip's source span and how far it's nudged, in the order
+// the Timeline holds them, by number. takes and at name the same Takes in
+// the same order; a position a rounding hair before the span's start is
+// taken as its start, as settingTakes takes one.
+func takesAt(takes []Take, at []TakeAt) []Take {
+	placed := slices.Clone(takes)
+	for i := range placed {
+		placed[i].Position, placed[i].Nudge = max(at[i].Position, 0), at[i].Nudge
+	}
+	sortTakes(placed)
+	return placed
+}
+
+// renaming is tl with one of its Clips given a name of its own, or, given a
+// blank one, none, so it goes by its source's name again: what RenameClip
+// leaves.
+func (tl Timeline) renaming(clipID int64, name string) (Timeline, error) {
+	return tl.changingClip(clipID, func(c Clip) (Clip, error) {
+		c.Name = ownName(name)
+		return c, nil
+	})
+}
+
 // moving is tl with one of its Clips moved to start at a time on one of its
 // Tracks, keeping its trim: what MoveClip leaves.
 func (tl Timeline) moving(clipID, trackID int64, start float64) (Timeline, error) {
@@ -88,7 +142,7 @@ func (tl Timeline) trimming(clipID int64, offset, length float64, fades *Fades) 
 		return Timeline{}, err
 	}
 	offset = roundedToZero(offset)
-	c.Start, c.Offset, c.Length = placementOf(t.ID, c).timelineAt(offset), offset, length
+	c.Start, c.Offset, c.Length = c.timelineAt(offset), offset, length
 	if fades != nil {
 		if err := fades.check(length); err != nil {
 			return Timeline{}, err
@@ -189,7 +243,7 @@ func (tl Timeline) retaking(clipID int64, take Take, takeStart float64) (Timelin
 	if end <= c.Start+tolerance {
 		return Timeline{}, errTakeTooEarly
 	}
-	take.Position = placementOf(t.ID, c).sourceAt(takeStart)
+	take.Position = c.sourceAt(takeStart)
 	c.Takes = slices.Clone(c.Takes)
 	if take.Position < 0 {
 		c.Takes = takesStartingLater(c.Takes, -take.Position)
@@ -274,14 +328,16 @@ func (tl Timeline) keepingTakes(clipID int64, keep []int64) (Timeline, error) {
 		recent := c.Takes[len(c.Takes)-1].ID
 		c.ActiveTakeID = &recent
 	}
-	p := placementOf(t.ID, c)
+	// Where the Clip's window sits is worked out from where it was, so the
+	// window it had is kept while it's changed.
+	was := c
 	end := takesEnd(c.Takes)
-	if end <= p.offset+tolerance {
+	if end <= was.Offset+tolerance {
 		// Its audio stays where it is on the Timeline.
-		offset := max(0, end-p.sourceLength(p.length))
-		c.Start, c.Offset = p.timelineAt(offset), offset
+		offset := max(0, end-was.sourceLength(was.Length))
+		c.Start, c.Offset = was.timelineAt(offset), offset
 	}
-	c.Length = min(p.length, p.timelineLength(end-c.Offset))
+	c.Length = min(was.Length, was.timelineLength(end-c.Offset))
 	return tl.replacing(t, t.ID, asPlaced(c)), nil
 }
 
@@ -613,7 +669,7 @@ func (tl Timeline) splitting(clipID int64, at float64, rightID int64, copied spl
 	}
 	right := cloneClip(c)
 	right.ID, right.Takes, right.ActiveTakeID = rightID, copied.takes, copied.active
-	right.Start, right.Offset, right.Length = at, placementOf(t.ID, c).sourceAt(at), c.Length-cut
+	right.Start, right.Offset, right.Length = at, c.sourceAt(at), c.Length-cut
 	right.setFades(Fades{In: 0, Out: min(c.FadeOut, right.Length)})
 	left := c
 	left.Length = cut
@@ -739,6 +795,14 @@ func (tl Timeline) findTrack(id int64) (Track, error) {
 		return Track{}, domain.ErrNotFound
 	}
 	return tl.Tracks[i], nil
+}
+
+// sortTakes puts a Clip's Takes in the order they're numbered, as the
+// Timeline holds them.
+func sortTakes(takes []Take) {
+	slices.SortStableFunc(takes, func(a, b Take) int {
+		return cmp.Or(cmp.Compare(a.Number, b.Number), cmp.Compare(a.ID, b.ID))
+	})
 }
 
 // sortClips puts a Track's Clips in the order they start, as the Timeline
