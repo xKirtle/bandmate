@@ -143,11 +143,12 @@ func (tl Timeline) deleting(clipIDs, trackIDs []int64) (Timeline, error) {
 
 // recording is tl with a Take just recorded placed in a new Clip starting
 // at start on one of its Tracks, as its first and active Take: what
-// RecordTake leaves. at is where the Take starts on the Timeline. Whatever
-// it holds before the Clip's start (the lead-in) is kept, hidden behind it,
-// so the Clip plays from its start to the Take's end.
-func (tl Timeline) recording(trackID int64, take Take, at, start float64, clipID int64) (Timeline, error) {
-	length := at + take.Duration - start
+// RecordTake leaves. takeStart is where the Take itself starts on the
+// Timeline. Whatever it holds before the Clip's start (the lead-in) is
+// kept, hidden behind it, so the Clip plays from its start to the Take's
+// end.
+func (tl Timeline) recording(trackID int64, take Take, takeStart, start float64, clipID int64) (Timeline, error) {
+	length := takeStart + take.Duration - start
 	if length <= tolerance {
 		return Timeline{}, errTakeTooEarly
 	}
@@ -156,18 +157,18 @@ func (tl Timeline) recording(trackID int64, take Take, at, start float64, clipID
 	}
 	// The span's origin is the Take's start, or the Clip's if the Take
 	// starts later, so the Clip never starts before its source.
-	take.Position = max(0, at-start)
+	take.Position = max(0, takeStart-start)
 	return tl.placing(trackID, asPlaced(Clip{ID: clipID, ClipPlayback: asRecorded(), Takes: []Take{take},
-		ActiveTakeID: &take.ID, Start: start, Offset: max(0, start-at), Length: length})), nil
+		ActiveTakeID: &take.ID, Start: start, Offset: max(0, start-takeStart), Length: length})), nil
 }
 
 // retaking is tl with a Take just recorded in one of its Clips of Takes, as
-// its active Take: what Retake leaves. at is where the Take starts on the
-// Timeline. Where it starts before the Clip's source span, the span is
-// taken back to where it starts, the Takes already there staying where they
-// are on the Timeline. The Clip grows to where the Take ends, but never
-// past the next Clip on its Track.
-func (tl Timeline) retaking(clipID int64, take Take, at float64) (Timeline, error) {
+// its active Take: what Retake leaves. takeStart is where the Take starts
+// on the Timeline. Where it starts before the Clip's source span, the span
+// is taken back to where it starts, the Takes already there staying where
+// they are on the Timeline. The Clip grows to where the Take ends, but
+// never past the next Clip on its Track.
+func (tl Timeline) retaking(clipID int64, take Take, takeStart float64) (Timeline, error) {
 	t, c, err := tl.findClip(clipID)
 	if err != nil {
 		return Timeline{}, err
@@ -183,11 +184,11 @@ func (tl Timeline) retaking(clipID int64, take Take, at float64) (Timeline, erro
 	if c.Pitch != 0 {
 		return Timeline{}, domain.Invalid("set the Clip's Pitch back to 0 to retake it")
 	}
-	end := at + take.Duration
+	end := takeStart + take.Duration
 	if end <= c.Start+tolerance {
 		return Timeline{}, errTakeTooEarly
 	}
-	take.Position = placementOf(t.ID, c).sourceAt(at)
+	take.Position = placementOf(t.ID, c).sourceAt(takeStart)
 	c.Takes = slices.Clone(c.Takes)
 	if take.Position < 0 {
 		c.Takes = takesStartingLater(c.Takes, -take.Position)
@@ -231,6 +232,8 @@ func (tl Timeline) settingTakes(clipID int64, set ClipTakes, takes []Take, fades
 	if err != nil {
 		return Timeline{}, err
 	}
+	// takes are the Takes set names, read in the order they're numbered, so
+	// each is in at.
 	at := map[int64]TakeAt{}
 	for _, a := range set.Takes {
 		at[a.ID] = a
@@ -239,7 +242,7 @@ func (tl Timeline) settingTakes(clipID int64, set ClipTakes, takes []Take, fades
 	for i, take := range c.Takes {
 		c.Takes[i].Position, c.Takes[i].Nudge = max(at[take.ID].Position, 0), at[take.ID].Nudge
 	}
-	c.ActiveTakeID = set.ActiveTakeID
+	c.ActiveTakeID = copyID(set.ActiveTakeID)
 	c.Start, c.Offset, c.Length = set.Start, set.Offset, set.Length
 	if fades != nil {
 		if err := fades.check(set.Length); err != nil {
@@ -251,11 +254,12 @@ func (tl Timeline) settingTakes(clipID int64, set ClipTakes, takes []Take, fades
 }
 
 // keepingTakes is tl with one of its Clips of Takes holding only the Takes
-// keep, ids of some of them in the order of their numbers: what dropping a
-// Take leaves. The rest leave it, to be placed again, and if the one it
-// plays goes, the most recent one kept plays. Its window shrinks to end
-// where the Takes kept do, and if they all end before it starts, it moves
-// back to end there, its audio staying where it is on the Timeline.
+// keep, ids of at least one of them in the order of their numbers: what
+// dropping a Take leaves. The rest leave it, to be placed again, and if the
+// one it plays goes, the most recent one kept plays. Its window shrinks to
+// end where the Takes kept do, and if they all end before it starts, it
+// moves back to end there, its audio staying where it is on the Timeline. A
+// Clip left with no Takes is deleted instead (deletingTake).
 func (tl Timeline) keepingTakes(clipID int64, keep []int64) (Timeline, error) {
 	t, c, err := tl.findClipOfTakes(clipID)
 	if err != nil {
@@ -324,7 +328,7 @@ func (tl Timeline) choosingTake(clipID, takeID int64) (Timeline, error) {
 		return Timeline{}, domain.Invalid("a Clip of Takes plays one of them")
 	}
 	c.ActiveTakeID = &takeID
-	return tl.replacing(t, t.ID, c), nil
+	return tl.replacing(t, t.ID, asPlaced(c)), nil
 }
 
 // nudgingTake is tl with one of a Clip of Takes' Takes nudge seconds from
