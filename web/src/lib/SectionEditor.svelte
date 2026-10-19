@@ -8,19 +8,18 @@
   import ActionsMenu from './ActionsMenu.svelte';
   import AlternateText, { type Cueing } from './AlternateText.svelte';
   import type { CaretListener } from './lyricsLanguage';
-  import { suggestedLabels, type Alternate, type Section, type Sheet } from './api';
+  import { suggestedLabels, type Alternate, type Section } from './api';
   import Combobox from './Combobox.svelte';
   import type { LyricSheetEditing, SheetField } from './lyricSheetEditing.svelte';
   import type { MenuAction } from './menu';
   import type { Drop } from './sectionDrag';
   import type { SectionDragging } from './sectionDragging.svelte';
-  import { dropMove, sectionMove, type SectionMove } from './sectionMoves';
+  import type { Landing } from './sectionMoves';
   import { activeAlternate, alternateName, alternatesLabel, labelOf, type Place } from './sections';
   import { cancelOnEscape, committedAsItGoes } from './typedField.svelte';
 
   let {
     section,
-    sheet,
     autofocus = false,
     editing,
     grip,
@@ -31,10 +30,10 @@
     places = [],
     onCaret,
     tour,
+    moveOut,
+    dropped,
   }: {
     section: Section;
-    /** The Lyric Sheet and Scrapbook the Section is in, which its Alternates are moved out into (see sectionMoves.ts). */
-    sheet: Sheet;
     /** Focus the Label when this becomes true, e.g. for a Section just added. */
     autofocus?: boolean;
     /** Makes the Section's changes, saves the Lines typed, and holds the edits typed here while they aren't saved. */
@@ -55,6 +54,10 @@
     onCaret?: CaretListener;
     /** Given, names the Section for the Tour to spotlight: its head and its Lines, as `data-tour` `<tour>-head` and `<tour>-lines`. */
     tour?: string;
+    /** Makes what moving one of the Section's Alternates out comes to, worked out and applied by the page (see sectionMoves.ts); resolves to whether it was saved. */
+    moveOut: (landing: Landing) => Promise<boolean>;
+    /** Makes what a drop by a grip in here comes to, worked out and applied by the page; resolves to whether it was saved. */
+    dropped: (drop: Drop) => Promise<boolean>;
   } = $props();
 
   // The server guarantees exactly one active Alternate.
@@ -136,21 +139,15 @@
     if (await editing.change({ kind: 'deleteAlternate', alternateId: alt.id })) radio(active.id)?.focus();
   }
 
-  /**
-   * Makes what moving an Alternate out comes to (see sectionMoves.ts). Such a
-   * move says nothing and leaves no editor behind, so there's nothing in it to
-   * say or to close.
-   */
-  async function moveAlternate(move: SectionMove | null) {
-    if (!move) return;
-    // Its ⋯ goes with it: the keyboard carries on from the active card.
-    if (await editing.change(move.change)) radio(active.id)?.focus();
+  /** Carries the keyboard on from the active card once an Alternate has moved out: its ⋯ goes with it. */
+  async function moved(made: Promise<boolean>) {
+    if (await made) radio(active.id)?.focus();
   }
 
   // Dragged by its card's grip, an inactive Alternate goes into a gap in the
   // Lyric Sheet or onto the Scrapbook, as a Section of its own: where it lands
-  // says which, and the card hands it over as it is.
-  const dropAlternate = (drop: Drop) => moveAlternate(dropMove(sheet, drop));
+  // says which, and the card hands the drop over as it is.
+  const dropAlternate = (drop: Drop) => moved(dropped(drop));
 
   // What an inactive Alternate's ⋯ does.
   function alternateActions(alt: Alternate): MenuAction[] {
@@ -159,7 +156,7 @@
         icon: X,
         label: 'Move to the Scrapbook',
         title: 'Move to the Scrapbook: keep it as a Section of its own, with its Cues',
-        run: () => moveAlternate(sectionMove(sheet, { alternateIntoScrapbook: alt.id })),
+        run: () => moved(moveOut({ alternateIntoScrapbook: alt.id })),
       },
     ];
     if (places.length > 0) {
@@ -168,10 +165,7 @@
         label: 'Move to the Lyric Sheet…',
         choices: places.map((place) => ({
           label: place.name,
-          run: () =>
-            moveAlternate(
-              sectionMove(sheet, { alternateIntoArrangement: { alternateId: alt.id, position: place.position } }),
-            ),
+          run: () => moved(moveOut({ alternateIntoArrangement: { alternateId: alt.id, position: place.position } })),
         })),
       });
     }

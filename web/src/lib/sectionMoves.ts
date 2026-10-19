@@ -21,12 +21,12 @@ import { addedNotice, describe, isEmpty } from './sections';
  * the ids and places the Lyric Sheet shows.
  */
 export type Landing =
-  /** A Section in the Arrangement moved to another place in it, both by their places. */
+  /** A Section in the Arrangement moved from one place in it to another, both by their places. */
   | { within: { from: number; to: number } }
   /** A Section taken out of the Arrangement, by its id: it goes to the Scrapbook, or is deleted with nothing written in it. */
   | { outOfArrangement: number }
-  /** A Section in the Scrapbook put back into the Arrangement, at position, or at the end. */
-  | { intoArrangement: { sectionId: number; position?: number } }
+  /** A Section in the Scrapbook put back into the Arrangement, at position. */
+  | { intoArrangement: { sectionId: number; position: number } }
   /** A Section's Alternates added to the Alternates of another Section in the Arrangement, inactive. */
   | { ontoSection: { sectionId: number; targetId: number } }
   /** An inactive Alternate made a Section of its own, in the Arrangement at position. */
@@ -54,14 +54,18 @@ export type SectionMove = {
 export function sectionMove(sheet: Sheet, landing: Landing): SectionMove | null {
   if ('within' in landing) {
     const { from, to } = landing.within;
-    return plain({ kind: 'reorderArrangement', order: moveTo(sheet.arrangement, from, to) });
+    const places = sheet.arrangement.length;
+    const place = (at: number) => at >= 0 && at < places;
+    if (!place(from) || !place(to) || to === from) return null;
+    return quietly({ kind: 'reorderArrangement', order: moveTo(sheet.arrangement, from, to) });
   }
   if ('outOfArrangement' in landing) {
     const sectionId = landing.outOfArrangement;
     const section = sectionById(sheet, sectionId);
     if (!section) return null;
     // Nothing written in it, it isn't kept in the Scrapbook but deleted,
-    // which is said wherever it was taken out from (see the GLOSSARY).
+    // which is said wherever it was taken out from (see the GLOSSARY's
+    // Scrapbook).
     const gone = isEmpty(section) ? `Nothing was written in ${describe(section)}, so it wasn't kept.` : null;
     return { change: { kind: 'removeFromArrangement', sectionId }, notice: gone, closes: null };
   }
@@ -87,9 +91,9 @@ export function sectionMove(sheet: Sheet, landing: Landing): SectionMove | null 
   }
   if ('alternateIntoArrangement' in landing) {
     const { alternateId, position } = landing.alternateIntoArrangement;
-    return plain({ kind: 'moveAlternateToArrangement', alternateId, position });
+    return quietly({ kind: 'moveAlternateToArrangement', alternateId, position });
   }
-  return plain({ kind: 'moveAlternateToScrapbook', alternateId: landing.alternateIntoScrapbook });
+  return quietly({ kind: 'moveAlternateToScrapbook', alternateId: landing.alternateIntoScrapbook });
 }
 
 /** What a drop comes to on a sheet; null when there's nothing to do. */
@@ -120,7 +124,7 @@ function landingFor(sheet: Sheet, drop: Drop): Landing | null {
 }
 
 /** A change with nothing to say about it and no editor to close. */
-function plain(change: LyricSheetChange): SectionMove {
+function quietly(change: LyricSheetChange): SectionMove {
   return { change, notice: null, closes: null };
 }
 

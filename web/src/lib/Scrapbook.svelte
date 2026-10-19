@@ -6,7 +6,7 @@
   import type { LyricSheetEditing } from './lyricSheetEditing.svelte';
   import type { Drop } from './sectionDrag';
   import type { SectionDragging } from './sectionDragging.svelte';
-  import { dropMove, sectionMove, type SectionMove } from './sectionMoves';
+  import { dropMove, sectionMove, type Landing, type SectionMove } from './sectionMoves';
   import type { SheetNotice } from './sheetNotice.svelte';
   import ActionsMenu from './ActionsMenu.svelte';
   import SectionEditor from './SectionEditor.svelte';
@@ -112,9 +112,7 @@
   // Sheet, putting it back there, or onto a Section in it, adding it there,
   // as "Put back…" does. Where it lands and what that comes to is worked out
   // in one place (see sectionMoves.ts), for the drag and the menu alike.
-  function dropSection(drop: Drop) {
-    apply(dropMove(song, drop));
-  }
+  const dropSection = (drop: Drop) => apply(dropMove(song, drop));
 
   /**
    * Makes a move's change, saying what it says in the Lyric Sheet once it's
@@ -124,11 +122,15 @@
    * caret where it is (see LyricSheetEditing.change).
    */
   async function apply(move: SectionMove | null) {
-    if (!move) return;
-    if (!(await editing.change(move.change))) return;
+    if (!move) return false;
+    if (!(await editing.change(move.change))) return false;
     if (move.notice) notice.say(move.notice);
     if (move.closes !== null && open === move.closes) open = null;
+    return true;
   }
+
+  /** Makes a move of one of a Section's Alternates, for its editor. */
+  const moveOut = (landing: Landing) => apply(sectionMove(song, landing));
 
   // Deleting doesn't ask first: Undo brings it back, and Snapshots do after
   // leaving. It isn't a move out, so it says nothing.
@@ -151,7 +153,8 @@
           {#if open === section.id}
             <SectionEditor
               {section}
-              sheet={song}
+              {moveOut}
+              dropped={dropSection}
               autofocus={focusing === section.id}
               {editing}
               more={[{ icon: Trash2, label: 'Delete', run: () => remove(section.id) }]}

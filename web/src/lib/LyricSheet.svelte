@@ -38,7 +38,7 @@
   import SectionEditor from './SectionEditor.svelte';
   import type { Drop } from './sectionDrag';
   import type { SectionDragging } from './sectionDragging.svelte';
-  import { dropMove, sectionMove, type SectionMove } from './sectionMoves';
+  import { dropMove, sectionMove, type Landing, type SectionMove } from './sectionMoves';
   import type { SheetNotice } from './sheetNotice.svelte';
   import { activeAlternate, describe, isEmpty, lineName, ofSection, places, sectionsInArrangement } from './sections';
   import type { Mode } from './songMode';
@@ -324,9 +324,7 @@
   // Where a Section dropped by its grip lands, and what that comes to, is
   // worked out in one place (see sectionMoves.ts), as it is for the ↑ and ↓
   // and the menu choices that move a Section from the keyboard.
-  function dropSection(drop: Drop) {
-    apply(dropMove(song, drop));
-  }
+  const dropSection = (drop: Drop) => apply(dropMove(song, drop));
 
   /**
    * Makes a move's change, saying what it says once it's saved. A Section
@@ -336,10 +334,16 @@
    * LyricSheetEditing.change).
    */
   async function apply(move: SectionMove | null) {
-    if (!move) return;
-    if (!(await editing.change(move.change))) return;
+    if (!move) return false;
+    if (!(await editing.change(move.change))) return false;
     if (move.notice) notice.say(move.notice);
+    // Nothing of a move made here closes: only the Scrapbook shows a Section
+    // in an editor of its own, so move.closes is never one of these Sections.
+    return true;
   }
+
+  /** Makes a move of one of a Section's Alternates, for its editor. */
+  const moveOut = (landing: Landing) => apply(sectionMove(song, landing));
 
   function onKey(event: KeyboardEvent) {
     if (drag.current && event.key === 'Escape') {
@@ -446,7 +450,8 @@
           >
             <SectionEditor
               {section}
-              sheet={song}
+              {moveOut}
+              dropped={dropSection}
               autofocus={focusing === section.id}
               {editing}
               cueing={cueingFor(section)}

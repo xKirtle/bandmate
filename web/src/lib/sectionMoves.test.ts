@@ -23,21 +23,22 @@ function section(id: number, label: string, ...alternates: Alternate[]): Section
  */
 const sheet: Sheet = {
   arrangement: [1, 2, 3],
-  scrapbook: [7, 8],
+  scrapbook: [7, 8, 9],
   sections: [
     section(1, 'Verse 1'),
     section(2, 'Chorus'),
     section(3, 'Bridge', alternate(30, true, 'Harbour'), alternate(31, false, 'Lights')),
     section(7, 'Night swim'),
     section(8, '', alternate(80, true, '', '  ')),
+    section(9, 'Two ways', alternate(90, true, 'Quay'), alternate(91, false, 'Pier')),
   ],
 };
 
 /** A Section in the Arrangement with nothing written in it: taken out, it isn't kept. */
 const emptyInArrangement: Sheet = {
-  arrangement: [1, 9],
+  arrangement: [1, 5],
   scrapbook: [],
-  sections: [section(1, 'Verse 1'), section(9, 'Hook', alternate(90, true, '', ' '))],
+  sections: [section(1, 'Verse 1'), section(5, 'Hook', alternate(50, true, '', ' '))],
 };
 
 group('dropMove', () => {
@@ -61,7 +62,7 @@ group('dropMove', () => {
       emptyInArrangement,
       { toScrapbook: 1 },
       {
-        change: { kind: 'removeFromArrangement', sectionId: 9 },
+        change: { kind: 'removeFromArrangement', sectionId: 5 },
         notice: "Nothing was written in Hook, so it wasn't kept.",
         closes: null,
       },
@@ -87,6 +88,16 @@ group('dropMove', () => {
       },
     ],
     [
+      'a Scrapbook Section of several Alternates dropped onto a Section in the Arrangement',
+      sheet,
+      { addTo: { dragged: { section: 9 }, arrangementAt: 1 } },
+      {
+        change: { kind: 'addToSection', sectionId: 9, targetId: 2 },
+        notice: 'Two ways added to Chorus as Alternates',
+        closes: 9,
+      },
+    ],
+    [
       'a Scrapbook Section dropped into a gap in the Arrangement',
       sheet,
       { putBack: 7, gap: 2 },
@@ -104,11 +115,11 @@ group('dropMove', () => {
       { alternateToScrapbook: 31 },
       { change: { kind: 'moveAlternateToScrapbook', alternateId: 31 }, notice: null, closes: null },
     ],
-    ['a Section no longer in the Arrangement, dropped on the Scrapbook', sheet, { toScrapbook: 9 }, null],
+    ['a Section no longer in the Arrangement, dropped on the Scrapbook', sheet, { toScrapbook: 99 }, null],
     [
       'a Section dropped onto one no longer in the Arrangement',
       sheet,
-      { addTo: { dragged: { section: 7 }, arrangementAt: 9 } },
+      { addTo: { dragged: { section: 7 }, arrangementAt: 99 } },
       null,
     ],
   ];
@@ -136,9 +147,9 @@ group('sectionMove', () => {
     [
       '"Delete this Section" on one with nothing written in it',
       emptyInArrangement,
-      { outOfArrangement: 9 },
+      { outOfArrangement: 5 },
       {
-        change: { kind: 'removeFromArrangement', sectionId: 9 },
+        change: { kind: 'removeFromArrangement', sectionId: 5 },
         notice: "Nothing was written in Hook, so it wasn't kept.",
         closes: null,
       },
@@ -170,12 +181,6 @@ group('sectionMove', () => {
       { change: { kind: 'addToArrangement', sectionId: 7, position: 0 }, notice: null, closes: 7 },
     ],
     [
-      '"Put back into the Lyric Sheet…" with no place, which is the end',
-      sheet,
-      { intoArrangement: { sectionId: 7 } },
-      { change: { kind: 'addToArrangement', sectionId: 7, position: undefined }, notice: null, closes: 7 },
-    ],
-    [
       '"Move to the Lyric Sheet…" on an inactive Alternate',
       sheet,
       { alternateIntoArrangement: { alternateId: 31, position: 3 } },
@@ -187,9 +192,11 @@ group('sectionMove', () => {
       { alternateIntoScrapbook: 31 },
       { change: { kind: 'moveAlternateToScrapbook', alternateId: 31 }, notice: null, closes: null },
     ],
-    ['a Section no longer there taken out of the Arrangement', sheet, { outOfArrangement: 9 }, null],
-    ['a Section no longer there put back', sheet, { intoArrangement: { sectionId: 9 } }, null],
-    ['a Section added to one no longer there', sheet, { ontoSection: { sectionId: 7, targetId: 9 } }, null],
+    ['a Section moved to the place it is in', sheet, { within: { from: 1, to: 1 } }, null],
+    ['a Section moved from or to no place in the Arrangement', sheet, { within: { from: 1, to: 3 } }, null],
+    ['a Section no longer there taken out of the Arrangement', sheet, { outOfArrangement: 99 }, null],
+    ['a Section no longer there put back', sheet, { intoArrangement: { sectionId: 99, position: 0 } }, null],
+    ['a Section added to one no longer there', sheet, { ontoSection: { sectionId: 7, targetId: 99 } }, null],
   ];
 
   it.each(cases)('is the change, the notice and the close for %s', (_what, on, landing, expected) => {
