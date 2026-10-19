@@ -300,17 +300,16 @@ func read(ctx context.Context, tx *sql.Tx, songID int64) (Timeline, error) {
 // AddBeat places the whole of a Beat on a Track of the Song, after its last
 // Clip, or at 0:00 if it has none.
 func (s *Store) AddBeat(ctx context.Context, songID int64, based songversion.Version, trackID, beatID int64) (Timeline, error) {
-	return s.changeFrom(ctx, songID, based, func(tx *sql.Tx, _ *audio.FileChanges, before Timeline) error {
-		if err := findTrack(ctx, tx, songID, trackID); err != nil {
-			return err
-		}
-		duration, err := source{beatID: sql.NullInt64{Int64: beatID, Valid: true}}.duration(ctx, tx)
-		if err != nil {
-			return err
-		}
-		start := trackEnd(before.track(trackID))
-		return addClip(ctx, tx, songID, trackID, NewClip{BeatID: &beatID, ClipPlayback: asRecorded(), Start: start, Length: duration})
-	})
+	return s.editTimelineReading(ctx, songID, based,
+		func(ctx context.Context, tx *sql.Tx, _ *audio.FileChanges, _ Timeline) (edit, error) {
+			beat, err := readBeat(ctx, tx, beatID)
+			if err != nil {
+				return nil, err
+			}
+			return func(tl Timeline, ids *ids) (Timeline, error) {
+				return tl.addingBeat(trackID, beat, ids.clip())
+			}, nil
+		})
 }
 
 // TrackChanges is a partial update to a Track's name and levels.
@@ -619,27 +618,9 @@ func (src source) duration(ctx context.Context, tx *sql.Tx) (float64, error) {
 // MoveClip moves a Clip to start at a time on a Track of the same Timeline,
 // keeping its trim. It can't overlap a Clip already there.
 func (s *Store) MoveClip(ctx context.Context, songID int64, based songversion.Version, clipID, trackID int64, start float64) (Timeline, error) {
-	return s.changeFrom(ctx, songID, based, func(tx *sql.Tx, _ *audio.FileChanges, before Timeline) error {
-		p, err := before.moved(clipID, trackID, start)
-		if err != nil {
-			return err
-		}
-		return store(ctx, tx, clipID, p)
+	return s.editTimeline(ctx, songID, based, func(tl Timeline, _ *ids) (Timeline, error) {
+		return tl.moving(clipID, trackID, start)
 	})
-}
-
-// moved is where one of tl's Clips goes, moved to start at a time on one of
-// tl's Tracks, keeping its trim.
-func (tl Timeline) moved(clipID, trackID int64, start float64) (placement, error) {
-	p, err := tl.placement(clipID)
-	if err != nil {
-		return placement{}, err
-	}
-	if err := tl.findTrackToPlaceOn(trackID); err != nil {
-		return placement{}, err
-	}
-	p.trackID, p.start = trackID, start
-	return p, nil
 }
 
 // ClipMove is where one Clip of several moved at once goes: a Track and a
@@ -666,17 +647,8 @@ func (s *Store) MoveClips(ctx context.Context, songID int64, based songversion.V
 		}
 		seen[m.ClipID] = true
 	}
-	return s.changeFrom(ctx, songID, based, func(tx *sql.Tx, _ *audio.FileChanges, before Timeline) error {
-		for _, m := range moves {
-			p, err := before.moved(m.ClipID, m.TrackID, m.Start)
-			if err != nil {
-				return err
-			}
-			if err := store(ctx, tx, m.ClipID, p); err != nil {
-				return err
-			}
-		}
-		return nil
+	return s.editTimeline(ctx, songID, based, func(tl Timeline, _ *ids) (Timeline, error) {
+		return tl.movingAll(moves)
 	})
 }
 
@@ -688,32 +660,9 @@ func (s *Store) MoveClips(ctx context.Context, songID int64, based songversion.V
 // sets them, e.g. to undo the trim.
 func (s *Store) TrimClip(ctx context.Context, songID int64, based songversion.Version, clipID int64, offset, length float64,
 	fades *Fades) (Timeline, error) {
-	return s.changeFrom(ctx, songID, based, func(tx *sql.Tx, _ *audio.FileChanges, before Timeline) error {
-		p, err := before.trimmed(clipID, offset, length)
-		if err != nil {
-			return err
-		}
-		if fades != nil {
-			if err := fades.check(length); err != nil {
-				return err
-			}
-			p.setFades(*fades)
-		}
-		return store(ctx, tx, clipID, p)
+	return s.editTimeline(ctx, songID, based, func(tl Timeline, _ *ids) (Timeline, error) {
+		return tl.trimming(clipID, offset, length, fades)
 	})
-}
-
-// trimmed is where one of tl's Clips goes, playing length seconds of its
-// source from offset. Its audio stays where it is on the Timeline, so
-// trimming the start moves where the Clip starts.
-func (tl Timeline) trimmed(clipID int64, offset, length float64) (placement, error) {
-	p, err := tl.placement(clipID)
-	if err != nil {
-		return placement{}, err
-	}
-	offset = roundedToZero(offset)
-	p.start, p.offset, p.length = p.timelineAt(offset), offset, length
-	return p, nil
 }
 
 // NewClip is a stretch of a Beat or a Sound, or of detached Takes, to
@@ -742,9 +691,16 @@ type NewClip struct {
 // must stay within its source, start on the Timeline and not overlap a Clip
 // already there.
 func (s *Store) PlaceClip(ctx context.Context, songID int64, based songversion.Version, trackID int64, c NewClip) (Timeline, error) {
-	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
-		return placeOnTrack(ctx, tx, songID, trackID, c)
-	})
+	return s.editTimelineReading(ctx, songID, based,
+		func(ctx context.Context, tx *sql.Tx, _ *audio.FileChanges, _ Timeline) (edit, error) {
+			src, err := readClipSource(ctx, tx, songID, c)
+			if err != nil {
+				return nil, err
+			}
+			return func(tl Timeline, ids *ids) (Timeline, error) {
+				return tl.placingNew(trackID, c, src, ids.clip())
+			}, nil
+		})
 }
 
 // OnTrack is the Track one of several Clips placed or pasted at once goes
@@ -905,22 +861,29 @@ func (s *Store) PlaceClips(ctx context.Context, songID int64, based songversion.
 	if err != nil {
 		return Timeline{}, err
 	}
-	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
-		added, err := addTracksAtBottom(ctx, tx, songID, names)
-		if err != nil {
-			return err
-		}
-		for _, c := range clips {
-			trackID, err := c.trackOf(added)
-			if err != nil {
-				return err
+	return s.editTimelineReading(ctx, songID, based,
+		func(ctx context.Context, tx *sql.Tx, _ *audio.FileChanges, _ Timeline) (edit, error) {
+			sources := make([]clipSource, len(clips))
+			for i, c := range clips {
+				var err error
+				if sources[i], err = readClipSource(ctx, tx, songID, c.NewClip); err != nil {
+					return nil, err
+				}
 			}
-			if err := placeOnTrack(ctx, tx, songID, trackID, c.NewClip); err != nil {
-				return err
-			}
-		}
-		return nil
-	})
+			return func(tl Timeline, ids *ids) (Timeline, error) {
+				tl, added := tl.addingTracks(names, ids)
+				for i, c := range clips {
+					trackID, err := c.trackOf(added)
+					if err != nil {
+						return Timeline{}, err
+					}
+					if tl, err = tl.placingNew(trackID, c.NewClip, sources[i], ids.clip()); err != nil {
+						return Timeline{}, err
+					}
+				}
+				return tl, nil
+			}, nil
+		})
 }
 
 // placeOnTrack adds a new Clip to one of the Song's Tracks, as addClip does.
@@ -1064,20 +1027,26 @@ func insertClip(ctx context.Context, tx *sql.Tx, p placement) (int64, error) {
 // Tempo, Pitch and Fades, right after it on its Track, or after the Track's last Clip if something is in
 // the way. A Clip of Takes gets copies of its Takes, sharing their files.
 func (s *Store) DuplicateClip(ctx context.Context, songID int64, based songversion.Version, clipID int64) (Timeline, error) {
-	return s.changeFrom(ctx, songID, based, func(tx *sql.Tx, changes *audio.FileChanges, before Timeline) error {
-		t, c, err := before.findClip(clipID)
-		if err != nil {
-			return err
-		}
-		p := placementOf(t.ID, c)
-		p.start = duplicateStart(t, c)
-		return s.insertCopy(ctx, tx, changes, p)
-	})
+	return s.editTimelineReading(ctx, songID, based,
+		func(ctx context.Context, tx *sql.Tx, changes *audio.FileChanges, before Timeline) (edit, error) {
+			_, c, err := before.findClip(clipID)
+			if err != nil {
+				return nil, err
+			}
+			takes, active, err := s.copyTakesOf(ctx, tx, changes, c)
+			if err != nil {
+				return nil, err
+			}
+			return func(tl Timeline, ids *ids) (Timeline, error) {
+				return tl.duplicating(clipID, ids.clip(), takes, active)
+			}, nil
+		})
 }
 
 // insertCopy stores a new Clip as placed, unchecked, playing what p
 // plays: for a Clip of Takes, copies of its Takes, sharing their files,
-// which changes links once the change is committed.
+// which changes links once the change is committed. A Split, which hasn't
+// moved onto the edit path yet, copies a Clip this way.
 func (s *Store) insertCopy(ctx context.Context, tx *sql.Tx, changes *audio.FileChanges, p placement) error {
 	if !p.source.activeTakeID.Valid {
 		_, err := insertClip(ctx, tx, p)
@@ -1359,8 +1328,8 @@ func nullID(id *int64) sql.NullInt64 {
 // Library, its Sound is kept a while for undo, and its Takes are detached,
 // to be placed again.
 func (s *Store) DeleteClip(ctx context.Context, songID int64, based songversion.Version, clipID int64) (Timeline, error) {
-	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
-		return deleteClip(ctx, tx, songID, clipID)
+	return s.editTimeline(ctx, songID, based, func(tl Timeline, _ *ids) (Timeline, error) {
+		return tl.deleting([]int64{clipID}, nil)
 	})
 }
 
@@ -1376,18 +1345,8 @@ func (s *Store) DeleteClips(ctx context.Context, songID int64, based songversion
 	if err := checkDeletedOnce(clipIDs); err != nil {
 		return Timeline{}, err
 	}
-	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
-		for _, id := range clipIDs {
-			if err := deleteClip(ctx, tx, songID, id); err != nil {
-				return err
-			}
-		}
-		for _, id := range trackIDs {
-			if err := deleteTrack(ctx, tx, songID, id); err != nil {
-				return err
-			}
-		}
-		return nil
+	return s.editTimeline(ctx, songID, based, func(tl Timeline, _ *ids) (Timeline, error) {
+		return tl.deleting(clipIDs, trackIDs)
 	})
 }
 
