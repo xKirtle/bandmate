@@ -115,7 +115,7 @@ describe("transposeChord with the Song's key", () => {
 });
 
 describe('a signature spelled by letter', () => {
-  it('is the plain one but where the key has spent the letter: the seven-sharp keys and F# major', () => {
+  it('is the plain one but where the key has spent the letter: C# major, whose C is B#, and F# major', () => {
     const changed = Array.from({ length: 12 }, (_, tonic) => {
       const plain = plainSignature(tonic, false);
       return signature(tonic, false).flatMap((spelling, semitone) =>

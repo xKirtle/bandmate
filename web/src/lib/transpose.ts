@@ -14,7 +14,8 @@ const flats: Spelling = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', '
 /**
  * Each major key's plain signature, by its note's semitone from C: Eb, F, Ab
  * and Bb major have flats, the rest sharps, since a key takes sharps wherever
- * it has the choice and flats only where no sharp spelling fits in seven. C
+ * a signature can write them: D#, G# and A# major would need nine, eight and
+ * ten sharps, and a signature holds at most seven. C
  * major has none, so it keeps the common spellings. Plain, because every
  * semitone takes one of the twelve everyday spellings, none of them a letter
  * the key has spent already: the signature `byLetter` derives from it spells

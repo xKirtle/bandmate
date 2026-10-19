@@ -795,7 +795,7 @@ describe('spelling suggestions', () => {
     expect(kind('Cm', 'diatonic')).toEqual(['i Cm', 'ii° Ddim', 'III Eb', 'iv Fm', 'v Gm', 'VI Ab', 'VII Bb', 'V G7']);
   });
 
-  it('offers the seven-sharp Keys, C# major and A# minor, with no double accidental on screen', () => {
+  it('offers the seven-sharp Keys, C# major and A# minor', () => {
     expect(kind('C#', 'diatonic')).toEqual(['I C#', 'ii D#m', 'iii E#m', 'IV F#', 'V G#', 'vi A#m', 'vii° B#dim']);
     expect(kind('C#', 'secondary')).toEqual(['V/ii A#7', 'V/iii C7', 'V/IV C#7', 'V/V D#7', 'V/vi F7']);
     expect(kind('A#m', 'diatonic')).toEqual([
@@ -808,11 +808,6 @@ describe('spelling suggestions', () => {
       'VII G#',
       'V E#7',
     ]);
-    for (const key of ['C#', 'A#m']) {
-      const s = suggest(key);
-      const chords = s.kind === 'key' ? s.chords : [];
-      for (const c of chords) expect([c.chord, ...(notes(c.chord) ?? [])].join(' '), c.chord).not.toMatch(/##|bb/);
-    }
   });
 
   it('spells a Key’s own Chords by letter, so F# major’s vii° is E#dim', () => {
@@ -829,11 +824,14 @@ describe('spelling suggestions', () => {
     ]);
   });
 
-  it('can look up and voice every Chord every Key suggests', () => {
+  it('can look up and voice every Chord every Key suggests, none of them double accidental', () => {
     for (const key of keys) {
       const s = suggest(key);
       const chords = s.kind === 'key' ? s.chords : [];
-      for (const c of chords) expect(firstVoicing(c.chord, context), c.chord).not.toBeNull();
+      for (const c of chords) {
+        expect(firstVoicing(c.chord, context), c.chord).not.toBeNull();
+        expect([c.chord, ...(notes(c.chord) ?? [])].join(' '), c.chord).not.toMatch(/##|bb/);
+      }
     }
   });
 
