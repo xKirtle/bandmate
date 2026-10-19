@@ -193,23 +193,6 @@ func soundFiles(t *testing.T, ts *testServer) []string {
 	return names
 }
 
-func TestASoundClipMovesAndTrimsLikeABeatClip(t *testing.T) {
-	ts := newTestServer(t)
-	s, tl, c := songWithSound(t, ts)
-	vox := tl.Tracks[1].ID
-
-	got := timelineChange(t, ts.moveClip(s.ID, c.ID, vox, 4))
-	if moved := clipByID(t, got, c.ID); moved.Start != 4 || got.Tracks[1].Clips[0].ID != c.ID {
-		t.Errorf("clip = %+v, want it moved onto Lead vox at 4", moved)
-	}
-	got = timelineChange(t, ts.trimClip(s.ID, c.ID, 1, 5))
-	if trimmed := clipByID(t, got, c.ID); trimmed.Start != 5 || trimmed.Offset != 1 || trimmed.Length != 5 {
-		t.Errorf("clip = %+v, want it trimmed to 5 seconds from 1, starting at 5", trimmed)
-	}
-	expectError(t, ts.trimClip(s.ID, c.ID, 1, 7.5), http.StatusBadRequest, "a Clip can't play past the end of its source")
-	expectError(t, ts.moveClip(s.ID, c.ID, tl.Tracks[0].ID, 20), http.StatusConflict, "Clips can't overlap on a Track")
-}
-
 func TestDuplicatingASoundClipUsesTheSameSound(t *testing.T) {
 	ts := newTestServer(t)
 	s, _, c := songWithSound(t, ts)

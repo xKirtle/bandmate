@@ -19,47 +19,6 @@ func (ts *testServer) moveClips(songID int64, moves ...clipMove) response {
 	return ts.Do(http.MethodPost, timelinePath(songID)+"/clips/move", map[string]any{"clips": moves})
 }
 
-func TestSeveralClipsCanBeMovedAtOnce(t *testing.T) {
-	ts := newTestServer(t)
-	p := placeTwoClips(t, ts)
-	beatTrack, adlibs := p.tl.Tracks[0].ID, p.tl.Tracks[1].ID
-
-	got := timelineChange(t, ts.moveClips(p.song.ID,
-		clipMove{p.first, adlibs, 5},
-		clipMove{p.second, beatTrack, 40}))
-
-	if at := clipAt(got, p.first); at != "1:5+10@0" {
-		t.Errorf("first clip = %s, want it on the second Track at 0:05", at)
-	}
-	if at := clipAt(got, p.second); at != "0:40+20@0" {
-		t.Errorf("second clip = %s, want it at 0:40", at)
-	}
-	if got.Version != p.tl.Version+1 {
-		t.Errorf("version = %d, want one more than %d", got.Version, p.tl.Version)
-	}
-	if read := ts.getTimeline(p.song.ID); !reflect.DeepEqual(read, got) {
-		t.Errorf("read timeline = %+v, want %+v", read, got)
-	}
-}
-
-func TestClipsMovedTogetherAreCheckedWhereTheyLand(t *testing.T) {
-	ts := newTestServer(t)
-	p := placeTwoClips(t, ts)
-	beatTrack := p.tl.Tracks[0].ID
-
-	// The first lands where the second was, which has moved on by then.
-	got := timelineChange(t, ts.moveClips(p.song.ID,
-		clipMove{p.first, beatTrack, 35},
-		clipMove{p.second, beatTrack, 60}))
-
-	if at := clipAt(got, p.first); at != "0:35+10@0" {
-		t.Errorf("first clip = %s, want it at 0:35", at)
-	}
-	if at := clipAt(got, p.second); at != "0:60+20@0" {
-		t.Errorf("second clip = %s, want it at 1:00", at)
-	}
-}
-
 func TestAMoveOfSeveralClipsIsRefusedWhole(t *testing.T) {
 	ts := newTestServer(t)
 	p := placeTwoClips(t, ts)

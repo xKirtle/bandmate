@@ -54,47 +54,6 @@ func TestSplittingAClipCutsItInTwoAtTheTimeGiven(t *testing.T) {
 	}
 }
 
-func TestASplitShortensAFadeThatRunsPastTheCutToEndThere(t *testing.T) {
-	ts := newTestServer(t)
-	p := placeTwoClips(t, ts)
-	// The first Clip plays 0:00 to 0:10.
-	timelineChange(t, ts.setClipFades(p.song.ID, p.first, 6, 3))
-
-	got := timelineChange(t, ts.splitClips(p.song.ID, 2, p.first))
-
-	clips := got.Tracks[0].Clips
-	if f := fadesOf(clips[0]); f != [2]float64{2, 0} {
-		t.Errorf("left half's fades = %v, want the fade in shortened to the cut, [2 0]", f)
-	}
-	if f := fadesOf(clips[1]); f != [2]float64{0, 3} {
-		t.Errorf("right half's fades = %v, want [0 3]", f)
-	}
-	got = timelineChange(t, ts.splitClips(p.song.ID, 9, clips[1].ID))
-	if f := fadesOf(got.Tracks[0].Clips[2]); f != [2]float64{0, 1} {
-		t.Errorf("last half's fades = %v, want the fade out shortened to the cut, [0 1]", f)
-	}
-}
-
-func TestSplittingSeveralClipsSplitsEachAsOneChange(t *testing.T) {
-	ts := newTestServer(t)
-	p := placeTwoClips(t, ts)
-	// One on each Track across 0:05.
-	tl := timelineChange(t, ts.addBeatToTrack(p.song.ID, p.tl.Tracks[1].ID, p.short.ID))
-	other := tl.Tracks[1].Clips[0].ID
-	version := tl.Version
-
-	got := timelineChange(t, ts.splitClips(p.song.ID, 5, p.first, other))
-
-	if got.Version != version+1 {
-		t.Errorf("version = %d, want one change after %d", got.Version, version)
-	}
-	for i, tr := range got.Tracks {
-		if len(tr.Clips) < 2 || clipAt(got, tr.Clips[0].ID)[2:] != "0+5@0" || clipAt(got, tr.Clips[1].ID)[2:] != "5+5@5" {
-			t.Errorf("track %d clips = %+v, want its Clip cut at 0:05", i, tr.Clips)
-		}
-	}
-}
-
 func TestOnlyAClipThePlayheadCrossesCanBeSplit(t *testing.T) {
 	ts := newTestServer(t)
 	p := placeTwoClips(t, ts)

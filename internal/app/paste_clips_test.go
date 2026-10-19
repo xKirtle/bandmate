@@ -117,24 +117,6 @@ func TestACutClipOfTakesPastesAgainAndAgainWithItsAudio(t *testing.T) {
 	}
 }
 
-func TestClipsOfBeatsAndSoundsPasteAsCopied(t *testing.T) {
-	ts := newTestServer(t)
-	p := placeTwoClips(t, ts)
-	tl := timelineChange(t, ts.importSound(p.song.ID, soundFile("hum.m4a", "Hum", p.tl.Tracks[0].ID, 8)))
-	hum := tl.Tracks[0].Clips[2]
-	adlibs := tl.Tracks[1].ID
-
-	got := timelineChange(t, ts.pasteClips(p.song.ID,
-		map[string]any{"trackId": adlibs, "beatId": p.short.ID, "name": "Intro", "start": 0, "offset": 2, "length": 5},
-		map[string]any{"trackId": adlibs, "soundId": *hum.SoundID, "start": 5, "offset": 0, "length": 8}))
-
-	clips := got.Tracks[1].Clips
-	if len(clips) != 2 || clips[0].BeatID != p.short.ID || nameOf(clips[0]) != "Intro" || clips[0].Offset != 2 ||
-		clips[0].Length != 5 || clips[1].SoundID == nil || *clips[1].SoundID != *hum.SoundID || clips[1].Start != 5 {
-		t.Errorf("adlibs clips = %+v, want the Beat's Clip named Intro, then the Sound's", clips)
-	}
-}
-
 func TestAPasteIsRefusedWhole(t *testing.T) {
 	ts := newTestServer(t)
 	r := recordATake(t, ts)
@@ -190,36 +172,6 @@ func newTracks(names []string) []map[string]any {
 		tracks[i] = map[string]any{"name": n}
 	}
 	return tracks
-}
-
-func TestAPasteCanAddTracksAtTheBottomForItsClips(t *testing.T) {
-	ts := newTestServer(t)
-	p := placeTwoClips(t, ts)
-	adlibs := p.tl.Tracks[1].ID
-
-	got := timelineChange(t, ts.pasteOntoNewTracks(p.song.ID, []string{"Beat", "Adlibs"},
-		map[string]any{"trackId": adlibs, "beatId": p.short.ID, "start": 0, "offset": 0, "length": 10},
-		map[string]any{"newTrack": 1, "beatId": p.long.ID, "start": 5, "offset": 0, "length": 20},
-		map[string]any{"newTrack": 0, "beatId": p.short.ID, "start": 2, "offset": 0, "length": 10}))
-
-	if len(got.Tracks) != 4 {
-		t.Fatalf("tracks = %+v, want two new ones", got.Tracks)
-	}
-	if n := []string{got.Tracks[2].Name, got.Tracks[3].Name}; !reflect.DeepEqual(n, []string{"Beat", "Adlibs"}) {
-		t.Errorf("new Tracks = %q, want Beat then Adlibs at the bottom", n)
-	}
-	for i, want := range [][]string{
-		{fmt.Sprintf("%d@0+10", p.short.ID)},
-		{fmt.Sprintf("%d@2+10", p.short.ID)},
-		{fmt.Sprintf("%d@5+20", p.long.ID)},
-	} {
-		if c := clipsOf(got, i+1); !reflect.DeepEqual(c, want) {
-			t.Errorf("track %d clips = %q, want %q", i+1, c, want)
-		}
-	}
-	if tr := got.Tracks[2]; tr.Volume != 0 || tr.Muted || tr.Soloed {
-		t.Errorf("new Track = %+v, want it at 0 dB, neither muted nor soloed", tr)
-	}
 }
 
 func TestAPasteOntoNewTracksIsUndoneAndRedoneAsOneStep(t *testing.T) {

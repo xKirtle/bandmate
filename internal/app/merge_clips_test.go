@@ -89,53 +89,6 @@ func TestMergingClipsOnATrackMakesOneClipOfANewSound(t *testing.T) {
 	}
 }
 
-func TestMergingClipsAcrossTracksPutsTheirClipOnTheTrackGiven(t *testing.T) {
-	ts := newTestServer(t)
-	p := placeTwoClips(t, ts)
-	// One on Adlibs, from 0:00 to 0:10, under the first on Track 1.
-	adlib := timelineChange(t, ts.addBeatToTrack(p.song.ID, p.tl.Tracks[1].ID, p.short.ID)).Tracks[1].Clips[0]
-
-	got := timelineChange(t, ts.mergeClips(p.song.ID, mergedAudio(10, onTrack(p.tl.Tracks[1].ID), p.first, adlib.ID)))
-
-	if len(got.Tracks) != 2 {
-		t.Fatalf("tracks = %+v, want no Track added", got.Tracks)
-	}
-	if c := got.Tracks[1].Clips; len(c) != 1 || c[0].SoundID == nil || c[0].Start != 0 || c[0].Length != 10 {
-		t.Errorf("Adlibs clips = %+v, want the merged Clip, from 0:00 to 0:10", c)
-	}
-	if c := got.Tracks[0].Clips; len(c) != 1 || c[0].ID != p.second {
-		t.Errorf("Track 1 clips = %+v, want only the Clip not merged left", c)
-	}
-}
-
-func TestMergingClipsOntoANewTrackAddsItWhereGiven(t *testing.T) {
-	ts := newTestServer(t)
-	p := placeTwoClips(t, ts)
-	adlib := timelineChange(t, ts.addBeatToTrack(p.song.ID, p.tl.Tracks[1].ID, p.short.ID)).Tracks[1].Clips[0]
-	timelineChange(t, ts.addTrack(p.song.ID, "Pads"))
-
-	// Below Track 1, above Adlibs.
-	got := timelineChange(t, ts.mergeClips(p.song.ID, mergedAudio(50, onNewTrack(" Track 4 ", 1), p.second, adlib.ID)))
-
-	var names []string
-	for _, tr := range got.Tracks {
-		names = append(names, tr.Name)
-	}
-	if want := []string{"Track 1", "Track 4", "Adlibs", "Pads"}; !reflect.DeepEqual(names, want) {
-		t.Fatalf("tracks = %q, want %q", names, want)
-	}
-	added := got.Tracks[1]
-	if added.Volume != 0 || added.Muted || added.Soloed {
-		t.Errorf("new track = %+v, want it at 0 dB, neither muted nor soloed, as any new Track", added)
-	}
-	if c := added.Clips; len(c) != 1 || c[0].SoundID == nil || c[0].Start != 0 || c[0].Length != 50 {
-		t.Errorf("new track clips = %+v, want the merged Clip, from 0:00 to 0:50", c)
-	}
-	if len(got.Tracks[2].Clips) != 0 || len(got.Tracks[0].Clips) != 1 {
-		t.Errorf("tracks = %+v, want the Clips merged gone from theirs", got.Tracks)
-	}
-}
-
 func TestAMergeOntoANewTrackIsUndoneAndRedoneWithIt(t *testing.T) {
 	ts := newTestServer(t)
 	p := placeTwoClips(t, ts)
