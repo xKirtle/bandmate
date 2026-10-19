@@ -45,6 +45,9 @@ type TakesClip = Clip & { activeTakeId: number; takes: { id: number; nudge: numb
 /** The Nudge of a Clip's active Take, in seconds. */
 const activeNudge = (c: TakesClip) => c.takes.find((t) => t.id === c.activeTakeId)!.nudge;
 
+/** The number field an open menu shows, e.g. a Clip's Nudge, in milliseconds. */
+const nudgeField = (page: Page) => page.getByRole('spinbutton', { name: 'ms' });
+
 /** The page's save error, under the Details. */
 const saveError = (page: Page) => page.getByRole('main').getByRole('alert');
 
@@ -280,6 +283,74 @@ test('a Clip of Takes Alt+dragged nudges its active Take, the Clip staying put, 
     length: 21,
   });
   await expect(undo).toBeDisabled();
+});
+
+test('a Clip of Takes Alt+dragged left nudges its active Take earlier, past zero, and Undo and Redo follow', async ({
+  page,
+  bandmate,
+}) => {
+  const song = await heroSong(bandmate);
+  await page.goto(`/songs/${song.id}`);
+  const take = clip(page, 'Take 2');
+  const [undo, redo] = [undoButton(page), redoButton(page)];
+  await expect(take).toHaveAccessibleName('Take 2, 0:04 to 0:25');
+  const [before] = (await serverClips(bandmate, song.id, 'Lead vox')) as TakesClip[];
+  expect(activeNudge(before)).toBe(0);
+
+  // Dragged a fifth of its width earlier: -4.2 s, as the Clip spans 21 s.
+  const width = (await take.boundingBox())!.width;
+  await page.keyboard.down('Alt');
+  await dragClip(page, take, -width / 5);
+  await page.keyboard.up('Alt');
+  await expect
+    .poll(async () => activeNudge((await serverClips(bandmate, song.id, 'Lead vox'))[0] as TakesClip))
+    .not.toBe(0);
+  const [nudged] = (await serverClips(bandmate, song.id, 'Lead vox')) as TakesClip[];
+  expect(activeNudge(nudged)).toBeCloseTo(-4.2, 1);
+  // Only the Take moved: the Clip's own window stays where it is.
+  expect(nudged).toMatchObject({ start: 4, length: 21, activeTakeId: before.activeTakeId });
+  await expect(take).toHaveAccessibleName('Take 2, 0:04 to 0:25');
+
+  await undo.click();
+  await expect
+    .poll(async () => activeNudge((await serverClips(bandmate, song.id, 'Lead vox'))[0] as TakesClip))
+    .toBe(0);
+  await redo.click();
+  await expect
+    .poll(async () => activeNudge((await serverClips(bandmate, song.id, 'Lead vox'))[0] as TakesClip))
+    .toBeCloseTo(-4.2, 1);
+
+  // The Nudge is still there once the page is loaded again, and the Clip
+  // menu's Nudge field shows it in milliseconds.
+  await page.reload();
+  const again = clip(page, 'Take 2');
+  await expect(again).toHaveAccessibleName('Take 2, 0:04 to 0:25');
+  await again.click();
+  await page.keyboard.press('ContextMenu');
+  await page.getByRole('menuitem', { name: /^Nudge/ }).click();
+  await expect(nudgeField(page)).toHaveValue('-4200');
+});
+
+test("a negative Nudge typed in the Clip menu moves the Take as dragging left by as much does", async ({
+  page,
+  bandmate,
+}) => {
+  const song = await heroSong(bandmate);
+  await page.goto(`/songs/${song.id}`);
+  const take = clip(page, 'Take 2');
+  await expect(take).toHaveAccessibleName('Take 2, 0:04 to 0:25');
+  await take.click();
+  await page.keyboard.press('ContextMenu');
+  await page.getByRole('menuitem', { name: /^Nudge/ }).click();
+  await expect(nudgeField(page)).toHaveValue('0');
+
+  await nudgeField(page).fill('-500');
+  await nudgeField(page).press('Enter');
+  await expect
+    .poll(async () => activeNudge((await serverClips(bandmate, song.id, 'Lead vox'))[0] as TakesClip))
+    .toBeCloseTo(-0.5, 3);
+  // The Clip's own window stays where it is, as a drag leaves it.
+  expect((await serverClips(bandmate, song.id, 'Lead vox'))[0]).toMatchObject({ start: 4, length: 21 });
 });
 
 test('a Clip dragged in a Selection of several moves them all by as much, and one undo brings them back', async ({
