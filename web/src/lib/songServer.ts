@@ -8,9 +8,25 @@
 //
 // It's the one place a Cue change, a Lyric Sheet change or a Timeline edit
 // becomes a request: the modules that make and undo them only describe
-// them. The fake in songServerFake.ts makes them in memory instead, and
-// songServerContract.test.ts checks it against the real server.
-import { api, ApiError, type ClipMerge, type Song, type SongAt, type SoundImport, type Timeline } from './api';
+// them, and each kind names its method, its path and its body once, here,
+// built on the api module's request primitive. The fake in songServerFake.ts
+// makes them in memory instead, from a mapping of its own, and
+// songServerContract.test.ts checks both against the real server: that the
+// fake leaves what the server left, and that the request sent is the one
+// the server was sent.
+import {
+  api,
+  ApiError,
+  audioForm,
+  request,
+  type ClipMerge,
+  type PastedClip,
+  type PlacedClip,
+  type Song,
+  type SongAt,
+  type SoundImport,
+  type Timeline,
+} from './api';
 import type { CueChange } from './cueChanges';
 import type { Edit } from './history';
 import { isLyricSheetChange, type LyricSheetChange } from './lyricSheetChanges';
@@ -54,138 +70,171 @@ export function isCueChange(change: CueChange | LyricSheetChange | Edit): change
 /** The Song of the id given, on the server, through the api. */
 export function songServer(id: number): SongServer {
   return {
-    getSong: () => api.getSong(id),
-    getTimeline: () => api.getTimeline(id),
+    getSong: () => request<Song>('GET', `/songs/${id}`),
+    getTimeline: () => request<Timeline>('GET', `/songs/${id}/timeline`),
     apply: ((at: SongAt, change: CueChange | LyricSheetChange | Edit) => {
       if (isCueChange(change)) return sendCueChange(at, change);
       if (isLyricSheetChange(change)) return sendLyricSheetChange(at, change);
       return sendEdit(at, change);
     }) as SongServer['apply'],
     setTags: (tags) => api.setSongTags(id, tags),
-    importSound: api.importSound,
-    mergeClips: api.mergeClips,
+    importSound: (at, file, details) => onTimeline(at)('POST', '/sounds', audioForm(file, details)),
+    mergeClips: (at, wav, merge) => onTimeline(at)('POST', '/clips/merge', audioForm(wav, merge, 'merged.wav')),
   };
+}
+
+// Each change below names its method, the rest of its path and its body,
+// against one of these two: a write to the Song, which answers with the
+// Song it leaves, or one to its Timeline, which answers with the Timeline.
+// Both send the version the change is based on, which the server refuses
+// the write against if the Song has since changed elsewhere.
+
+/** Sends a write to the Song, under /songs/<id>, returning the Song it leaves. */
+const onSheet =
+  (at: SongAt) =>
+  (method: string, path: string, body?: unknown): Promise<Song> =>
+    request<Song>(method, `/songs/${at.id}${path}`, body, at);
+
+/** Sends a write to the Song's Timeline, under /songs/<id>/timeline, returning the Timeline it leaves. */
+const onTimeline =
+  (at: SongAt) =>
+  (method: string, path: string, body?: unknown): Promise<Timeline> =>
+    request<Timeline>(method, `/songs/${at.id}/timeline${path}`, body, at);
+
+/** Clips to place or paste as the API takes them: each with the Track it goes on. */
+function onTracks(clips: readonly (PlacedClip | PastedClip)[]) {
+  return clips.map(({ clip, ...on }) => ({ ...on, ...clip }));
 }
 
 /** Sends a Cue change, returning the Song it leaves. */
 function sendCueChange(at: SongAt, change: CueChange): Promise<Song> {
+  const send = onSheet(at);
   switch (change.kind) {
     case 'setLineCue':
-      return change.cue === null ? api.clearLineCue(at, change.lineId) : api.setLineCue(at, change.lineId, change.cue);
+      return change.cue === null
+        ? send('DELETE', `/lines/${change.lineId}/cue`)
+        : send('PUT', `/lines/${change.lineId}/cue`, { cue: change.cue });
     case 'clearSectionCues':
-      return api.clearSectionCues(at, change.sectionId);
+      return send('DELETE', `/sections/${change.sectionId}/cues`);
     case 'clearCues':
-      return api.clearCues(at);
+      return send('DELETE', '/cues');
     case 'shiftCues':
-      return api.shiftCues(at, change.start, change.end, change.by);
+      return send('POST', '/cues/shift', { start: change.start, end: change.end, by: change.by });
     case 'restoreCues':
-      return api.restoreCues(at, change.cues);
+      return send('PATCH', '/cues', { cues: change.cues });
   }
 }
 
-/** Sends a Lyric Sheet change through the api, returning the Song it leaves. */
+/** Sends a Lyric Sheet change, returning the Song it leaves. */
 function sendLyricSheetChange(at: SongAt, change: LyricSheetChange): Promise<Song> {
+  const send = onSheet(at);
   switch (change.kind) {
     case 'addSection':
-      return api.addSection(at, { position: change.position });
+      return send('POST', '/sections', { position: change.position });
     case 'duplicateSection':
-      return api.duplicateSection(at, change.sectionId, change.position);
+      return send('POST', `/sections/${change.sectionId}/duplicate`, { position: change.position });
     case 'reorderArrangement':
-      return api.reorderArrangement(at, change.order);
+      return send('PUT', '/arrangement', { sections: change.order });
     case 'removeFromArrangement':
-      return api.removeFromArrangement(at, change.sectionId);
+      return send('DELETE', `/arrangement/${change.sectionId}`);
     case 'addToSection':
-      return api.addToSection(at, change.sectionId, change.targetId);
+      return send('POST', `/sections/${change.sectionId}/add-to-section`, { sectionId: change.targetId });
     case 'deleteSection':
-      return api.deleteSection(at, change.sectionId);
+      return send('DELETE', `/sections/${change.sectionId}`);
     case 'setSectionLabel':
-      return api.setSectionLabel(at, change.sectionId, change.label);
+      return send('PATCH', `/sections/${change.sectionId}`, { label: change.label });
     case 'addAlternate':
-      return api.addAlternate(at, change.sectionId);
+      return send('POST', `/sections/${change.sectionId}/alternates`, { name: '' });
     case 'renameAlternate':
-      return api.renameAlternate(at, change.alternateId, change.name);
+      return send('PATCH', `/alternates/${change.alternateId}`, { name: change.name });
     case 'activateAlternate':
-      return api.activateAlternate(at, change.alternateId);
+      return send('POST', `/alternates/${change.alternateId}/activate`);
     case 'deleteAlternate':
-      return api.deleteAlternate(at, change.alternateId);
+      return send('DELETE', `/alternates/${change.alternateId}`);
     case 'moveAlternateToScrapbook':
-      return api.moveAlternateToScrapbook(at, change.alternateId);
+      return send('POST', `/alternates/${change.alternateId}/scrapbook`);
     case 'moveAlternateToArrangement':
-      return api.moveAlternateToArrangement(at, change.alternateId, change.position);
+      return send('POST', `/alternates/${change.alternateId}/arrangement`, { position: change.position });
     case 'addToScrapbook':
-      return api.addToScrapbook(at);
+      return send('POST', '/scrapbook', { label: '' });
     case 'addToArrangement':
-      return api.addToArrangement(at, change.sectionId, change.position);
+      return send('POST', '/arrangement', { sectionId: change.sectionId, position: change.position });
     case 'replaceAlternateText':
-      return api.replaceAlternateText(at, change.alternateId, change.text);
+      return send('PUT', `/alternates/${change.alternateId}/text`, { text: change.text });
     case 'restoreSnapshot':
-      return api.restoreSnapshot(at, change.snapshotId);
+      return send('POST', `/snapshots/${change.snapshotId}/restore`);
     case 'putSheetBack':
-      return api.putSheetBack(at, change.sheet);
+      return send('PUT', '/sheet', change.sheet);
   }
 }
 
 /** Sends an edit to the Song's Timeline, returning the Timeline it leaves. */
 function sendEdit(at: SongAt, edit: Edit): Promise<Timeline> {
+  const send = onTimeline(at);
   switch (edit.kind) {
     case 'addBeat':
-      return api.addBeatToTimeline(at, edit.trackId, edit.beatId);
+      return send('POST', '/beats', { trackId: edit.trackId, beatId: edit.beatId });
     case 'addTrack':
-      return api.addTrack(at, edit.track);
+      return send('POST', '/tracks', edit.track);
     case 'updateTrack':
-      return api.updateTrack(at, edit.trackId, edit.changes);
+      return send('PATCH', `/tracks/${edit.trackId}`, edit.changes);
     case 'reorderTracks':
-      return api.reorderTracks(at, edit.order);
+      return send('PUT', '/tracks', { tracks: edit.order });
     case 'deleteTrack':
-      return api.deleteTrack(at, edit.trackId);
+      return send('DELETE', `/tracks/${edit.trackId}`);
     case 'placeClip':
-      return api.placeClip(at, edit.trackId, edit.clip);
+      return send('POST', '/clips', { trackId: edit.trackId, ...edit.clip });
     case 'placeClips':
-      return api.placeClips(at, edit.clips, edit.newTracks);
+      return send('POST', '/clips/place', { newTracks: edit.newTracks ?? [], clips: onTracks(edit.clips) });
     case 'pasteClips':
-      return api.pasteClips(at, edit.clips, edit.newTracks);
+      return send('POST', '/clips/paste', { newTracks: edit.newTracks, clips: onTracks(edit.clips) });
     case 'moveClip':
-      return api.moveClip(at, edit.clipId, edit.trackId, edit.start);
+      return send('POST', `/clips/${edit.clipId}/move`, { trackId: edit.trackId, start: edit.start });
     case 'moveClips':
-      return api.moveClips(at, edit.moves);
+      return send('POST', '/clips/move', { clips: edit.moves });
     case 'trimClip':
-      return api.trimClip(at, edit.clipId, edit.offset, edit.length, edit.fades);
+      return send('POST', `/clips/${edit.clipId}/trim`, { offset: edit.offset, length: edit.length, ...edit.fades });
     case 'renameClip':
-      return api.renameClip(at, edit.clipId, edit.name);
+      return send('PUT', `/clips/${edit.clipId}/name`, { name: edit.name });
     case 'setClipGain':
-      return api.setClipGain(at, edit.clipId, edit.gain);
+      return send('PUT', `/clips/${edit.clipId}/gain`, { gain: edit.gain });
     case 'setClipFades':
-      return api.setClipFades(at, edit.clipId, { fadeIn: edit.fadeIn, fadeOut: edit.fadeOut });
+      return send('PUT', `/clips/${edit.clipId}/fades`, { fadeIn: edit.fadeIn, fadeOut: edit.fadeOut });
     case 'setClipTempos':
-      return api.setClipTempos(at, edit.tempos);
+      return send('POST', '/clips/tempo', { clips: edit.tempos });
     case 'setClipPitches':
-      return api.setClipPitches(at, edit.pitches);
+      return send('POST', '/clips/pitch', { clips: edit.pitches });
     case 'duplicateClip':
-      return api.duplicateClip(at, edit.clipId);
+      return send('POST', `/clips/${edit.clipId}/duplicate`);
     case 'deleteClip':
-      return api.deleteClip(at, edit.clipId);
+      return send('DELETE', `/clips/${edit.clipId}`);
     case 'deleteClips':
-      return api.deleteClips(at, edit.clipIds, edit.trackIds);
+      return send('POST', '/clips/delete', { clipIds: edit.clipIds, trackIds: edit.trackIds ?? [] });
     case 'replaceClips':
-      return api.replaceClips(at, edit.clipIds, edit.clips, edit.trackIds, edit.newTracks);
+      return send('POST', '/clips/replace', {
+        clipIds: edit.clipIds,
+        trackIds: edit.trackIds ?? [],
+        newTracks: edit.newTracks ?? [],
+        clips: onTracks(edit.clips),
+      });
     case 'splitClips':
-      return api.splitClips(at, edit.clipIds, edit.at);
+      return send('POST', '/clips/split', { clipIds: edit.clipIds, at: edit.at });
     case 'setTakes':
-      return api.setTakes(at, edit.clipId, edit.takes);
+      return send('PUT', `/clips/${edit.clipId}/takes`, edit.takes);
     case 'chooseTake':
-      return api.chooseTake(at, edit.clipId, edit.takeId);
+      return send('PUT', `/clips/${edit.clipId}/active-take`, { takeId: edit.takeId });
     case 'nudgeTake':
-      return api.nudgeTake(at, edit.clipId, edit.takeId, edit.nudge);
+      return send('PUT', `/clips/${edit.clipId}/takes/${edit.takeId}/nudge`, { nudge: edit.nudge });
     case 'deleteTake':
-      return api.deleteTake(at, edit.clipId, edit.takeId);
+      return send('DELETE', `/clips/${edit.clipId}/takes/${edit.takeId}`);
     case 'clearInactiveTakes':
-      return api.clearInactiveTakes(at, edit.clipId);
+      return send('DELETE', `/clips/${edit.clipId}/inactive-takes`);
     case 'setLoop':
-      return api.setLoop(at, edit.loop);
+      return send('PUT', '/loop', edit.loop);
     case 'switchLoop':
-      return api.switchLoop(at, edit.on);
+      return send('PATCH', '/loop', { on: edit.on });
     case 'clearLoop':
-      return api.clearLoop(at);
+      return send('DELETE', '/loop');
   }
 }
 
