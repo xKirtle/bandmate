@@ -465,9 +465,9 @@ const suggestion = ({ chord, numeral, reason, kind }: KeyChord): Suggestion => (
  * so each takes its own letter: F# major's vii° is E#dim. A secondary
  * dominant and a borrowed Chord fall back to the signature's plain
  * spellings, which a player writes the easy way: F# major's V/iii is F7, not
- * E#7 and its double sharps, and Db major borrows bIII E, not Fb. A Key
+ * E#7 and its double sharps, and C# major borrows bIII E, not Fb. A Key
  * whose signature has flats keeps it for its borrowed Chords, as Transpose
- * reads the parallel minor of Eb, Ab and Db as sharp (Eb minor as D# minor).
+ * reads the parallel minor of Eb, Ab and Bb as sharp (Eb minor as D# minor).
  */
 function keyChords(key: Key): KeyChord[] {
   const at = ({ numeral, semitones, suffix }: Degree, kind: Suggestion['kind'], spelling: Spelling, reason: string) => {

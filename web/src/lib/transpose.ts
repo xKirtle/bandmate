@@ -12,15 +12,17 @@ const sharps: Spelling = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 
 const flats: Spelling = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
 
 /**
- * Each major key's plain signature, by its note's semitone from C: Db, Eb, F,
- * Ab and Bb major have flats, the rest sharps. C major has none, so it keeps
- * the common spellings. Plain, because every semitone takes one of the twelve
- * everyday spellings, none of them a letter the key has spent already: the
- * signature `byLetter` derives from it spells the key's own seven exactly.
+ * Each major key's plain signature, by its note's semitone from C: Eb, F, Ab
+ * and Bb major have flats, the rest sharps, since a key takes sharps wherever
+ * it has the choice and flats only where no sharp spelling fits in seven. C
+ * major has none, so it keeps the common spellings. Plain, because every
+ * semitone takes one of the twelve everyday spellings, none of them a letter
+ * the key has spent already: the signature `byLetter` derives from it spells
+ * the key's own seven exactly.
  */
 const plainSignatures: Spelling[] = [
   common, // C
-  flats, // Db
+  sharps, // C#
   sharps, // D
   flats, // Eb
   sharps, // E
@@ -125,10 +127,11 @@ export function plainSignature(tonic: number, isMinor: boolean): Spelling {
 /**
  * The Keys offered wherever one is picked — a Song's and a Beat's Key, and
  * the Chord Finder's Suggest — all 24, interleaved by tonic, each tonic's
- * major then the minor on it. Each is spelled from its own signature, so the
- * list never offers a Key no signature can write: Db, not D# major, which
- * would need nine sharps. A Key field stays free text, so C# typed by hand is
- * kept as written.
+ * major then the minor on it. Each is spelled from its own signature, which
+ * takes sharps wherever the Key has the choice, so the list never offers a
+ * Key no signature can write: Eb, not D# major, which would need nine
+ * sharps. A Key field stays free text, so Db typed by hand is kept as
+ * written.
  */
 export const keys: readonly string[] = signatures.flatMap((_, tonic) => [
   signature(tonic, false)[tonic],
