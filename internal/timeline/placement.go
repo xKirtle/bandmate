@@ -4,7 +4,6 @@ import (
 	"cmp"
 	"fmt"
 	"slices"
-	"strings"
 
 	"github.com/xKirtle/bandmate/internal/domain"
 )
@@ -66,7 +65,7 @@ func (tl Timeline) pasting(newTracks []string, clips []ClipCopy, srcs []clipSour
 			return Timeline{}, err
 		}
 		src := srcs[i]
-		if len(c.Takes) > 0 {
+		if len(src.takes) > 0 {
 			src.takes = takesAt(src.takes, c.Takes)
 		}
 		if tl, err = tl.placingNew(trackID, c.pasted(), src, ids.clip()); err != nil {
@@ -101,10 +100,7 @@ func takesAt(takes []Take, at []TakeAt) []Take {
 // leaves.
 func (tl Timeline) renaming(clipID int64, name string) (Timeline, error) {
 	return tl.changingClip(clipID, func(c Clip) (Clip, error) {
-		c.Name = nil
-		if trimmed := strings.TrimSpace(name); trimmed != "" {
-			c.Name = &trimmed
-		}
+		c.Name = ownName(name)
 		return c, nil
 	})
 }
@@ -146,7 +142,7 @@ func (tl Timeline) trimming(clipID int64, offset, length float64, fades *Fades) 
 		return Timeline{}, err
 	}
 	offset = roundedToZero(offset)
-	c.Start, c.Offset, c.Length = placementOf(c).timelineAt(offset), offset, length
+	c.Start, c.Offset, c.Length = c.timelineAt(offset), offset, length
 	if fades != nil {
 		if err := fades.check(length); err != nil {
 			return Timeline{}, err
@@ -247,7 +243,7 @@ func (tl Timeline) retaking(clipID int64, take Take, takeStart float64) (Timelin
 	if end <= c.Start+tolerance {
 		return Timeline{}, errTakeTooEarly
 	}
-	take.Position = placementOf(c).sourceAt(takeStart)
+	take.Position = c.sourceAt(takeStart)
 	c.Takes = slices.Clone(c.Takes)
 	if take.Position < 0 {
 		c.Takes = takesStartingLater(c.Takes, -take.Position)
@@ -332,14 +328,16 @@ func (tl Timeline) keepingTakes(clipID int64, keep []int64) (Timeline, error) {
 		recent := c.Takes[len(c.Takes)-1].ID
 		c.ActiveTakeID = &recent
 	}
-	p := placementOf(c)
+	// Where the Clip's window sits is worked out from where it was, so the
+	// window it had is kept while it's changed.
+	was := c
 	end := takesEnd(c.Takes)
-	if end <= p.offset+tolerance {
+	if end <= was.Offset+tolerance {
 		// Its audio stays where it is on the Timeline.
-		offset := max(0, end-p.sourceLength(p.length))
-		c.Start, c.Offset = p.timelineAt(offset), offset
+		offset := max(0, end-was.sourceLength(was.Length))
+		c.Start, c.Offset = was.timelineAt(offset), offset
 	}
-	c.Length = min(p.length, p.timelineLength(end-c.Offset))
+	c.Length = min(was.Length, was.timelineLength(end-c.Offset))
 	return tl.replacing(t, t.ID, asPlaced(c)), nil
 }
 
@@ -671,7 +669,7 @@ func (tl Timeline) splitting(clipID int64, at float64, rightID int64, copied spl
 	}
 	right := cloneClip(c)
 	right.ID, right.Takes, right.ActiveTakeID = rightID, copied.takes, copied.active
-	right.Start, right.Offset, right.Length = at, placementOf(c).sourceAt(at), c.Length-cut
+	right.Start, right.Offset, right.Length = at, c.sourceAt(at), c.Length-cut
 	right.setFades(Fades{In: 0, Out: min(c.FadeOut, right.Length)})
 	left := c
 	left.Length = cut

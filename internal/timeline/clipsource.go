@@ -180,34 +180,33 @@ func readTakes(ctx context.Context, tx *sql.Tx, songID int64, freeing []int64, i
 	return takes, nil
 }
 
-// copyTakesAt adds a detached copy of each of the Song's Takes given,
-// sharing its file, linked by changes once committed, and returns the
-// copies in the order they're given, with the id of the copy of active. The
-// copies are rows a Clip of Takes pasted plays; where each starts in the
-// Clip's source span is worked out by the edit that places them (takesAt),
-// as it is for any Clip of Takes.
+// copyTakesAt is what a pasted Clip of Takes plays: a detached copy of each
+// of the Song's Takes given, sharing its file, linked by changes once
+// committed, in the order they're given, and the copy of active among them.
+// Where each starts in the Clip's source span is worked out by the edit
+// that places them (takesAt), as it is for any Clip of Takes.
 func (s *Store) copyTakesAt(ctx context.Context, tx *sql.Tx, changes *audio.FileChanges, songID int64,
-	takes []TakeAt, active int64) ([]Take, *int64, error) {
+	takes []TakeAt, active int64) (clipSource, error) {
 	ids := make([]int64, len(takes))
 	for i, t := range takes {
 		ids[i] = t.ID
 	}
 	// In a Clip or detached, as a Clip cut leaves them.
 	if _, err := takesOfSong(ctx, tx, songID, ids); err != nil {
-		return nil, nil, err
+		return clipSource{}, err
 	}
 	copies, err := s.copyTakes(ctx, tx, changes, ids)
 	if err != nil {
-		return nil, nil, err
+		return clipSource{}, err
 	}
 	copied := make([]Take, len(ids))
 	for i, id := range ids {
 		if copied[i], err = readTakeRow(ctx, tx, copies[id]); err != nil {
-			return nil, nil, err
+			return clipSource{}, err
 		}
 	}
 	activeCopy := copies[active]
-	return copied, &activeCopy, nil
+	return clipSource{takes: copied, activeTakeID: &activeCopy}, nil
 }
 
 // readTakeRow reads a Take of the Song, as a Clip holds it.

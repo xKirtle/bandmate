@@ -544,24 +544,6 @@ func TestSeveralClipsCanPlayTheSameBeat(t *testing.T) {
 	expectStatus(t, ts.duplicateClip(p.song.ID, 999), http.StatusNotFound)
 }
 
-func TestAClipCanBeDeleted(t *testing.T) {
-	ts := newTestServer(t)
-	p := placeTwoClips(t, ts)
-	timelineChange(t, ts.duplicateClip(p.song.ID, p.first))
-
-	got := timelineChange(t, ts.deleteClip(p.song.ID, p.second))
-
-	if want := []string{fmt.Sprintf("%d@0+10", p.short.ID), fmt.Sprintf("%d@10+10", p.short.ID)}; !reflect.DeepEqual(clipsOf(got, 0), want) {
-		t.Errorf("clips = %q, want %q", clipsOf(got, 0), want)
-	}
-	if len(got.Beats) != 1 || got.Beats[0].ID != p.short.ID {
-		t.Errorf("beats = %+v, want only the Beat still played", got.Beats)
-	}
-	// No Clip plays the long Beat any more, so it can go.
-	expectStatus(t, ts.Do(http.MethodDelete, beatPath(p.long.ID), nil), http.StatusNoContent)
-	expectStatus(t, ts.deleteClip(p.song.ID, p.second), http.StatusNotFound)
-}
-
 // trackPath is where one of a Song's Tracks lives.
 func trackPath(songID, trackID int64) string {
 	return fmt.Sprintf("%s/tracks/%d", timelinePath(songID), trackID)

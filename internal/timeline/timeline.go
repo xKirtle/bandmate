@@ -479,16 +479,6 @@ func roundedToZero(t float64) float64 {
 	return t
 }
 
-// placement is where a Clip is on the Timeline, what of its source it
-// plays and how it plays it: what the arithmetic of a change needs to turn
-// a Timeline time into a place in the source, and back (cliptime.go).
-type placement struct {
-	ClipPlayback
-	start  float64
-	offset float64
-	length float64
-}
-
 // MoveClip moves a Clip to start at a time on a Track of the same Timeline,
 // keeping its trim. It can't overlap a Clip already there.
 func (s *Store) MoveClip(ctx context.Context, songID int64, based songversion.Version, clipID, trackID int64, start float64) (Timeline, error) {
@@ -755,20 +745,17 @@ func (s *Store) PasteClips(ctx context.Context, songID int64, based songversion.
 		func(ctx context.Context, tx *sql.Tx, changes *audio.FileChanges, _ Timeline) (edit, error) {
 			srcs := make([]clipSource, len(clips))
 			for i, c := range clips {
-				if len(c.Takes) == 0 {
-					// A Beat or a Sound the Clip was copied playing.
-					src, err := readClipSource(ctx, tx, songID, c.pasted(), nil)
-					if err != nil {
-						return nil, err
-					}
-					srcs[i] = src
-					continue
+				var err error
+				if len(c.Takes) > 0 {
+					// Copies of the Takes it was copied playing.
+					srcs[i], err = s.copyTakesAt(ctx, tx, changes, songID, c.Takes, *c.ActiveTakeID)
+				} else {
+					// The Beat or the Sound it was copied playing.
+					srcs[i], err = readClipSource(ctx, tx, songID, c.pasted(), nil)
 				}
-				takes, active, err := s.copyTakesAt(ctx, tx, changes, songID, c.Takes, *c.ActiveTakeID)
 				if err != nil {
 					return nil, err
 				}
-				srcs[i] = clipSource{takes: takes, activeTakeID: active}
 			}
 			return func(tl Timeline, ids *ids) (Timeline, error) {
 				return tl.pasting(names, clips, srcs, ids)
@@ -779,12 +766,18 @@ func (s *Store) PasteClips(ctx context.Context, songID int64, based songversion.
 // copyTakes adds a detached copy of each of the Takes, sharing its file,
 // linked by changes once committed. It returns the copies' ids by the ids
 // of the Takes copied.
+//
+// A copy comes out of the recording it was made from: its audio, how it was
+// recorded and its number. Where it starts in a Clip's source span, and how
+// far it's nudged, are a placement, so the copy starts at the origin of no
+// span, and the edit that places it says where it goes, as it does for any
+// Take (write.go).
 func (s *Store) copyTakes(ctx context.Context, tx *sql.Tx, changes *audio.FileChanges, ids []int64) (map[int64]int64, error) {
 	copies := map[int64]int64{}
 	for _, id := range ids {
 		res, err := tx.ExecContext(ctx, `INSERT INTO takes (song_id, number, size, duration, sample_rate, peaks,
-				latency_offset, position, nudge, recorded_at)
-			SELECT song_id, number, size, duration, sample_rate, peaks, latency_offset, position, nudge, recorded_at
+				latency_offset, position, recorded_at)
+			SELECT song_id, number, size, duration, sample_rate, peaks, latency_offset, 0, recorded_at
 			FROM takes WHERE id = ?`, id)
 		if err != nil {
 			return nil, fmt.Errorf("copying take: %w", err)
@@ -895,14 +888,25 @@ func (f Fades) fitted(length float64) Fades {
 	return Fades{In: f.In * share, Out: min(f.Out*share, length-f.In*share)}
 }
 
-// clipName is a Clip's name as stored: trimmed, and null if it has none or
-// it's blank.
+// ownName is a Clip's own name as it holds it: trimmed, or none where it's
+// blank, so the Clip goes by its source's name.
+func ownName(name string) *string {
+	trimmed := strings.TrimSpace(name)
+	if trimmed == "" {
+		return nil
+	}
+	return &trimmed
+}
+
+// clipName is a Clip's name as stored: null where it has none of its own.
 func clipName(name *string) sql.NullString {
 	if name == nil {
 		return sql.NullString{}
 	}
-	n := strings.TrimSpace(*name)
-	return sql.NullString{String: n, Valid: n != ""}
+	if own := ownName(*name); own != nil {
+		return sql.NullString{String: *own, Valid: true}
+	}
+	return sql.NullString{}
 }
 
 // nullID is one of a Clip's optional ids as stored: null where it has none.
@@ -955,6 +959,9 @@ func checkDeletedOnce(clipIDs []int64) error {
 // writes its row itself; every change to the Tracks and Clips goes through
 // the edit path (edit.go). If the Song is no longer at the version the
 // change was based on, or fn fails, nothing changes.
+//
+// It leaves no Clip moved and no Sound unused, so it neither checks the
+// placement rules nor sweeps the Sounds, which every edit on the path does.
 func (s *Store) changeLoop(ctx context.Context, songID int64, based songversion.Version,
 	fn func(tx *sql.Tx) error) (Timeline, error) {
 	var tl Timeline

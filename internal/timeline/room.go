@@ -44,13 +44,6 @@ func (tl Timeline) findClip(id int64) (Track, Clip, error) {
 	return t, c, nil
 }
 
-// placementOf is where c is on the Timeline and what of its source it
-// plays, for the arithmetic of a change (cliptime.go), taken from the
-// Timeline in hand rather than read back a Clip at a time.
-func placementOf(c Clip) placement {
-	return placement{ClipPlayback: c.ClipPlayback, start: c.Start, offset: c.Offset, length: c.Length}
-}
-
 // findTrackToPlaceOn refuses a Track a Clip is to go on that isn't one of
 // tl's, in the same words as the findTrackToPlaceOn that asks the database.
 func (tl Timeline) findTrackToPlaceOn(id int64) error {

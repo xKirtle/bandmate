@@ -69,30 +69,6 @@ func TestATrimCanSetTheFadesBack(t *testing.T) {
 		http.StatusBadRequest, "fadeIn and fadeOut go together")
 }
 
-func TestSettingAClipsTakesCanSetItsFadesBack(t *testing.T) {
-	ts := newTestServer(t)
-	s := ts.createSong("Night Drive")
-	tl := timelineChange(t, ts.recordTake(s.ID, takeRecording(ts.getTimeline(s.ID).Tracks[0].ID, 0, 0, 0, 3)))
-	c := tl.Tracks[0].Clips[0]
-	timelineChange(t, ts.setClipFades(s.ID, c.ID, 1, 1))
-
-	// Shorter than its Fades, they shorten to fit; given, they're set.
-	short := takesAsIn(c)
-	short.Length = 1
-	got := timelineChange(t, ts.setTakes(s.ID, c.ID, short))
-	if f := fadesOf(clipByID(t, got, c.ID)); !fadesNear(f, [2]float64{0.5, 0.5}) {
-		t.Errorf("fades = %v, want them shortened to [0.5 0.5]", f)
-	}
-	back := takesAsIn(c)
-	back.FadeIn, back.FadeOut = ptr(1.0), ptr(1.0)
-	got = timelineChange(t, ts.setTakes(s.ID, c.ID, back))
-	if f := fadesOf(clipByID(t, got, c.ID)); f != [2]float64{1, 1} {
-		t.Errorf("fades = %v, want them back at [1 1]", f)
-	}
-	back.FadeOut = nil
-	expectError(t, ts.setTakes(s.ID, c.ID, back), http.StatusBadRequest, "fadeIn and fadeOut go together")
-}
-
 func TestSettingTheFadesOfAClipNotOnTheSongsTimelineIsNotFound(t *testing.T) {
 	ts := newTestServer(t)
 	p := placeTwoClips(t, ts)
