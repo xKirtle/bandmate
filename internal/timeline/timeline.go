@@ -1379,20 +1379,12 @@ func (s *Store) changeWithFiles(ctx context.Context, songID int64, based songver
 
 // changeFrom is changeWithFiles for a change that looks at the Timeline it
 // starts from, before, e.g. to find room for a Clip.
+//
+// It's the path the changes that haven't moved onto the edit path take: the
+// Timeline is read before fn runs, which is handed it, and after, and
+// checkLayout checks what fn left.
 func (s *Store) changeFrom(ctx context.Context, songID int64, based songversion.Version,
 	fn func(tx *sql.Tx, changes *audio.FileChanges, before Timeline) error) (Timeline, error) {
-	return s.changeRewording(ctx, songID, based, nil, fn)
-}
-
-// changeRewording is changeFrom, its refusal for breaking a placement rule
-// in reword's words, unless reword is nil or gives nil, when it's in the
-// rule's own.
-//
-// It's the one path every change to a Timeline takes: the Timeline is read
-// before fn runs, which is handed it, and after, and checkLayout checks
-// what fn left.
-func (s *Store) changeRewording(ctx context.Context, songID int64, based songversion.Version,
-	reword func(violation) error, fn func(tx *sql.Tx, changes *audio.FileChanges, before Timeline) error) (Timeline, error) {
 	var tl Timeline
 	if err := songversion.Change(ctx, s.db, songID, based, func(tx *sql.Tx, changes *audio.FileChanges) error {
 		before, err := read(ctx, tx, songID)
@@ -1410,11 +1402,6 @@ func (s *Store) changeRewording(ctx context.Context, songID int64, based songver
 			return err
 		}
 		if v := checkLayout(before, tl); v != nil {
-			if reword != nil {
-				if err := reword(*v); err != nil {
-					return err
-				}
-			}
 			return v.err()
 		}
 		return nil
