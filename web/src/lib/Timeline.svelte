@@ -33,8 +33,7 @@
   import type { SongUndo } from './songUndo.svelte';
   import type { SyncMode } from './syncMode.svelte';
   import { editHint, type Freeze } from './freeze';
-  import { draggedFiles, fileDropTrack, type TrackRow } from './fileDrop';
-  import { nearestRow } from './gripDragging.svelte';
+  import { draggedFiles } from './fileDrop';
   import { keyHints } from './keyHints';
   import { formatVolume, maxVolume, minVolume, trackGains } from './mixer';
   import type { MenuAction } from './menu';
@@ -80,7 +79,8 @@
   import { audioContext, clipAudioKey, TimelinePlayer, type PlayableClip } from './timelinePlayer';
   import { stretches } from './stretch';
   import { Transport } from './transport.svelte';
-  import { shownSpan, ticks as rulerTicks, timeAt as viewTimeAt, waveWindow } from './timelineView';
+  import { TimelinePlaces } from './timelinePlaces';
+  import { shownSpan, ticks as rulerTicks, waveWindow } from './timelineView';
   import { TimelineViewing } from './timelineViewing.svelte';
   import { barWidth } from './waveform';
   import { clipping, tileBars } from './liveWave';
@@ -294,6 +294,17 @@
   const view = $derived(viewing.view);
   /** Where the scroll bar's thumb is, or null with the whole Timeline in view and no bar. */
   const thumb = $derived(viewing.thumb);
+  // Where a point on the page is on the Timeline — the time under it, the
+  // Track whose lane it is over, how far down the lanes it is — all
+  // through TimelinePlaces (see timelinePlaces.ts), which reads them off
+  // the view and the elements the Timeline keeps. Every pointer gesture on
+  // the lanes asks it rather than measuring the page itself.
+  const places = new TimelinePlaces(viewing, {
+    tracks: () => timeline.tracks,
+    lane: (index) => laneElements[index],
+    area: () => tracksElement,
+    bar: () => barElement,
+  });
 
   const loopOn = $derived(timeline.loop?.on ?? false);
   // The Loop playback repeats, while it's on.
@@ -494,44 +505,27 @@
   // so the last Line stays highlighted, until it's moved.
   $effect(() => onPlayhead?.(transport.playingAt));
 
-  /**
-   * A time on the Timeline shown, kept on its ruler: past the end too, e.g.
-   * to record there, though playback still stops at the end.
-   */
-  function clamp(t: number): number {
-    return Math.max(0, Math.min(span, t));
-  }
-
   // Clicking on the ruler seeks, and dragging along it scrubs the playhead:
   // see Transport.
-  function timeAt(event: Point): number {
-    return clamp(spanTimeAt(event.clientX));
-  }
-
-  /** The time under a point across the lanes, which may be past the end. */
-  function spanTimeAt(clientX: number): number {
-    return viewTimeAt(view, viewing.xIn(clientX));
-  }
-
   function pointerDown(event: PointerEvent) {
     // A second finger is pinching.
     if (!event.isPrimary) return;
     // Clicking the playhead back into view follows it again, even while
     // recording, which doesn't scrub.
-    transport.startScrub(timeAt(event));
+    transport.startScrub(places.rulerTimeAt(event.clientX));
     if (transport.scrubbing) (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
   }
 
   function pointerMove(event: Point) {
     if (!transport.scrubbing) return;
-    transport.scrubTo(timeAt(event));
+    transport.scrubTo(places.rulerTimeAt(event.clientX));
     viewing.edgeScroll.along(event, pointerMove);
   }
 
   function pointerUp(event: PointerEvent) {
     if (!transport.scrubbing) return;
     viewing.edgeScroll.done();
-    transport.endScrub(timeAt(event));
+    transport.endScrub(places.rulerTimeAt(event.clientX));
   }
 
   // A drag given up, e.g. for a pinch, isn't a seek.
@@ -552,7 +546,7 @@
 
   /** Seeks as asked by hand, bringing the playhead into view. */
   function seekTo(to: number) {
-    transport.seek(clamp(to));
+    transport.seek(places.onRuler(to));
     viewing.reveal(position);
   }
 
@@ -563,7 +557,7 @@
   export function playFrom(at: number) {
     // Nor while a recording starts or saves, stopped meanwhile.
     if (recording) return;
-    transport.playFrom(clamp(at));
+    transport.playFrom(places.onRuler(at));
     viewing.reveal(position);
   }
 
@@ -747,21 +741,9 @@
     return editable.current && !frozen && !picking && !calibrating && !mixingDown && tracksShown;
   }
 
-  /**
-   * The Track files dropped this far down the page go to, or null where
-   * they'd do nothing. Unlike a Clip dragged, which goes to the nearest
-   * Track, files go nowhere above the first Track.
-   */
+  /** The Track files dropped this far down the page go to, or null where they'd do nothing. */
   function fileTrackAt(y: number): number | null {
-    if (!takesFiles() || !tracksElement || chosen === null) return null;
-    const rows: TrackRow[] = [];
-    for (const [i, track] of timeline.tracks.entries()) {
-      const lane = laneElements[i];
-      if (!lane) return null;
-      const { top, bottom } = lane.getBoundingClientRect();
-      rows.push({ trackId: track.id, top, bottom });
-    }
-    return fileDropTrack(y, tracksElement.getBoundingClientRect(), rows, chosen);
+    return takesFiles() && chosen !== null ? places.fileTrackAt(y, chosen) : null;
   }
 
   function filesOver(event: DragEvent) {
@@ -928,34 +910,23 @@
 
   // Dragging from empty lane space draws a box, selecting the Clips it
   // touches, and a click there is an insertion point: see
-  // boxDrag.svelte.ts. Here it's measured, the pointer followed, the lanes
-  // scrolled along near their edges, a finger's long press timed and a
-  // second finger heard, and the playhead moved and the Track chosen as a
-  // click asks.
+  // boxDrag.svelte.ts. Here each point is placed (see places above), the
+  // pointer followed, the lanes scrolled along near their edges, a
+  // finger's long press timed and a second finger heard, and the playhead
+  // moved and the Track chosen as a click asks.
   const boxDrag = new BoxDrag({ selection, frozen: () => frozen });
   /** The pointer pressing empty lane space, the only one followed. */
   let boxPointer = 0;
   /** Waiting for a finger on empty lane space to be held still long enough to draw a box. */
   let boxTimer: ReturnType<typeof setTimeout> | undefined;
 
-  /** How far a point is down the lanes, in pixels. */
-  function yIn(clientY: number): number {
-    return clientY - lanesElement!.getBoundingClientRect().top;
-  }
-
-  /** The index of the Track whose lane is nearest to a height on the page. */
-  function trackIndexAt(clientY: number): number {
-    const id = trackAt(clientY);
-    return timeline.tracks.findIndex((t) => t.id === id);
-  }
-
   /** Where a point is, for BoxDrag: the time under it across the lanes, the Track whose lane is nearest, and how far down the lanes it is. */
   function boxAt(at: Point): BoxAt {
     return {
       point: { clientX: at.clientX, clientY: at.clientY },
-      time: spanTimeAt(at.clientX),
-      track: trackIndexAt(at.clientY),
-      y: yIn(at.clientY),
+      time: places.timeAt(at.clientX),
+      track: places.trackIndexAt(at.clientY),
+      y: places.yIn(at.clientY),
     };
   }
 
@@ -1109,7 +1080,7 @@
 
   // Moving, trimming and nudging a Clip, moving the Selection, and setting
   // a Clip's Gain or Fades by dragging go through ClipDrag (see
-  // clipDrag.svelte.ts), with the page measured here.
+  // clipDrag.svelte.ts), with each point placed by places above.
   const clipDrag = new ClipDrag(selection, {
     tracks: () => timeline.tracks,
     playhead: () => position,
@@ -1122,8 +1093,8 @@
   function clipDragAt(at: Point): DragAt {
     return {
       point: { clientX: at.clientX, clientY: at.clientY },
-      time: spanTimeAt(at.clientX),
-      trackId: trackAt(at.clientY),
+      time: places.timeAt(at.clientX),
+      trackId: places.trackIdAt(at.clientY),
     };
   }
 
@@ -1172,17 +1143,6 @@
     if (!top || !bottom) return null;
     return { at: snapped.at, top: top.offsetTop, height: bottom.offsetTop + bottom.offsetHeight - top.offsetTop };
   });
-
-  function trackOf(clip: Clip) {
-    return timeline.tracks.find((t) => t.clips.some((c) => c.id === clip.id))!;
-  }
-
-  /** The Track whose lane is nearest to a height on the page. */
-  function trackAt(clientY: number): number {
-    // Only the lanes of Tracks there now: a removed Track's may linger.
-    const lanes = timeline.tracks.map((_, i) => laneElements[i]?.getBoundingClientRect() ?? null);
-    return timeline.tracks[nearestRow(clientY, lanes) ?? 0].id;
-  }
 
   // The Tracks area's height, dragged by the Timeline's top edge. Null is the
   // default, which follows the window. A height dragged on this device is
@@ -1265,7 +1225,7 @@
     if (frozen) return;
     // Mod+clicking it to gather a Selection leaves the Chosen Track be.
     const toggles = togglesSelection(event);
-    if (event.isPrimary && event.button === 0 && !toggles) choose({ kind: 'choose', trackId: trackOf(clip).id });
+    if (event.isPrimary && event.button === 0 && !toggles) choose({ kind: 'choose', trackId: places.trackOf(clip).id });
     const pressed = clipDrag.clip;
     if (!editable.current || !event.isPrimary || event.button !== 0 || pressed || inClipMenu(event.target)) return;
     event.stopPropagation();
@@ -1326,10 +1286,10 @@
     const trim = clipElement.querySelector('.trim')!.getBoundingClientRect();
     return {
       dots: {
-        fadeIn: spanTimeAt(middle('fadeIn')),
-        fadeOut: spanTimeAt(middle('fadeOut')),
-        width: width / view.scale,
-        rests: (trim.width + width / 2) / view.scale,
+        fadeIn: places.timeAt(middle('fadeIn')),
+        fadeOut: places.timeAt(middle('fadeOut')),
+        width: places.seconds(width),
+        rests: places.seconds(trim.width + width / 2),
       },
     };
   }
@@ -1491,7 +1451,7 @@
   }
 
   // Setting the Loop by dragging along the top of the ruler goes through
-  // LoopDrag (see loopDrag.svelte.ts), with the page measured here.
+  // LoopDrag (see loopDrag.svelte.ts), with each point placed by places above.
   const loopDrag = new LoopDrag({
     tracks: () => timeline.tracks,
     playhead: () => position,
@@ -1503,7 +1463,7 @@
 
   /** Where a point is, for LoopDrag: the time under it across the lanes. */
   function loopDragAt(at: Point): PointerAt {
-    return { point: { clientX: at.clientX, clientY: at.clientY }, time: spanTimeAt(at.clientX) };
+    return { point: { clientX: at.clientX, clientY: at.clientY }, time: places.timeAt(at.clientX) };
   }
 
   function loopDown(event: PointerEvent) {
@@ -1565,28 +1525,23 @@
   // Its points are measured along the bar, which the Timeline draws.
   let barElement = $state<HTMLElement>();
 
-  /** How far a point is from the left of the scroll bar, in pixels. */
-  function xInBar(clientX: number): number {
-    return clientX - barElement!.getBoundingClientRect().left;
-  }
-
   function thumbDown(event: PointerEvent) {
     // One finger at a time: a second is pinching.
     if (event.button !== 0 || !event.isPrimary || !thumb) return;
     // Not a click on the bar beside it.
     event.stopPropagation();
     (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
-    viewing.thumbDown(event.pointerId, xInBar(event.clientX));
+    viewing.thumbDown(event.pointerId, places.xInBar(event.clientX));
   }
 
   function thumbMove(event: PointerEvent) {
-    viewing.thumbMove(event.pointerId, xInBar(event.clientX));
+    viewing.thumbMove(event.pointerId, places.xInBar(event.clientX));
   }
 
   /** A click beside the thumb centres it there, and so the view. */
   function barDown(event: PointerEvent) {
     if (event.button !== 0 || !event.isPrimary || !thumb) return;
-    viewing.barDown(xInBar(event.clientX));
+    viewing.barDown(places.xInBar(event.clientX));
   }
 
   // Over the bar, the wheel scrolls the lanes as it would over them: the
