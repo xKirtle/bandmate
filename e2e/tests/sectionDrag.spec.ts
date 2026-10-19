@@ -5,7 +5,8 @@ import { middleOf, type Point } from '../songPage';
 
 // Dragging a Section by the grip on its header, on a Song of three Sections:
 // to a new place in the Arrangement, or onto another Section to add it to it.
-// Esc gives the drag up.
+// Esc gives the drag up. A Section added to another is remade, so what's
+// being typed in it is saved first, and the caret stays where it is.
 
 /** The labels of a Song's Sections, in the order the Arrangement has them on the server. */
 async function serverArrangement(bandmate: Bandmate, songId: number): Promise<string[]> {
@@ -101,6 +102,41 @@ test('a Section dragged onto another saves the Label still being typed in it, wh
   await expect.poll(() => serverArrangement(bandmate, song.id)).toEqual(['Verse 1', 'Chorus']);
   await chorus.getByRole('button', { name: 'Alternates' }).click();
   await expect(chorus.getByRole('radio', { name: 'Middle 8' })).toBeVisible();
+});
+
+test('a Scrapbook Section dragged onto a Section leaves the caret in a field elsewhere', async ({
+  page,
+  bandmate,
+}) => {
+  const song = await bandmate.song({ title: 'Harbour' });
+  const sheet = await bandmate.addSection(song.id, 'Chorus');
+  await bandmate.setLines(song.id, sheet.sections[0].alternates[0].id, 'Lanterns on the quay');
+  await bandmate.addSection(song.id, 'Night swim', 'scrapbook');
+  await page.goto(`/songs/${song.id}`);
+
+  // Its editor open in the Scrapbook, which is when the whole page's focus was at risk.
+  await page.getByRole('button', { name: /^Night swim/ }).click();
+  const idea = page.getByRole('article', { name: 'Night swim' });
+  await expect(idea).toBeVisible();
+
+  // The caret in the Chorus' Lines, nowhere near the Section being moved.
+  const lines = section(page, 'Chorus').getByRole('textbox', { name: 'Lines' });
+  await lines.click();
+  await lines.press('End');
+  await lines.pressSequentially(' at night');
+
+  await idea.getByTitle(/^Drag between Sections/).hover();
+  await page.mouse.down();
+  const onto = await middleOf(section(page, 'Chorus'));
+  await page.mouse.move(onto.x, onto.y, { steps: 5 });
+  await page.mouse.up();
+
+  // Added to the Chorus as Alternates, with the caret left where it was.
+  await expect(idea).toHaveCount(0);
+  await expect(lines).toBeFocused();
+  await expect(lines).toHaveValue('Lanterns on the quay at night');
+  await section(page, 'Chorus').getByRole('button', { name: 'Alternates' }).click();
+  await expect(section(page, 'Chorus').getByRole('radio')).toHaveCount(2);
 });
 
 test('Esc gives a Section drag up, leaving the Arrangement as it was', async ({ page, bandmate }) => {

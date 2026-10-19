@@ -10,13 +10,15 @@
 //   which may still be on its way as Sync mode comes on. Opening a Section
 //   in the Scrapbook, or a Section's Alternates, ends it too. Cue changes
 //   don't go through here, so never end it.
-// - Adding a Section to another makes its Alternates anew, so everything
-//   being typed in that Section is sent first, while it can still land on
-//   it: its Label, its Alternates' names and the Lines text still waiting
-//   in their text boxes alike. A drag doesn't leave the field it started
-//   from, and nothing here leaves it for the user: what's typed is sent
-//   where it is, so the caret stays put, and a field being typed in
-//   anywhere else is left alone.
+// - Adding a Section to another makes its Alternates anew, an unnamed one
+//   taking the Section's Label as its name, so everything being typed in
+//   that Section is sent first, while it can still land on it: its Label,
+//   its Alternates' names and the Lines text still waiting in their text
+//   boxes alike. A drag doesn't leave the field it started from, and
+//   nothing here leaves it for the user: what's typed is sent where it is,
+//   so the caret stays put, and a field being typed in anywhere else is
+//   left alone. What a field's own rule refuses isn't sent, and goes with
+//   the Section, as it would have on leaving the field.
 //
 // It makes a Section's Label and an Alternate's name fields typed in place
 // (see typedField.svelte.ts), and saves an Alternate's text as typed into
@@ -148,8 +150,10 @@ function endsSyncMode(change: LyricSheetChange): boolean {
 
 /**
  * The Section whose Alternates a change makes anew, so anything sent to
- * them after it would be lost: one added to another. (Moving an Alternate out
- * makes it anew too, but only an inactive one, which has no text box.)
+ * them after it would be lost: one added to another. (Moving an Alternate
+ * out makes that one anew too, but only an inactive one, which has no text
+ * box; its name, typed on its card, is left as it was, saved as the card is
+ * left.)
  */
 function sectionRemadeBy(change: LyricSheetChange): number | null {
   return change.kind === 'addToSection' ? change.sectionId : null;

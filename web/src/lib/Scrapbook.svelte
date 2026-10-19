@@ -103,9 +103,8 @@
     );
   }
 
-  // Its Alternates are made anew in the Section they join, and an unnamed one
-  // is named after its Label, so everything still being typed in its editor
-  // is sent first: Lyric Sheet editing does that, leaving the caret where it is.
+  // Everything still being typed in its editor is sent first, by Lyric Sheet
+  // editing, which leaves the caret where it is (see LyricSheetEditing.change).
   function addTo(sectionId: number, targetId: number) {
     editing.change({ kind: 'addToSection', sectionId, targetId }).then(closed(sectionId));
   }

@@ -465,6 +465,16 @@ const withBridge = () => {
   return { ...song, sections: [...song.sections, bridge], scrapbook: [2] };
 };
 
+/** The Hook, a third Section at the end of the Arrangement, of one empty Alternate. */
+const withHook = (song: Song): Song => {
+  const hook = {
+    id: 3,
+    label: 'Hook',
+    alternates: [{ id: 3, name: '', active: true, lines: [] }],
+  };
+  return { ...song, arrangement: [...song.arrangement, 3], sections: [...song.sections, hook] };
+};
+
 describe('Lyric Sheet editing, a Label or an Alternate’s name typed as its Section goes', () => {
   it('drops what’s typed, sending nothing, with no save error', async () => {
     const server = new FakeSongServer(withBridge());
@@ -662,16 +672,20 @@ describe('Lyric Sheet editing, sending what’s being typed first', () => {
     expect(editing.unsavedIn(2)).toBe(false);
   });
 
-  it('leaves a field being typed in outside the Section alone, e.g. another Section’s Label', async () => {
-    const server = new FakeSongServer(withBridge());
+  it('leaves a field being typed in outside the Section alone, in the one added to and elsewhere', async () => {
+    const server = new FakeSongServer(withHook(withBridge()));
     const { editing } = await editingFor(server);
-    const label = editing.sectionLabel(1);
-    label.shown = 'Chorus';
+    // The Section added to, and a third Section nowhere near the change.
+    const verse = editing.sectionLabel(1);
+    const hook = editing.sectionLabel(3);
+    verse.shown = 'Chorus';
+    hook.shown = 'Outro';
     expect(await editing.change({ kind: 'addToSection', sectionId: 2, targetId: 1 })).toBe(true);
     expect(server.landed).toBe(1);
-    expect(server.song.sections[0].label).toBe('Verse');
-    expect(label.shown).toBe('Chorus');
+    expect(server.song.sections.map((s) => s.label)).toEqual(['Verse', 'Hook']);
+    expect([verse.shown, hook.shown]).toEqual(['Chorus', 'Outro']);
     expect(editing.unsavedIn(1)).toBe(true);
+    expect(editing.unsavedIn(3)).toBe(true);
   });
 });
 

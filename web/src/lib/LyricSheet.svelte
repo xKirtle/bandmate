@@ -341,9 +341,8 @@
   // the other's, inactive, which a notice says: it isn't asked first, and
   // it's undone by moving them to the Scrapbook and back.
   //
-  // Its Alternates are made anew in the Section they join, and an unnamed one
-  // is named after its Label, so everything still being typed in its editor is
-  // sent first: Lyric Sheet editing does that, leaving the caret where it is.
+  // Everything still being typed in its editor is sent first, by Lyric Sheet
+  // editing, which leaves the caret where it is (see LyricSheetEditing.change).
   async function addTo(section: Section, to: Section) {
     const said = addedNotice(section, to);
     if (await editing.change({ kind: 'addToSection', sectionId: section.id, targetId: to.id })) notice = said;

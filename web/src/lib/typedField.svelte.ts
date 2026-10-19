@@ -12,7 +12,9 @@
 //   typed since wins over it. Refused as the Song changed elsewhere, what
 //   was typed stays, unsaved, to copy out.
 // - Asked to send what's typed now, e.g. before the Section it's in is
-//   made anew, it commits where it is, without being left first.
+//   made anew, it commits where it is, without being left first. Its rule
+//   refusing what's typed, nothing is sent and it keeps it with the
+//   message, as a commit always does: what's asked for goes ahead anyway.
 // - Cancelled, e.g. on Esc, it shows what's saved again.
 // - Destroyed, e.g. as the page goes, it commits what's typed, dropping it
 //   if its rule refuses it.
