@@ -326,6 +326,16 @@ describe('a preferred Voicing', () => {
     expect(other.preferred).toBe(false);
   });
 
+  it('applies to every spelling of the Chord, since they are one sound played one way', () => {
+    const preferred = { 'C#maj7': [null, 4, 6, 5, 6, 4] };
+    for (const name of ['C#maj7', 'Dbmaj7', 'DbMaj7']) {
+      const found = lookUp(name, { tuning: standard, preferred });
+      if (found.kind !== 'chord') throw new Error(`${name} should read`);
+      expect(written(found.voicings[0].frets), name).toBe('x46564');
+      expect(found.preferred, name).toBe(true);
+    }
+  });
+
   it('leaves the ranked order as it is with no preference, or one that is no Voicing of the Chord', () => {
     for (const found of [lookUp('G', context), lookUpG({ G: [0, 0, 0, 0, 0, 0] })]) {
       if (found.kind !== 'chord') throw new Error('G should read');

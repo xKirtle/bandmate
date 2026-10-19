@@ -5,6 +5,7 @@
 
 import {
   nameNotes,
+  oneSpelling,
   readChord,
   readKey,
   spellNotes,
@@ -65,7 +66,8 @@ export interface FinderContext {
   tuning: readonly number[];
   /**
    * The user's preferred Voicing of each Chord in this tuning, by the Chord's
-   * name as read (see LookUp's name), as its frets low string to high.
+   * name in the one spelling (see chordSpelling), as its frets low string to
+   * high.
    */
   preferred?: Readonly<Record<string, Frets>>;
 }
@@ -96,7 +98,7 @@ export function lookUp(name: string, context: FinderContext): LookUp {
   const chord = readChord(name);
   if (!chord) return { kind: 'unreadable', name };
   const voicings = guitarVoicings(chord, context.tuning);
-  const preferredFrets = context.preferred?.[chord.name];
+  const preferredFrets = context.preferred?.[oneSpelling(chord)];
   const preferredAt = preferredFrets ? voicings.findIndex((v) => sameFrets(v.frets, preferredFrets)) : -1;
   if (preferredAt > 0) voicings.unshift(...voicings.splice(preferredAt, 1));
   return {
@@ -124,6 +126,16 @@ export function firstVoicing(name: string, context: FinderContext): Voicing | nu
 /** A Chord name, tidied as Look up reads it (CMaj7 reads as Cmaj7, F♯- as F#m), or null if it can't be read. */
 export function chordName(text: string): string | null {
   return readChord(text)?.name ?? null;
+}
+
+/**
+ * A Chord name in the one spelling: one name for every spelling of a Chord,
+ * since Dbmaj7 and C#maj7 are one sound with one set of Voicings. What's
+ * kept per Chord on this device is kept by it. Null if it can't be read.
+ */
+export function chordSpelling(text: string): string | null {
+  const chord = readChord(text);
+  return chord && oneSpelling(chord);
 }
 
 export type NameIt =
