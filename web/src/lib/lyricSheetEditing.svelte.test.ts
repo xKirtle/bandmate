@@ -592,7 +592,7 @@ describe('Lyric Sheet editing, Sync mode', () => {
   });
 });
 
-describe('Lyric Sheet editing, saving waiting text first', () => {
+describe('Lyric Sheet editing, sending what’s being typed first', () => {
   it('sends the Lines text still waiting in a Section before adding it to another, in order', async () => {
     const server = new FakeSongServer(withBridge());
     const { saves, editing } = await editingFor(server);
@@ -637,6 +637,41 @@ describe('Lyric Sheet editing, saving waiting text first', () => {
     await vi.advanceTimersByTimeAsync(800);
     expect(server.landed).toBe(2);
     expect(textOf(server.song)).toBe('One\nTwo\nThree');
+  });
+
+  it('sends the Label being typed in a Section before adding it to another, which names its Alternate', async () => {
+    const server = new FakeSongServer(withBridge());
+    const { editing } = await editingFor(server);
+    const label = editing.sectionLabel(2);
+    label.shown = 'Middle 8';
+    // No blur: a drag by the grip leaves the Label being typed in.
+    expect(await editing.change({ kind: 'addToSection', sectionId: 2, targetId: 1 })).toBe(true);
+    expect(server.landed).toBe(2);
+    expect(server.song.sections[0].alternates[1].name).toBe('Middle 8');
+    expect(editing.unsavedIn(2)).toBe(false);
+  });
+
+  it("sends an Alternate's name being typed in a Section before adding it to another", async () => {
+    const server = new FakeSongServer(withBridge());
+    const { editing } = await editingFor(server);
+    const name = editing.alternateName(2, 2);
+    name.shown = 'Darker';
+    expect(await editing.change({ kind: 'addToSection', sectionId: 2, targetId: 1 })).toBe(true);
+    expect(server.landed).toBe(2);
+    expect(server.song.sections[0].alternates[1].name).toBe('Darker');
+    expect(editing.unsavedIn(2)).toBe(false);
+  });
+
+  it('leaves a field being typed in outside the Section alone, e.g. another Section’s Label', async () => {
+    const server = new FakeSongServer(withBridge());
+    const { editing } = await editingFor(server);
+    const label = editing.sectionLabel(1);
+    label.shown = 'Chorus';
+    expect(await editing.change({ kind: 'addToSection', sectionId: 2, targetId: 1 })).toBe(true);
+    expect(server.landed).toBe(1);
+    expect(server.song.sections[0].label).toBe('Verse');
+    expect(label.shown).toBe('Chorus');
+    expect(editing.unsavedIn(1)).toBe(true);
   });
 });
 

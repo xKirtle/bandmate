@@ -133,7 +133,7 @@ describe('Saves, refreshing', () => {
   it('marks the Song stale rather than replace edits not saved yet', async () => {
     const server = new FakeSongServer();
     const saves = await savesFor(server);
-    const leave = saves.typing({ unsaved: true, typed: 1 });
+    const leave = saves.typing({ unsaved: true, typed: 1, saveNow: () => {} });
     server.changeElsewhere({ title: 'From another tab' });
     await saves.refresh();
     expect(saves.stale).toBe(true);

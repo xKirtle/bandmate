@@ -79,6 +79,30 @@ test('a Section dragged onto the middle of another is added to it as Alternates'
   await expect(chorus.getByRole('radio')).toHaveCount(2);
 });
 
+test('a Section dragged onto another saves the Label still being typed in it, which names the Alternate', async ({
+  page,
+  bandmate,
+}) => {
+  const song = await threeSections(page, bandmate);
+  const chorus = section(page, 'Chorus');
+  // The Bridge by its place, as its Label is typed over below.
+  const bridge = page.getByRole('article').nth(2);
+  // A drag doesn't leave the Label, so what's typed in it has to be sent first.
+  const label = bridge.getByLabel('Label', { exact: true });
+  await label.click();
+  await label.fill('Middle 8');
+
+  await takeGrip(page, bridge);
+  const onto = await middleOf(chorus);
+  await page.mouse.move(onto.x, onto.y, { steps: 5 });
+  await expect(label).toBeFocused();
+  await page.mouse.up();
+
+  await expect.poll(() => serverArrangement(bandmate, song.id)).toEqual(['Verse 1', 'Chorus']);
+  await chorus.getByRole('button', { name: 'Alternates' }).click();
+  await expect(chorus.getByRole('radio', { name: 'Middle 8' })).toBeVisible();
+});
+
 test('Esc gives a Section drag up, leaving the Arrangement as it was', async ({ page, bandmate }) => {
   const song = await threeSections(page, bandmate);
   const bridge = section(page, 'Bridge');
