@@ -904,7 +904,7 @@ export async function request<T>(method: string, path: string, body?: unknown, a
  * Sends a file as it is, as request does, but reporting how much of it has
  * been sent, and stopping if the signal aborts, which fails with an AbortError.
  */
-export function upload<T>(path: string, file: Blob, options: UploadOptions = {}): Promise<T> {
+function upload<T>(path: string, file: Blob, options: UploadOptions = {}): Promise<T> {
   return answer<T>(sendWithProgress('POST', `/api${path}`, file, options, zoneHeaders()));
 }
 

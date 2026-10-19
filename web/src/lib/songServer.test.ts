@@ -1,6 +1,64 @@
-import { describe, expect, it } from 'vitest';
-import { ApiError } from './api';
-import { savedRetrying } from './songServer';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { ApiError, type ClipMerge, type SongAt, type SoundImport } from './api';
+import { savedRetrying, songServer } from './songServer';
+
+// Importing a Sound and merging Clips send a file, so they aren't changes the
+// contract test records: these pin the requests they send instead.
+describe('the writes that send a file', () => {
+  const at: SongAt = { id: 7, version: 3 };
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  /** What the next request sends, with the file part read back as its name. */
+  function sent() {
+    const requests: { method?: string; url: string; details: unknown; file: string; ifMatch?: string }[] = [];
+    vi.stubGlobal('fetch', async (url: string, init: RequestInit) => {
+      const form = init.body as FormData;
+      const file = form.get('file') as File;
+      requests.push({
+        method: init.method,
+        url,
+        details: JSON.parse(form.get('details') as string),
+        file: file.name,
+        ifMatch: (init.headers as Record<string, string>)['If-Match'],
+      });
+      return new Response('{}', { headers: { 'Content-Type': 'application/json' } });
+    });
+    return requests;
+  }
+
+  it('imports a Sound as the file under its own name, with its details', async () => {
+    const requests = sent();
+    const details: SoundImport = { trackId: 2, name: 'Shaker', duration: 4, peaks: [0.5] };
+    await songServer(at.id).importSound(at, new File(['wav'], 'shaker.wav'), details);
+    expect(requests).toEqual([
+      {
+        method: 'POST',
+        url: '/api/songs/7/timeline/sounds',
+        details,
+        file: 'shaker.wav',
+        ifMatch: '"3"',
+      },
+    ]);
+  });
+
+  it('merges Clips as the rendered WAV, with the Clips it merged', async () => {
+    const requests = sent();
+    const merge: ClipMerge = { clipIds: [1, 2], peaks: [0.25], trackId: 2 };
+    await songServer(at.id).mergeClips(at, new Blob(['wav']), merge);
+    expect(requests).toEqual([
+      {
+        method: 'POST',
+        url: '/api/songs/7/timeline/clips/merge',
+        details: merge,
+        file: 'merged.wav',
+        ifMatch: '"3"',
+      },
+    ]);
+  });
+});
 
 describe('savedRetrying', () => {
   // Waits nothing, noting how long each wait was asked to be.

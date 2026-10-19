@@ -43,9 +43,18 @@ export interface SongServer {
   apply(at: SongAt, edit: Edit): Promise<Timeline>;
   /** Sets the Song's Tags, returning them as saved. Tagging leaves the Song's version as it was. */
   setTags(tags: string[]): Promise<string[]>;
-  /** Imports an audio file as a Sound, in a new Clip after a Track's last Clip, or at 0:00, returning the Timeline it leaves. */
+  /**
+   * Imports an audio file, unchanged, as one of the Song's Sounds, placed
+   * whole in a new Clip after a Track's last Clip, or at 0:00, returning the
+   * Timeline it leaves.
+   */
   importSound(at: SongAt, file: File, details: SoundImport): Promise<Timeline>;
-  /** Replaces Clips with one Clip of a new Sound, "Merged Clip", from their audio rendered together, returning the Timeline it leaves. */
+  /**
+   * Replaces Clips, on any Tracks, with one Clip of a new Sound, "Merged
+   * Clip", from their audio rendered together: a 24-bit WAV running from the
+   * earliest one's start to the latest one's end. It goes on the Track merge
+   * names, or a new one added where it says. Returns the Timeline it leaves.
+   */
   mergeClips(at: SongAt, wav: Blob, merge: ClipMerge): Promise<Timeline>;
 }
 
