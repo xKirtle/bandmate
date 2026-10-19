@@ -5,6 +5,7 @@
 // pointer is to what it would drop into, to what the drop does. A move
 // within the Arrangement saves the same order pressing ↑ or ↓ that many
 // times gives, as those presses would.
+import type { Span } from './gripDragging.svelte';
 
 /**
  * What's being dragged: a Lyric Sheet Section, by its place in the
@@ -39,9 +40,6 @@ export type Drop =
 
 /** A box on the page, as getBoundingClientRect gives it. */
 export type Box = { left: number; right: number; top: number; bottom: number };
-
-/** Where something runs down the page, as getBoundingClientRect gives it. */
-export type Span = { top: number; bottom: number };
 
 /**
  * The gap a Section would drop into, with the pointer at `y`: 0 above the

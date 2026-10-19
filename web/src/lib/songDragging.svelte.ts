@@ -1,5 +1,5 @@
-import { untrack } from 'svelte';
 import type { SongSummary } from './api';
+import { GripDragging, type At } from './gripDragging.svelte';
 import { longPressDelay, type Point } from './press';
 import {
   listEdgeSpeed,
@@ -26,13 +26,13 @@ export function songTarget(folder: number | null) {
 // and a swipe still scrolls. Pointer events rather than HTML5 drag and
 // drop, which touch doesn't have, so Esc cancels and the list scrolls when
 // the drag nears its edges.
-export class SongDragging {
-  /** The drag under way: the Song, where it would drop, and where the pointer is. */
-  current = $state<{ song: SongSummary; target: SongTarget | null; x: number; y: number } | null>(null);
-  /** Whether there's anywhere for a Song to drop, so Songs can be dragged. */
-  readonly on: boolean = $derived.by(() => this.#enabled());
-
-  #enabled: () => boolean;
+//
+// The drag under way is gripDragging's, with the Songs' rule for where it
+// drops handed to it; a Song's row is no grip, so telling a drag from a
+// click or a tap, and the scrolling that follows it, stay here. It has no
+// rows to measure either: what a Song drops on is whatever row of the page
+// is under the pointer.
+export class SongDragging extends GripDragging<SongSummary, SongTarget, SongTarget> {
   #inView: () => { top: number; bottom: number };
   #onDrop: (song: SongSummary, to: number | null) => void;
   #press: { press: SongPress; song: SongSummary; pointerId: number; timer: number } | null = null;
@@ -50,29 +50,40 @@ export class SongDragging {
     inView: () => { top: number; bottom: number },
     onDrop: (song: SongSummary, to: number | null) => void,
   ) {
-    this.#enabled = enabled;
+    super({ enabled });
     this.#inView = inView;
     this.#onDrop = onDrop;
-    $effect(() => {
-      if (!this.on) untrack(() => this.cancel());
-    });
-    $effect(() => () => this.cancel());
+  }
+
+  // What's under the pointer, which is where the Song drops if it's a place
+  // Songs drop on: measured from the page itself rather than rows attached
+  // here, as a Folder's row, the "Songs" link and the list all are.
+  protected targetAt(_song: SongSummary, at: At): SongTarget | null {
+    const el = document.elementFromPoint(at.x, at.y)?.closest(`[${targetAttribute}]`);
+    const to = el?.getAttribute(targetAttribute);
+    return to === undefined || to === null ? null : { folder: to === '' ? null : Number(to) };
+  }
+
+  // Dropped there, the Song moves into that Folder, or, on the "Songs" link
+  // inside one, out of it; nowhere if it's the Folder it's already in.
+  protected dropFor(song: SongSummary, target: SongTarget | null): SongTarget | null {
+    return songDrop(song.folderId, target);
   }
 
   /** Whether a drop now would land on `folder`, or for null, out of the Folder open. */
   aimsAt(folder: number | null): boolean {
-    return this.current?.target?.folder === folder;
+    return this.drop?.folder === folder;
   }
 
   /** Whether `song` is being dragged. */
   drags(song: SongSummary): boolean {
-    return this.current?.song.id === song.id;
+    return this.current?.dragged.id === song.id;
   }
 
-  cancel() {
+  override cancel() {
     if (this.#press) clearTimeout(this.#press.timer);
     this.#press = null;
-    this.current = null;
+    super.cancel();
     cancelAnimationFrame(this.#frame);
     this.#frame = 0;
     document.documentElement.classList.remove('dragging-song');
@@ -135,14 +146,14 @@ export class SongDragging {
         return;
       case 'drag':
         if (!this.current) this.#start(pressing.song);
-        this.#aim(at.clientX, at.clientY);
+        this.aim(at.clientX, at.clientY);
         return;
       case 'drop': {
-        // Aimed only where it moves the Song, if anywhere.
-        const target = this.current?.target;
+        // Dropped only where it moves the Song, if anywhere.
+        const drop = this.drop;
         this.cancel();
         this.#swallowClick();
-        if (target) this.#onDrop(pressing.song, target.folder);
+        if (drop) this.#onDrop(pressing.song, drop.folder);
         return;
       }
       case 'giveUp':
@@ -154,7 +165,7 @@ export class SongDragging {
   // Shows the drag, and scrolls the list while it's near an edge, aiming
   // again at what scrolls under the pointer.
   #start(song: SongSummary) {
-    this.current = { song, target: null, x: 0, y: 0 };
+    this.current = { dragged: song, target: null, x: 0, y: 0 };
     document.documentElement.classList.add('dragging-song');
     getSelection()?.removeAllRanges();
     let last = performance.now();
@@ -164,22 +175,12 @@ export class SongDragging {
       const speed = listEdgeSpeed(this.current.y, top, bottom);
       if (speed !== 0) {
         window.scrollBy(0, (speed * (now - last)) / 1000);
-        this.#aim(this.current.x, this.current.y);
+        this.aim(this.current.x, this.current.y);
       }
       last = now;
       this.#frame = requestAnimationFrame(step);
     };
     this.#frame = requestAnimationFrame(step);
-  }
-
-  // Aims the drag at what's under the pointer: a Folder the Song isn't in,
-  // or the "Songs" link out of the one it is in.
-  #aim(x: number, y: number) {
-    if (!this.current) return;
-    const el = document.elementFromPoint(x, y)?.closest(`[${targetAttribute}]`);
-    const at = el?.getAttribute(targetAttribute);
-    const target = at === undefined || at === null ? null : { folder: at === '' ? null : Number(at) };
-    this.current = { ...this.current, target: songDrop(this.current.song.folderId, target), x, y };
   }
 
   // A drag let go over its own row would click it, opening the Song.

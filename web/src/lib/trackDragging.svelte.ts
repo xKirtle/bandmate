@@ -1,22 +1,14 @@
-import { untrack } from 'svelte';
+import { GripDragging, offPage, type At, type Span } from './gripDragging.svelte';
 import { trackDrop, type TrackDrop } from './trackDrag';
 
 // On desktop, a Track is dragged by the grip along its header's left edge
 // to a new place among the Tracks, its lane going with it. Pointer events
 // rather than HTML5 drag and drop, like dragging Sections, so the drop
-// shows between Tracks and Esc cancels.
-export class TrackDragging {
-  /** The drag under way: the place of the Track dragged, where it would drop, and how far down the pointer is. */
-  current = $state<{ from: number; drop: TrackDrop | null; y: number } | null>(null);
-  /** Whether Tracks can be dragged at all. */
-  readonly on: boolean = $derived.by(() => this.#enabled());
-
-  #enabled: () => boolean;
-  #order: string = $derived.by(() => this.#orderOf());
-  #orderOf: () => string;
-  // Each Track header's place on the page, by the Track's place.
-  #heads = new Map<number, HTMLElement>();
-
+// shows between Tracks and Esc cancels. The drag itself is gripDragging's,
+// with the Tracks' rule for where it drops handed to it: a Track header's
+// place among them is a row, and where it would drop is already what the
+// drop does.
+export class TrackDragging extends GripDragging<number, TrackDrop, TrackDrop> {
   /**
    * `enabled` says whether Tracks can be dragged; it turning false
    * mid-drag, e.g. the window narrowing or a recording starting, cancels
@@ -24,60 +16,21 @@ export class TrackDragging {
    * e.g. by an undo, which would move what's being dragged.
    */
   constructor(enabled: () => boolean, order: () => string) {
-    this.#enabled = enabled;
-    this.#orderOf = order;
-    $effect(() => {
-      if (!this.on) untrack(() => this.cancel());
-    });
-    $effect(() => {
-      void this.#order;
-      untrack(() => this.cancel());
-    });
+    super({ enabled, order });
   }
 
-  cancel() {
-    this.current = null;
+  protected targetAt(from: number, at: At, rows: readonly (Span | null)[]): TrackDrop | null {
+    return trackDrop(from, at.y, rows.map(middleOf));
   }
 
-  /** Attaches a Track header's place on the page, at `index` among the Tracks. */
-  placeHead(el: HTMLElement, index: number) {
-    this.#heads.set(index, el);
-    return () => {
-      if (this.#heads.get(index) === el) this.#heads.delete(index);
-    };
+  protected dropFor(_from: number, drop: TrackDrop | null): TrackDrop | null {
+    return drop;
   }
+}
 
-  /** Aims the drag at where the pointer is, e.g. again as the Tracks scroll under it. */
-  aim(y = this.current?.y) {
-    if (this.current && y !== undefined)
-      this.current = { ...this.current, drop: this.#dropAt(this.current.from, y), y };
-  }
-
-  #dropAt(from: number, y: number): TrackDrop | null {
-    const count = Math.max(-1, ...this.#heads.keys()) + 1;
-    const middles = Array.from({ length: count }, (_, i) => {
-      const box = this.#heads.get(i)?.getBoundingClientRect();
-      return box ? (box.top + box.bottom) / 2 : -Infinity;
-    });
-    return trackDrop(from, y, middles);
-  }
-
-  /** The pointer handlers for the grip of the Track at `index`, dropping it by `onDrop`. */
-  grip(index: number, onDrop: (drop: TrackDrop) => void) {
-    return {
-      onpointerdown: (e: PointerEvent & { currentTarget: HTMLElement }) => {
-        if (e.button !== 0) return;
-        e.preventDefault();
-        e.currentTarget.setPointerCapture(e.pointerId);
-        this.current = { from: index, drop: null, y: e.clientY };
-      },
-      onpointermove: (e: PointerEvent) => this.aim(e.clientY),
-      onpointerup: () => {
-        const drop = this.current?.drop;
-        this.cancel();
-        if (drop) onDrop(drop);
-      },
-      onpointercancel: () => this.cancel(),
-    };
-  }
+// Where the middle of a Track's header is, down the page; one not on the
+// page counts above the pointer, as offPage says.
+function middleOf(row: Span | null): number {
+  const { top, bottom } = row ?? offPage;
+  return (top + bottom) / 2;
 }
