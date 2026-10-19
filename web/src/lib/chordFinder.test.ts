@@ -850,6 +850,7 @@ describe('spelling suggestions', () => {
   it('spells a borrowed Chord from the parallel minor’s signature, kept flat in a flat Key', () => {
     expect(kind('D', 'borrowed')).toEqual(['iv Gm', 'bIII F', 'bVI Bb', 'bVII C']);
     expect(kind('Eb', 'borrowed')).toEqual(['iv Abm', 'bIII Gb', 'bVI B', 'bVII Db']);
+    expect(kind('Bb', 'borrowed')).toEqual(['iv Ebm', 'bIII Db', 'bVI Gb', 'bVII Ab']);
   });
 
   it('offers Keys it reads, interleaved by tonic, each named from its own signature', () => {
