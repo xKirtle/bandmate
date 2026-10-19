@@ -49,14 +49,15 @@ afterEach(() => {
 function viewingFor() {
   const state = $state({ span: 100 });
   const lanes = new FakeLanes();
-  const heard = { handScrolls: 0 };
+  /** Each scroll away from where the view put it, and whether a drag at the edges did it. */
+  const heard: { handScrolls: boolean[] } = { handScrolls: [] };
   let viewing!: TimelineViewing;
   disposers.push(
     $effect.root(() => {
       viewing = new TimelineViewing({
         span: () => state.span,
         lanes: () => lanes,
-        onHandScroll: () => heard.handScrolls++,
+        onHandScroll: (dragging) => heard.handScrolls.push(dragging),
       });
       lanes.viewing = viewing;
       viewing.width = 800;
@@ -74,7 +75,7 @@ function fingers(middle: number, apart: number) {
   ] as const;
 }
 
-/** Zooms in twice around the left edge, to 16 pixels a second with room to scroll. */
+/** Zooms to twice the fitted scale around the left edge: 16 pixels a second, with as far again to scroll. */
 async function zoomedIn(viewing: TimelineViewing) {
   viewing.zoomAt(2, 0);
   flushSync();
@@ -108,7 +109,7 @@ describe('the Timeline view scrolled', () => {
     await zoomedIn(viewing);
     lanes.scrollLeft = 200;
     expect(viewing.view.scroll).toBe(200);
-    expect(heard.handScrolls).toBe(1);
+    expect(heard.handScrolls).toEqual([false]);
   });
 
   it('reports no scroll it made itself', async () => {
@@ -118,7 +119,7 @@ describe('the Timeline view scrolled', () => {
     flushSync();
     await tick();
     expect(lanes.scrollLeft).toBeGreaterThan(0);
-    expect(heard.handScrolls).toBe(0);
+    expect(heard.handScrolls).toEqual([]);
   });
 
   it('reports no scroll of less than a pixel, which is the lanes rounding', async () => {
@@ -126,7 +127,7 @@ describe('the Timeline view scrolled', () => {
     await zoomedIn(viewing);
     lanes.scrollLeft = 200;
     lanes.scrollLeft = 200.4;
-    expect(heard.handScrolls).toBe(1);
+    expect(heard.handScrolls).toEqual([false]);
   });
 });
 
@@ -238,7 +239,7 @@ describe('the scroll bar thumb', () => {
     viewing.thumbMove(1, 110);
     // The thumb 100px along a 400px run of bar is a quarter of the 800px of scroll.
     expect(viewing.view.scroll).toBe(200);
-    expect(heard.handScrolls).toBe(1);
+    expect(heard.handScrolls).toEqual([false]);
     viewing.thumbUp();
     expect(viewing.thumbDragging).toBe(false);
     viewing.thumbMove(1, 210);
@@ -281,6 +282,6 @@ describe('the scroll bar thumb', () => {
     // Clicked at 600px, the 400px thumb starts 400px along: the end of the Timeline.
     viewing.barDown(600);
     expect(viewing.view.scroll).toBe(800);
-    expect(heard.handScrolls).toBe(1);
+    expect(heard.handScrolls).toEqual([false]);
   });
 });

@@ -11,10 +11,11 @@
 // - The lanes element's own scroll, which this is the only writer of: a new
 //   view is shown by scrolling it there, once it's as wide as the new scale
 //   makes it, so the lanes and the view never disagree.
-// - Hand-scrolling, told from the scrolling the Timeline did itself by
-//   comparing the lanes' scroll with where it was last put, and reported so
-//   the Transport can stop following the playhead. Transport keeps
-//   deciding that; this only says when a hand scrolled.
+// - Scrolling the Timeline didn't ask for: a hand's, told from the
+//   Timeline's own by comparing the lanes' scroll with where it was last
+//   put, and a drag's, as it reaches the lanes' edges. Both are reported,
+//   so the Transport can stop following the playhead; the Transport keeps
+//   deciding that, and this only says what scrolled the view.
 // - Revealing a time, i.e. scrolling the playhead into view as it plays.
 // - Zooming around a point, and pinching, which zooms and pans together.
 // - The scroll bar's thumb and its drag, given up when the bar goes or a
@@ -55,10 +56,11 @@ export interface TimelineViewingOptions {
   /** The lanes, once the Timeline has drawn them. */
   lanes: () => Lanes | undefined;
   /**
-   * Hears the view scrolled by hand, rather than to where the Timeline
-   * showed it, e.g. to stop following the playhead.
+   * Hears the view scrolled away from where the Timeline showed it, e.g.
+   * to stop following the playhead: by hand, as a wheel or the scroll bar
+   * does, or, while `dragging`, by a drag reaching the lanes' edges.
    */
-  onHandScroll: () => void;
+  onHandScroll: (dragging: boolean) => void;
 }
 
 /** Two fingers pinching: how far apart they are, and where their middle is on the page. */
@@ -110,7 +112,7 @@ export class TimelineViewing {
     });
 
     // Nothing is left scrolling once the Timeline goes.
-    $effect(() => () => this.dragDone());
+    $effect(() => () => this.#dragDone());
   }
 
   /** The view shown: the Timeline's span in a window, zoomed and scrolled as it can be. */
@@ -168,7 +170,7 @@ export class TimelineViewing {
     this.#scroll = at;
     // Scrolled by hand, rather than to where it was shown.
     if (Math.abs(at - timelineView({ ...this.view, scroll: this.#scrolledTo }).scroll) > 1)
-      this.#options.onHandScroll();
+      this.#options.onHandScroll(false);
     this.#scrolledTo = at;
   }
 
@@ -231,7 +233,7 @@ export class TimelineViewing {
   pinchStart(a: Point, b: Point) {
     this.#pinch = pinchOf(a, b);
     this.#thumbDrag = null;
-    this.dragDone();
+    this.#dragDone();
   }
 
   /** Zooms around a pinch's middle as the fingers move, and pans along with it. */
@@ -254,12 +256,12 @@ export class TimelineViewing {
    * the nearer the edge, with what's dragged moved again as they go.
    */
   readonly edgeScroll: EdgeScroll = {
-    along: (at, move) => this.dragTo(at, move),
-    done: () => this.dragDone(),
+    along: (at, move) => this.#dragTo(at, move),
+    done: () => this.#dragDone(),
   };
 
   /** Notes where something's dragged to, scrolling the lanes if it's near an edge. */
-  dragTo(at: Point, move: (at: Point) => void) {
+  #dragTo(at: Point, move: (at: Point) => void) {
     this.#dragScroll = { at: { clientX: at.clientX, clientY: at.clientY }, move };
     if (this.#dragFrame) return;
     let last = performance.now();
@@ -269,7 +271,7 @@ export class TimelineViewing {
       const speed = edgeSpeed(shown, this.xIn(this.#dragScroll.at.clientX));
       if (speed !== 0) {
         void this.#show(timelineView({ ...shown, scroll: shown.scroll + (speed * (now - last)) / 1000 }));
-        this.#options.onHandScroll();
+        this.#options.onHandScroll(true);
         this.#dragScroll.move(this.#dragScroll.at);
       }
       last = now;
@@ -279,7 +281,7 @@ export class TimelineViewing {
   }
 
   /** Stops scrolling along at the edges, as a drag ends or is given up. */
-  dragDone() {
+  #dragDone() {
     this.#dragScroll = null;
     if (this.#dragFrame) cancelAnimationFrame(this.#dragFrame);
     this.#dragFrame = 0;

@@ -283,10 +283,11 @@
   const viewing = new TimelineViewing({
     span: () => span,
     lanes: () => lanesElement,
-    onHandScroll: () => {
-      // Scrolling along at the edges to keep up with a scrub follows the
-      // playhead still; scrolling away from it by hand stops it being followed.
-      if (!transport.scrubbing) transport.stopFollowing();
+    onHandScroll: (dragging) => {
+      // A scrub scrolling along at the lanes' edges keeps up with the
+      // playhead, so it goes on being followed; anything else scrolled the
+      // view away from it.
+      if (!dragging || !transport.scrubbing) transport.stopFollowing();
     },
   });
   /** The stretch of the Timeline on screen, which it draws. */
@@ -525,12 +526,12 @@
   function pointerMove(event: Point) {
     if (!transport.scrubbing) return;
     transport.scrubTo(timeAt(event));
-    viewing.dragTo(event, pointerMove);
+    viewing.edgeScroll.along(event, pointerMove);
   }
 
   function pointerUp(event: PointerEvent) {
     if (!transport.scrubbing) return;
-    viewing.dragDone();
+    viewing.edgeScroll.done();
     transport.endScrub(timeAt(event));
   }
 
@@ -538,7 +539,7 @@
   function pointerCancel() {
     if (!transport.scrubbing) return;
     transport.cancelScrub();
-    viewing.dragDone();
+    viewing.edgeScroll.done();
   }
 
   function rulerKey(event: KeyboardEvent) {
