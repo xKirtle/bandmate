@@ -18,7 +18,7 @@ import { rebound } from './shortcutKeys';
 export function cueNudge(e: ShortcutPress, syncing: boolean): 1 | -1 | null {
   if (syncing) return null;
   const pressed = pressedInControl(e);
-  if (pressed?.id !== 'nudgeCue') return null;
+  if (pressed?.id !== 'nudgeCue' || pressed.way === null) return null;
   return pressed.way === 'forward' ? 1 : -1;
 }
 

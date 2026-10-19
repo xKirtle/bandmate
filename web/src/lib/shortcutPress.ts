@@ -1,12 +1,13 @@
 /**
  * Which Shortcut a key press on the Song page is: the one place that
  * decides it, for every handler there. It matches a press against the keys
- * as rebound on this device (see shortcutKeys.ts), leaves alone a press a
- * handler before has taken, one that's the control's own where it was
- * pressed (see keyPlace.ts) and a held key's repeat of a Shortcut that
- * doesn't repeat, and says no more: what each Shortcut then does, and
- * whether it can act now, is its handler's (see songKeys.ts,
- * timelineKeys.ts, syncKeys.ts and cueKeys.ts).
+ * as rebound on this device (see shortcutKeys.ts), and leaves alone a
+ * press a handler before has taken and a held key's repeat of a Shortcut
+ * that doesn't repeat; a handler on the page leaves alone a key that's the
+ * control's own where it was pressed as well (see keyPlace.ts). It says no
+ * more: what each Shortcut then does, and whether it can act now, is its
+ * handler's (see songKeys.ts, timelineKeys.ts, syncKeys.ts and
+ * cueKeys.ts).
  */
 
 import { ownKey } from './keyPlace';
@@ -19,7 +20,9 @@ export type ShortcutPress = KeyDown & Pick<KeyboardEvent, 'target'>;
 /** The Shortcut a key press is, and which way it goes if it's a two-way one, e.g. seeking back. */
 export type PressedShortcut = { id: ShortcutId; way: Way | null };
 
-const definitions: Record<ShortcutId, Shortcut> = shortcuts;
+// Every Shortcut as it's defined, by its id: the keys are the ones rebound
+// on this device, the rest, e.g. whether it repeats, its definition's.
+const defined: Record<ShortcutId, Shortcut> = shortcuts;
 const ids = Object.keys(shortcuts) as ShortcutId[];
 
 /** Which Shortcut a press is, by its keys alone, taken or not and wherever it landed. */
@@ -28,13 +31,13 @@ function matched(e: ShortcutPress): PressedShortcut | null {
   for (const id of ids) {
     // A held key does its Shortcut once, unless the Shortcut repeats. Keys
     // are unique, so a repeat is no other Shortcut's either.
-    if (e.repeat && !definitions[id].repeats) continue;
-    const of = keys[id];
-    if ('keys' in of) {
-      if (matches(e, of.keys)) return { id, way: null };
+    if (e.repeat && !defined[id].repeats) continue;
+    const shortcut = keys[id];
+    if ('keys' in shortcut) {
+      if (matches(e, shortcut.keys)) return { id, way: null };
       continue;
     }
-    const going = way(e, of);
+    const going = way(e, shortcut);
     if (going) return { id, way: going };
   }
   return null;

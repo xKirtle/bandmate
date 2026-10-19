@@ -99,7 +99,7 @@ export function togglesSelection(e: Modifiers): boolean {
 export function rulerSeek(e: ShortcutPress, position: number): number | null {
   const pressed = pressedInControl(e);
   const by = pressed?.id === 'seek' ? 5 : pressed?.id === 'seekFar' ? 15 : null;
-  if (by === null) return null;
+  if (by === null || pressed?.way === null) return null;
   return position + (pressed?.way === 'back' ? -by : by);
 }
 

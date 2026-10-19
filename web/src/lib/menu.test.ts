@@ -1,7 +1,7 @@
 import { describe as group, expect, it } from 'vitest';
 import { KeyHints } from './keyHints';
 import { fieldHint, fieldStep, fieldInRange, menuKey, opensMenu } from './menu';
-import { defaultKeyset, followKeys } from './shortcutKeys';
+import { rebind } from './shortcutKeysFake';
 
 group('menuKey', () => {
   it('moves down and up through the entries, wrapping round', () => {
@@ -98,10 +98,9 @@ group('opensMenu', () => {
   });
 
   it("keeps them whatever keys open a Clip's menu on this device, as they're a ⋯ button's own", () => {
-    followKeys(() => ({ ...defaultKeyset, clipMenu: { keys: [{ key: 'm', alt: true }] } }));
+    rebind({ clipMenu: { keys: [{ key: 'm', alt: true }] } });
     expect(opensMenu({ ...keys, key: 'ContextMenu' })).toBe(true);
     expect(opensMenu({ ...keys, key: 'm', altKey: true })).toBe(false);
-    followKeys(() => defaultKeyset);
   });
 
   it('leaves F10 alone, and other keys', () => {
