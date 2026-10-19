@@ -1,7 +1,8 @@
 // Transpose: reading a Chord name's root, and a slash chord's bass note, and
 // moving them by semitones. Everything else in the name is kept as written,
 // and a name that can't be read stays as written. The same rule reads the
-// Song's key, whose signature, once moved, spells the moved notes.
+// Song's key, whose signature, once moved, spells the moved notes. The same
+// signatures spell the one list of Keys offered wherever a Key is picked.
 
 /** How a note is spelled at each semitone from C. */
 export type Spelling = readonly string[];

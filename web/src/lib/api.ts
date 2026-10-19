@@ -191,11 +191,7 @@ export const suggestedLabels: readonly string[] = [
   'Outro',
 ];
 
-/**
- * The Keys offered for a Song's and a Beat's Key: the one list of Keys
- * (transpose.ts), the same list the Chord Finder's Suggest offers. The field
- * stays free text, so any text is allowed, e.g. C# for Db.
- */
+/** The Keys offered for a Song's and a Beat's Key: the one list of Keys (transpose.ts), the same list the Chord Finder offers. */
 export { keys as commonKeys } from './transpose';
 
 /** A partial update: only the fields present change; "" or null clears one. */
