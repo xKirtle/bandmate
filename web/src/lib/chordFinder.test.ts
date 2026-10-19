@@ -804,6 +804,40 @@ describe('spelling suggestions', () => {
     ]);
   });
 
+  it('spells a Key’s own Chords by letter, so F# major’s vii° is E#dim', () => {
+    expect(kind('F#', 'diatonic')).toEqual(['I F#', 'ii G#m', 'iii A#m', 'IV B', 'V C#', 'vi D#m', 'vii° E#dim']);
+    expect(kind('D#m', 'diatonic')).toEqual([
+      'i D#m',
+      'ii° E#dim',
+      'III F#',
+      'iv G#m',
+      'v A#m',
+      'VI B',
+      'VII C#',
+      'V A#7',
+    ]);
+  });
+
+  it('can look up and voice every Chord every Key suggests', () => {
+    for (const key of keys) {
+      const s = suggest(key);
+      const chords = s.kind === 'key' ? s.chords : [];
+      for (const c of chords) expect(firstVoicing(c.chord, context), c.chord).not.toBeNull();
+    }
+  });
+
+  it('leaves a Key with no letter to reuse as it was: B, C and Db major', () => {
+    expect(kind('B', 'diatonic')).toEqual(['I B', 'ii C#m', 'iii D#m', 'IV E', 'V F#', 'vi G#m', 'vii° A#dim']);
+    expect(kind('C', 'diatonic')).toEqual(['I C', 'ii Dm', 'iii Em', 'IV F', 'V G', 'vi Am', 'vii° Bdim']);
+    expect(kind('Db', 'diatonic')).toEqual(['I Db', 'ii Ebm', 'iii Fm', 'IV Gb', 'V Ab', 'vi Bbm', 'vii° Cdim']);
+  });
+
+  it('falls back to the enharmonic for a secondary dominant or a borrowed Chord, never a double accidental', () => {
+    expect(kind('F#', 'secondary')).toEqual(['V/ii D#7', 'V/iii F7', 'V/IV F#7', 'V/V G#7', 'V/vi A#7']);
+    expect(kind('F#', 'borrowed')).toEqual(['iv Bm', 'bIII A', 'bVI D', 'bVII E']);
+    expect(kind('Db', 'borrowed')).toEqual(['iv Gbm', 'bIII E', 'bVI A', 'bVII B']);
+  });
+
   it('spells a borrowed Chord from the parallel minor’s signature, kept flat in a flat Key', () => {
     expect(kind('D', 'borrowed')).toEqual(['iv Gm', 'bIII F', 'bVI Bb', 'bVII C']);
     expect(kind('Eb', 'borrowed')).toEqual(['iv Abm', 'bIII Gb', 'bVI B', 'bVII Db']);

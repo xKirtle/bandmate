@@ -3,7 +3,7 @@
 // that go with it. The Chord Finder (chordFinder.ts) is the one way in; the
 // Instruments that voice a Chord build on what this reads.
 
-import { readKey as readTransposeKey, readRoot, signature, type ReadKey, type Spelling } from './transpose';
+import { readKey as readTransposeKey, readRoot, plainSignature, type ReadKey, type Spelling } from './transpose';
 
 /** One note of a Chord, as an interval above its root. */
 export interface Tone {
@@ -459,12 +459,15 @@ const suggestion = ({ chord, numeral, reason, kind }: KeyChord): Suggestion => (
 /**
  * Every Chord that goes with a Key: its own, then those a major Key borrows
  * from its parallel minor, then the V of each of its own but the tonic and a
- * diminished one. Each is spelled from the Key's signature, as Transpose
- * spells Chords, and a borrowed one from its parallel minor's. A Key whose
- * signature has flats keeps it for its borrowed Chords, as Transpose reads
- * the parallel minor of Eb, Ab and Db as sharp (Eb minor as D# minor). As in
- * Transpose, a note with no name of its own there takes its common one: Cb
- * is written B, and E# F.
+ * diminished one.
+ *
+ * Its own are spelled from the Key's signature, as Transpose spells Chords,
+ * so each takes its own letter: F# major's vii° is E#dim. A secondary
+ * dominant and a borrowed Chord fall back to the signature's plain
+ * spellings, which a player writes the easy way: F# major's V/iii is F7, not
+ * E#7 and its double sharps, and Db major borrows bIII E, not Fb. A Key
+ * whose signature has flats keeps it for its borrowed Chords, as Transpose
+ * reads the parallel minor of Eb, Ab and Db as sharp (Eb minor as D# minor).
  */
 function keyChords(key: Key): KeyChord[] {
   const at = ({ numeral, semitones, suffix }: Degree, kind: Suggestion['kind'], spelling: Spelling, reason: string) => {
@@ -472,14 +475,15 @@ function keyChords(key: Key): KeyChord[] {
     return { chord: spelling[root] + suffix, numeral, reason, kind, root, suffix };
   };
   const own = (key.minor ? minor : major).degrees.map((d) => at(d, 'diatonic', key.signature, d.reason));
-  const flatSignature = key.signature.includes('Db');
-  const parallel = flatSignature ? key.signature : signature(key.tonic, true);
+  const plain = plainSignature(key.tonic, key.minor);
+  const flatSignature = plain.includes('Db');
+  const parallel = flatSignature ? plain : plainSignature(key.tonic, true);
   const borrowedFrom = `Borrowed from ${key.signature[key.tonic]} minor`;
   const borrowed = key.minor ? [] : borrowedDegrees.map((d) => at(d, 'borrowed', parallel, borrowedFrom));
   const secondary = own.slice(1).flatMap((c): KeyChord[] => {
     if (c.suffix === 'dim' || c.suffix === '7') return [];
     const root = (c.root + 7) % 12;
-    const chord = key.signature[root] + '7';
+    const chord = plain[root] + '7';
     return [
       { chord, numeral: 'V/' + c.numeral, reason: `V of ${c.chord}`, kind: 'secondary', root, suffix: '7', of: c },
     ];
