@@ -46,7 +46,7 @@ func (tl Timeline) addingTracks(names []string, ids *ids) (Timeline, []int64) {
 	added := make([]int64, len(names))
 	for i, name := range names {
 		added[i] = ids.track()
-		tl.Tracks = append(tl.Tracks, Track{ID: added[i], Name: name, Clips: []Clip{}})
+		tl = tl.insertingTrack(Track{ID: added[i], Name: name, Clips: []Clip{}}, len(tl.Tracks))
 	}
 	return tl, added
 }
@@ -400,16 +400,18 @@ func (tl Timeline) updatingTrack(trackID int64, changes TrackChanges) (Timeline,
 	return tl.replacingTrack(t), nil
 }
 
-// addingTrack is tl with a Track added as t says, holding its Clips, which
-// play srcs: what AddTrack leaves. Its name and volume are already checked,
-// and its Clips follow the same rules as placing a Clip.
+// addingTrack is tl with a Track added as t says, holding its Clips: what
+// AddTrack leaves. srcs are what those Clips play, one for each, in the
+// order t gives them. Its name and volume are already checked, and its
+// Clips follow the same rules as placing a Clip.
 func (tl Timeline) addingTrack(t NewTrack, srcs []clipSource, ids *ids) (Timeline, error) {
-	added := Track{ID: ids.track(), Name: t.Name, Volume: t.Volume, Muted: t.Muted, Soloed: t.Soloed,
-		Clips: []Clip{}}
-	tl, err := tl.insertingTrack(added, t.Position)
+	place, err := tl.trackPosition(t.Position)
 	if err != nil {
 		return Timeline{}, err
 	}
+	added := Track{ID: ids.track(), Name: t.Name, Volume: t.Volume, Muted: t.Muted, Soloed: t.Soloed,
+		Clips: []Clip{}}
+	tl = tl.insertingTrack(added, place)
 	for i, c := range t.Clips {
 		if tl, err = tl.placingNew(added.ID, c, srcs[i], ids.clip()); err != nil {
 			return Timeline{}, err
@@ -418,19 +420,11 @@ func (tl Timeline) addingTrack(t NewTrack, srcs []clipSource, ids *ids) (Timelin
 	return tl, nil
 }
 
-// insertingTrack is tl with t at position, from 0 (the top) to the number
-// of Tracks (the bottom), pushing those from there down, or at the bottom
-// for nil.
-func (tl Timeline) insertingTrack(t Track, position *int) (Timeline, error) {
-	at := len(tl.Tracks)
-	if position != nil {
-		if *position < 0 || *position > len(tl.Tracks) {
-			return Timeline{}, domain.Invalid("a Track's position must be from 0 to the number of Tracks")
-		}
-		at = *position
-	}
-	tl.Tracks = slices.Insert(slices.Clone(tl.Tracks), at, t)
-	return tl, nil
+// insertingTrack is tl with t among its Tracks at place, from 0 (the top)
+// to the number of Tracks (the bottom), pushing those from there down.
+func (tl Timeline) insertingTrack(t Track, place int) Timeline {
+	tl.Tracks = slices.Insert(slices.Clone(tl.Tracks), place, t)
+	return tl
 }
 
 // addingTracksAt is tl with an empty Track of each of those given, in
@@ -444,11 +438,12 @@ func (tl Timeline) addingTracksAt(tracks []TrackAt, ids *ids) (Timeline, []int64
 		if err != nil {
 			return Timeline{}, nil, err
 		}
-		added[i] = ids.track()
-		at := t.Position
-		if tl, err = tl.insertingTrack(Track{ID: added[i], Name: name, Clips: []Clip{}}, &at); err != nil {
+		place, err := tl.trackPosition(&t.Position)
+		if err != nil {
 			return Timeline{}, nil, err
 		}
+		added[i] = ids.track()
+		tl = tl.insertingTrack(Track{ID: added[i], Name: name, Clips: []Clip{}}, place)
 	}
 	return tl, added, nil
 }
@@ -461,10 +456,9 @@ func (tl Timeline) addingTrackBelow(trackID int64, ids *ids) (Timeline, int64, e
 	if !ok {
 		return Timeline{}, 0, domain.ErrNotFound
 	}
-	below, id := above+1, ids.track()
-	added, err := tl.insertingTrack(Track{ID: id, Name: fmt.Sprintf("Track %d", len(tl.Tracks)+1),
-		Clips: []Clip{}}, &below)
-	return added, id, err
+	id := ids.track()
+	return tl.insertingTrack(Track{ID: id, Name: fmt.Sprintf("Track %d", len(tl.Tracks)+1),
+		Clips: []Clip{}}, above+1), id, nil
 }
 
 // reordering is tl with its Tracks in the order given, top to bottom, which
@@ -487,45 +481,55 @@ func (tl Timeline) reordering(order []int64) (Timeline, error) {
 	return tl, nil
 }
 
-// settingGain is tl with one of its Clips playing gain decibels louder or
-// quieter: what SetClipGain leaves. The Gain it gives is already checked.
-func (tl Timeline) settingGain(clipID int64, gain float64) (Timeline, error) {
+// changingClip is tl with one of its Clips as how leaves it, where it is on
+// its Track: how a Clip's playback is set, which never moves it.
+func (tl Timeline) changingClip(clipID int64, how func(Clip) (Clip, error)) (Timeline, error) {
 	t, c, err := tl.findClip(clipID)
 	if err != nil {
 		return Timeline{}, err
 	}
-	c.Gain = gain
+	if c, err = how(c); err != nil {
+		return Timeline{}, err
+	}
 	return tl.replacing(t, t.ID, c), nil
+}
+
+// settingGain is tl with one of its Clips playing gain decibels louder or
+// quieter: what SetClipGain leaves. The Gain it gives is already checked.
+func (tl Timeline) settingGain(clipID int64, gain float64) (Timeline, error) {
+	return tl.changingClip(clipID, func(c Clip) (Clip, error) {
+		c.Gain = gain
+		return c, nil
+	})
 }
 
 // settingPitches is tl with each of several Clips' audio moved up or down
 // by the semitones given, nothing else about them changing: what
 // SetClipPitches leaves. The Pitches it gives are already checked.
 func (tl Timeline) settingPitches(pitches []ClipPitch) (Timeline, error) {
+	var err error
 	for _, p := range pitches {
-		t, c, err := tl.findClip(p.ClipID)
-		if err != nil {
+		if tl, err = tl.changingClip(p.ClipID, func(c Clip) (Clip, error) {
+			c.Pitch = *p.Pitch
+			return c, nil
+		}); err != nil {
 			return Timeline{}, err
 		}
-		c.Pitch = *p.Pitch
-		tl = tl.replacing(t, t.ID, c)
 	}
 	return tl, nil
 }
 
 // settingFades is tl with one of its Clips rising from silence at its start
 // and falling to silence at its end as fades says: what SetClipFades
-// leaves.
+// leaves. They must fit the Clip as it is.
 func (tl Timeline) settingFades(clipID int64, fades Fades) (Timeline, error) {
-	t, c, err := tl.findClip(clipID)
-	if err != nil {
-		return Timeline{}, err
-	}
-	if err := fades.check(c.Length); err != nil {
-		return Timeline{}, err
-	}
-	c.setFades(fades)
-	return tl.replacing(t, t.ID, c), nil
+	return tl.changingClip(clipID, func(c Clip) (Clip, error) {
+		if err := fades.check(c.Length); err != nil {
+			return Clip{}, err
+		}
+		c.setFades(fades)
+		return c, nil
+	})
 }
 
 // settingTempos is tl with each of several of its Clips playing its audio
@@ -624,12 +628,12 @@ func (tl Timeline) splitting(clipID int64, at float64, rightID int64, copied spl
 // audio, rendered to whole samples at sampleRate, may fall short of the
 // span by part of one, and the Clip then plays all there is; falling short
 // by more is refused.
-func (tl Timeline) merging(m ClipMerge, snd Sound, sampleRate int, ids *ids) (Timeline, error) {
+func (tl Timeline) merging(m ClipMerge, snd Sound, sampleRate float64, ids *ids) (Timeline, error) {
 	start, end, err := tl.mergedSpan(m.ClipIDs)
 	if err != nil {
 		return Timeline{}, err
 	}
-	if snd.Duration < end-start-1/float64(sampleRate) {
+	if snd.Duration < end-start-1/sampleRate {
 		return Timeline{}, domain.Invalid("the merged audio must last as long as the Clips merged")
 	}
 	if tl, err = tl.deleting(m.ClipIDs, nil); err != nil {
@@ -660,8 +664,9 @@ func (m ClipMerge) landing(tl Timeline, ids *ids) (Timeline, int64, error) {
 
 // replacingClips is tl without the Clips with the ids given, then without
 // the Tracks trackIDs, with an empty Track of each of newTracks added where
-// it says, and with clips placed on its Tracks, playing srcs: what
-// ReplaceClips leaves, e.g. undoing a Merge.
+// it says, and with clips placed on its Tracks: what ReplaceClips leaves,
+// e.g. undoing a Merge. srcs are what those Clips play, one for each, in
+// the order clips gives them.
 func (tl Timeline) replacingClips(clipIDs, trackIDs []int64, newTracks []TrackAt, clips []PlacedClip,
 	srcs []clipSource, ids *ids) (Timeline, error) {
 	tl, err := tl.deleting(clipIDs, trackIDs)

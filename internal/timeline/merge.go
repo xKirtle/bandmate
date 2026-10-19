@@ -85,7 +85,7 @@ func (s *Store) MergeClips(ctx context.Context, songID int64, based songversion.
 			}
 			changes.Keep(file, snd.ID)
 			return func(tl Timeline, ids *ids) (Timeline, error) {
-				return tl.merging(m, snd, int(wav.SampleRate), ids)
+				return tl.merging(m, snd, float64(wav.SampleRate), ids)
 			}, nil
 		})
 }

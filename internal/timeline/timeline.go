@@ -325,6 +325,7 @@ type TrackChanges struct {
 // can't be blank, and its volume must be from MinVolume to MaxVolume.
 func (s *Store) UpdateTrack(ctx context.Context, songID int64, based songversion.Version, trackID int64, changes TrackChanges) (Timeline, error) {
 	if c := changes.Name; c.Set {
+		// Trimmed here, so the edit sets the name as the Track will hold it.
 		name, err := trackName(c.Value)
 		if err != nil {
 			return Timeline{}, err

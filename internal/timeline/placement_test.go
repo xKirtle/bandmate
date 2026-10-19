@@ -1392,6 +1392,14 @@ func TestSplitting(t *testing.T) {
 				{clipID: 2, trackID: 1, start: 10.5, offset: 10.5, length: 9.5},
 			},
 		},
+		{
+			name: "a cut just inside its end",
+			at:   19.5,
+			want: []where{
+				{clipID: 1, trackID: 1, start: 10, offset: 10, length: 9.5},
+				{clipID: 2, trackID: 1, start: 19.5, offset: 19.5, length: 0.5},
+			},
+		},
 		{name: "a cut at its start", at: 10, refusal: refusal},
 		{name: "a cut at its end", at: 20, refusal: refusal},
 		{name: "a cut nowhere near it", at: 40, refusal: refusal},

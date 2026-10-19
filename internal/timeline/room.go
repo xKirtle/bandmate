@@ -90,6 +90,19 @@ func (tl Timeline) trackPlace(id int64) (int, bool) {
 	return i, i >= 0
 }
 
+// trackPosition is where a Track a request puts at position goes among
+// tl's, from 0 (the top) to the number of Tracks (the bottom), or the
+// bottom for nil, which is where a Track goes by default.
+func (tl Timeline) trackPosition(position *int) (int, error) {
+	if position == nil {
+		return len(tl.Tracks), nil
+	}
+	if *position < 0 || *position > len(tl.Tracks) {
+		return 0, domain.Invalid("a Track's position must be from 0 to the number of Tracks")
+	}
+	return *position, nil
+}
+
 // clipsLeaving are the ids of the Clips a change takes off tl: those named,
 // and any left on the Tracks named. They free their Takes to go in a Clip
 // the same change places.
