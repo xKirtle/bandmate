@@ -69,6 +69,14 @@ describe("transposeChord with the Song's key", () => {
     expect(transposeChord('D', -1, 'F#')).toBe('Db');
   });
 
+  it('spells by letter where the key reaches E#, as the Chord Finder does', () => {
+    // F up 1 is F# major, F# G# A# B C# D# E#, which has already spent F on F#.
+    expect(transposeChord('E', 1, 'F')).toBe('E#');
+    expect(transposeChord('Em7/G', 1, 'F')).toBe('E#m7/G#');
+    // Dm up 1 is D# minor, whose relative major is F#.
+    expect(transposeChord('E', 1, 'Dm')).toBe('E#');
+  });
+
   it('reads F major as flats and E major as sharps', () => {
     expect(transposeChord('A', 1, 'E')).toBe('Bb');
     expect(transposeChord('A', 1, 'Eb')).toBe('A#');
