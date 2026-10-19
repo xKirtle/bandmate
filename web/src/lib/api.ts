@@ -192,36 +192,11 @@ export const suggestedLabels: readonly string[] = [
 ];
 
 /**
- * Keys offered as suggestions, for Songs and Beats: all 24, by tonic, each
- * major then the minor on the same tonic, spelled with sharps only, so the
- * list reads plainly. Any text is allowed, e.g. Bb for A#.
+ * The Keys offered for a Song's and a Beat's Key: the one list of Keys
+ * (transpose.ts), the same list the Chord Finder's Suggest offers. The field
+ * stays free text, so any text is allowed, e.g. C# for Db.
  */
-export const commonKeys: readonly string[] = [
-  'C',
-  'Cm',
-  'C#',
-  'C#m',
-  'D',
-  'Dm',
-  'D#',
-  'D#m',
-  'E',
-  'Em',
-  'F',
-  'Fm',
-  'F#',
-  'F#m',
-  'G',
-  'Gm',
-  'G#',
-  'G#m',
-  'A',
-  'Am',
-  'A#',
-  'A#m',
-  'B',
-  'Bm',
-];
+export { keys as commonKeys } from './transpose';
 
 /** A partial update: only the fields present change; "" or null clears one. */
 export type SongChanges = Partial<

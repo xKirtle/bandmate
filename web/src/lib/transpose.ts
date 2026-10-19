@@ -75,6 +75,19 @@ export function signature(tonic: number, isMinor: boolean): Spelling {
   return signatures[isMinor ? (tonic + 3) % 12 : tonic];
 }
 
+/**
+ * The Keys offered wherever one is picked — a Song's and a Beat's Key, and
+ * the Chord Finder's Suggest — all 24, interleaved by tonic, each tonic's
+ * major then the minor on it. Each is spelled from its own signature, so the
+ * list never offers a Key no signature can write: Db, not D# major, which
+ * would need nine sharps. A Key field stays free text, so C# typed by hand is
+ * kept as written.
+ */
+export const keys: readonly string[] = signatures.flatMap((_, tonic) => [
+  signature(tonic, false)[tonic],
+  signature(tonic, true)[tonic] + 'm',
+]);
+
 /** A key as Transpose reads it: its tonic's semitone from C, whether it's minor, and its signature. */
 export interface ReadKey {
   tonic: number;

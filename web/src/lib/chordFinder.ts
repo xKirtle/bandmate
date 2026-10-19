@@ -23,6 +23,8 @@ import {
 } from './guitarTuning';
 
 export { qualities, roots, type Quality, type Suggestion } from './chordTheory';
+/** The Keys Suggest's picker offers: the one list of Keys (transpose.ts), the same list a Song's and a Beat's Key field offers. */
+export { keys } from './transpose';
 export type { Pluck, Voicing } from './guitar';
 
 /** Standard tuning, its strings' pitches low to high, as MIDI note numbers (E2 A2 D3 G3 B3 E4). */
@@ -162,12 +164,6 @@ export function plucks(frets: Frets, context: FinderContext): Pluck[] {
 function sameFrets(a: Frets, b: Frets): boolean {
   return a.length === b.length && a.every((f, i) => f === b[i]);
 }
-
-/** The Keys Suggest's picker offers, each spelled from its own signature: the twelve major Keys, then the twelve minor. */
-export const keys: readonly string[] = [
-  ...['C', 'Db', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B'],
-  ...['Cm', 'C#m', 'Dm', 'D#m', 'Em', 'Fm', 'F#m', 'Gm', 'G#m', 'Am', 'Bbm', 'Bm'],
-];
 
 /** A Key's name, tidied (G major, E minor), read as Transpose reads the Song's Key, or null if it can't be read. */
 export function keyName(text: string): string | null {
