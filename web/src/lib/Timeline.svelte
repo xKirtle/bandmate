@@ -1115,7 +1115,7 @@
     playhead: () => position,
     loop: () => loop,
     reach: () => reachAt(view.scale),
-    sourceLength: (clip) => trimLimit(clip, sources.of(clip)),
+    trimLimit: (clip) => trimLimit(clip, sources.of(clip)),
   });
 
   /** Where a point is, for ClipDrag: the time under it across the lanes and the Track whose lane is nearest. */

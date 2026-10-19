@@ -111,8 +111,8 @@ export interface DragContext {
   loop: () => { start: number; end: number } | null;
   /** How near a target an edge snaps to it, in seconds, at the zoom shown. */
   reach: () => number;
-  /** How long a Clip's source is, in seconds, which it can't be trimmed past. */
-  sourceLength: (clip: Clip) => number;
+  /** How far into its source a Clip's end can be dragged out, in seconds (see trimLimit). */
+  trimLimit: (clip: Clip) => number;
 }
 
 interface Drag {
@@ -388,7 +388,7 @@ export class ClipDrag {
     const others = this.#othersOn(drag.trackId, clip);
     const trimStart = drag.mode === 'start';
     const trim = (to: number) =>
-      trimStart ? clampTrimStart(clip, others, to) : clampTrimEnd(clip, others, this.#context.sourceLength(clip), to);
+      trimStart ? clampTrimStart(clip, others, to) : clampTrimEnd(clip, others, this.#context.trimLimit(clip), to);
     // Where the edge dragged ends up, trimmed to `to`.
     const edge = (to: number) => {
       const trimmed = trim(to);

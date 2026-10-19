@@ -46,15 +46,12 @@ export function clampTrimStart(clip: Placed, others: readonly Placed[], desired:
 }
 
 /**
- * The Clip with its end edge dragged to desired. It stops at the end of
- * its source, sourceDuration seconds long, and at the Clip after it.
+ * The Clip with its end edge dragged to desired. It stops where its source
+ * runs out, limit seconds into it, and at the Clip after it.
  */
-export function clampTrimEnd(clip: Placed, others: readonly Placed[], sourceDuration: number, desired: number): Placed {
+export function clampTrimEnd(clip: Placed, others: readonly Placed[], limit: number, desired: number): Placed {
   const end = clip.start + clip.length;
-  const latest = Math.min(
-    timelineAt(clip, sourceDuration),
-    ...others.filter((c) => c.start > clip.start).map((c) => c.start),
-  );
+  const latest = Math.min(timelineAt(clip, limit), ...others.filter((c) => c.start > clip.start).map((c) => c.start));
   const newEnd = Math.max(Math.min(desired, latest), clip.start + minClipLength);
   return { start: clip.start, offset: clip.offset, length: newEnd - clip.start, tempo: clip.tempo };
 }

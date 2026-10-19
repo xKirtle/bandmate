@@ -51,8 +51,8 @@ func TestNudgingATakeFollowsItsRules(t *testing.T) {
 	r := recordATake(t, ts)
 	other := timelineChange(t, ts.recordTake(r.song.ID, takeRecording(r.vox.ID, 10, 10, 0, 2))).Tracks[1].Clips[1]
 	beatClip := r.tl.Tracks[0].Clips[0].ID
-	// Nudged later and trimmed to its end, the Clip would play past its
-	// Take if it went back.
+	// Nudged later and trimmed to its end: the Clip the other rules are
+	// tried on, a Take's worth of Timeline away from where it started.
 	timelineChange(t, ts.nudgeTake(r.song.ID, r.clip.ID, r.take.ID, 1))
 	before := timelineChange(t, ts.trimClip(r.song.ID, r.clip.ID, 0.5, 4.5))
 

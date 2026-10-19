@@ -164,6 +164,13 @@ func TestCheckLayoutClips(t *testing.T) {
 		{"a Clip playing past where its nudged Take reaches",
 			takesClip(1, 0, 0, 13, Take{ID: 1}, Take{ID: 2, Position: 0, Nudge: -2}), 0},
 		{"a Clip of Takes starting before its span", offset(takesClip(1, 0, 0, 12, Take{ID: 1}), -1), ruleBeforeSource},
+		// Only a Clip of Takes is let past its source, so one playing
+		// nothing at all is still refused, as it always was.
+		{"a Clip with nothing to play", func() Clip {
+			c := takesClip(1, 0, 0, 12, Take{ID: 1})
+			c.Takes, c.ActiveTakeID = nil, nil
+			return c
+		}(), rulePastSource},
 		{"a Clip with Fades that fit", faded(beatClip(1, 0, 4), 1, 3), 0},
 		{"a Clip with Fades a rounding hair too long", faded(beatClip(1, 0, 4), 1, 3+tolerance/2), 0},
 		{"a Clip with Fades that don't fit", faded(beatClip(1, 0, 4), 2, 3), ruleFadesFit},

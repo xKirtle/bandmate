@@ -125,15 +125,15 @@ func storedRule(start, offset, length float64) placementRule {
 // holds whatever the Clip plays, so a Take nudged earlier leaves silence
 // at the Clip's end rather than costing the Clip its window (ADR 0023).
 func playsPastSource(tl Timeline, c Clip) bool {
-	if c.BeatID == nil && c.SoundID == nil {
+	if c.ActiveTakeID != nil {
 		return false
 	}
 	return c.sourceEnd() > sourceDuration(tl, c)+tolerance
 }
 
-// sourceDuration is how long the file c plays is on the Timeline tl, in
-// seconds, however c trims it: its Beat's or its Sound's. A Clip of Takes
-// has no such length, as playsPastSource says.
+// sourceDuration is how long the file c plays lasts, in seconds, however c
+// trims it: its Beat's or its Sound's, as the Timeline tl holds them. A
+// Clip of Takes plays no file of its own, as playsPastSource says.
 func sourceDuration(tl Timeline, c Clip) float64 {
 	switch {
 	case c.BeatID != nil:
@@ -150,7 +150,8 @@ func sourceDuration(tl Timeline, c Clip) float64 {
 
 // takesEnd is where in their Clip's source span the last of the Takes
 // ends. A Take nudged earlier still reaches where it ended before, so the
-// span a Clip of Takes can be trimmed out into never shrinks under it.
+// Clips that shrink to their Takes, as deleting one does, keep the window
+// a nudge left them.
 func takesEnd(takes []Take) float64 {
 	var end float64
 	for _, t := range takes {

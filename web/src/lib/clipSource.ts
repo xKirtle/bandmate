@@ -5,10 +5,11 @@
 // here too, as is what a Clip goes by until it has a name of its own.
 //
 // A Clip of Takes plays its active Take. Its source is the span its Takes
-// are laid out in, up to where the last of them ends: each Take starts at
-// its position in it, and the span starts the Clip's offset before the Clip
-// does. A Take nudged earlier still reaches where it ended before, so a
-// nudge never leaves its Clip playing past its source.
+// are laid out in: each Take starts at its position in it, and the span
+// starts the Clip's offset before the Clip does. The span holds whatever
+// the Clip plays, so a Clip may run on past where its Takes end, as it may
+// start before they do: nudged earlier, a Take leaves silence behind it
+// (ADR 0023).
 import { api, type Clip, type NewClip, type OwnOfClip, type Take, type Timeline } from './api';
 import type { PlacedFades } from './clipFade';
 import { gainFactor } from './clipGain';
@@ -111,12 +112,13 @@ export function activeTake(clip: Clip): Take | undefined {
 
 /**
  * How far into its source a Clip's end can be dragged out, in seconds: the
- * whole of a Beat's or a Sound's file. A Clip of Takes can go as far as its
- * Takes reach, or as far as it already plays, whichever is more: nudging a
- * Take earlier leaves the Clip playing silence past it (ADR 0023), and
- * grabbing its edge then never pulls it in.
+ * whole of a Beat's or a Sound's file, which it can never play past. A Clip
+ * of Takes can go as far as its Takes reach, or as far as it already plays,
+ * whichever is more: nudging a Take earlier leaves the Clip playing silence
+ * past it (ADR 0023), and grabbing its edge then never pulls it in.
  */
 export function trimLimit(clip: Clip, source: ClipSource): number {
+  if (clip.activeTakeId === null) return source.duration;
   return Math.max(source.duration, sourceAt(clip, clip.start + clip.length));
 }
 

@@ -97,7 +97,7 @@ function timelineDrag(tracks: Track[] = song()) {
     playhead: () => state.playhead,
     loop: () => state.loop,
     reach: () => 8 / scale,
-    sourceLength: () => 60,
+    trimLimit: () => 60,
   });
   const clipOf = (id: number) => state.tracks.flatMap((t) => t.clips).find((c) => c.id === id)!;
   return {

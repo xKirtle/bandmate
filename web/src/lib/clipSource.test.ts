@@ -218,6 +218,11 @@ describe('trimLimit', () => {
     expect(trimLimit(takeClip(1, [take(3)]), source(8))).toBe(12);
   });
 
+  it("is a Beat's or a Sound's own length, which its Clip can never play past", () => {
+    // Stored playing past its Beat, it's still pulled back to the Beat's end.
+    expect(trimLimit(clip(1, 7), source(8))).toBe(8);
+  });
+
   it('is as far as a Clip of Takes already plays, where a nudge left it past its Takes', () => {
     // Its Take nudged earlier, the span ends before the Clip does: its end
     // still goes back out to where it is, so grabbing it never pulls it in.
