@@ -17,6 +17,7 @@ function storage(values: Record<string, string> = {}, blocked = false): Storage 
 const dropD = readTuning('Drop D')!;
 const barreG = [3, 5, 5, 4, 3, 3];
 const openC = [null, 3, 2, 0, 1, 0];
+const dbMaj7 = [null, 4, 6, 5, 6, 4];
 
 describe('readPreferredVoicings', () => {
   it('is none until one is preferred on this device', () => {
@@ -42,6 +43,36 @@ describe('storePreferredVoicing', () => {
     storePreferredVoicing(s, standard, 'G', barreG);
     storePreferredVoicing(s, standard, 'G', [3, 2, 0, 0, 3, 3]);
     expect(readPreferredVoicings(s, standard)).toEqual({ G: [3, 2, 0, 0, 3, 3] });
+  });
+
+  it('keeps one Voicing per Chord however it is spelled, since two spellings are one sound', () => {
+    const s = storage();
+    storePreferredVoicing(s, standard, 'Dbmaj7', dbMaj7);
+    expect(readPreferredVoicings(s, standard)).toEqual({ 'C#maj7': dbMaj7 });
+    storePreferredVoicing(s, standard, 'C#maj7', [9, 11, 10, 10, 9, 9]);
+    expect(readPreferredVoicings(s, standard)).toEqual({ 'C#maj7': [9, 11, 10, 10, 9, 9] });
+  });
+
+  it('clears a preference under either spelling of its Chord', () => {
+    const s = storage();
+    storePreferredVoicing(s, standard, 'C#maj7', dbMaj7);
+    storePreferredVoicing(s, standard, 'Dbmaj7', null);
+    expect(readPreferredVoicings(s, standard)).toEqual({});
+  });
+
+  it("keeps a slash Chord by its bass's one spelling too", () => {
+    const s = storage();
+    storePreferredVoicing(s, standard, 'C/D#', openC);
+    expect(readPreferredVoicings(s, standard)).toEqual({ 'C/Eb': openC });
+    storePreferredVoicing(s, standard, 'C/Eb', null);
+    expect(readPreferredVoicings(s, standard)).toEqual({});
+  });
+
+  it('keeps Chords that share no notes apart', () => {
+    const s = storage();
+    storePreferredVoicing(s, standard, 'G', barreG);
+    storePreferredVoicing(s, standard, 'C#maj7', dbMaj7);
+    expect(readPreferredVoicings(s, standard)).toEqual({ G: barreG, 'C#maj7': dbMaj7 });
   });
 
   it('keeps preferences per tuning, so one in standard tuning does not apply in Drop D', () => {
@@ -81,6 +112,22 @@ describe('kept preferences that have gone wrong', () => {
       const values = { [preferredVoicingsKey(standard)]: kept };
       expect(readPreferredVoicings(storage(values), standard), kept).toEqual({});
     }
+  });
+
+  it('reads a preference kept under a Chord as it was spelled, so one kept before still applies', () => {
+    const values = { [preferredVoicingsKey(standard)]: JSON.stringify({ Dbmaj7: dbMaj7, G: barreG }) };
+    expect(readPreferredVoicings(storage(values), standard)).toEqual({ 'C#maj7': dbMaj7, G: barreG });
+  });
+
+  it('keeps a Chord that cannot be read as it was written, rather than dropping it', () => {
+    const values = { [preferredVoicingsKey(standard)]: JSON.stringify({ Galt: barreG }) };
+    expect(readPreferredVoicings(storage(values), standard)).toEqual({ Galt: barreG });
+  });
+
+  it('keeps the last of two spellings of one Chord kept before', () => {
+    const kept = { Dbmaj7: dbMaj7, 'C#maj7': [9, 11, 10, 10, 9, 9] };
+    const values = { [preferredVoicingsKey(standard)]: JSON.stringify(kept) };
+    expect(readPreferredVoicings(storage(values), standard)).toEqual({ 'C#maj7': [9, 11, 10, 10, 9, 9] });
   });
 
   it('drops a Voicing that is not a fret or muted for each string, keeping the rest', () => {
