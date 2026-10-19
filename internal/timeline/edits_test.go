@@ -607,21 +607,29 @@ func TestARetakeKeepsHowItsClipPlays(t *testing.T) {
 // nothing about it.
 func TestMovingAClipKeepsHowItPlays(t *testing.T) {
 	how := playback{name: "Chorus", gain: 6, pitch: -3, tempo: 1, fadeIn: 2, fadeOut: 3}
+	// renamed is how the Clip plays once it's given another name, which is
+	// the one thing these edits change about it.
+	renamed := how
+	renamed.name = "Verse"
 	tests := []struct {
 		name string
 		edit edit
+		want playback
 	}{
 		{
 			name: "moved along its Track",
 			edit: func(tl Timeline, _ *ids) (Timeline, error) { return tl.moving(1, 1, 30) },
+			want: how,
 		},
 		{
 			name: "trimmed to a length its Fades still fit",
 			edit: func(tl Timeline, _ *ids) (Timeline, error) { return tl.trimming(1, 2, 8, nil) },
+			want: how,
 		},
 		{
 			name: "renamed, which changes only its name",
 			edit: func(tl Timeline, _ *ids) (Timeline, error) { return tl.renaming(1, "Verse") },
+			want: renamed,
 		},
 	}
 	for _, tt := range tests {
@@ -632,12 +640,8 @@ func TestMovingAClipKeepsHowItPlays(t *testing.T) {
 				t.Fatalf("the edit's error = %v", err)
 			}
 			_, c, _ := after.clip(1)
-			want := how
-			if tt.name == "renamed, which changes only its name" {
-				want.name = "Verse"
-			}
-			if got := playbackOf(c); got != want {
-				t.Errorf("the Clip plays %+v, want %+v", got, want)
+			if got := playbackOf(c); got != tt.want {
+				t.Errorf("the Clip plays %+v, want %+v", got, tt.want)
 			}
 		})
 	}
