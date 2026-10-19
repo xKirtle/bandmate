@@ -544,6 +544,183 @@ func TestAddingTracks(t *testing.T) {
 	}
 }
 
+func TestPasting(t *testing.T) {
+	beat := int64(1)
+	// The Clips already on the Timeline: one Track, 0:00 to 0:10.
+	tracks := [][]Clip{{beatClip(1, 0, 10)}}
+	// copied is a Clip of the Beat as the Clipboard holds it.
+	copied := func(on OnTrack, start, length float64) ClipCopy {
+		return ClipCopy{OnTrack: on, BeatID: &beat, ClipPlayback: asRecorded(), Start: start, Length: length}
+	}
+	tests := []struct {
+		name       string
+		newTracks  []string
+		clips      []ClipCopy
+		wantTracks []string
+		want       []where
+		refusal    string
+	}{
+		{
+			name:       "a Clip pasted in the room after the one there",
+			clips:      []ClipCopy{copied(OnTrack{TrackID: 1}, 20, 10)},
+			wantTracks: []string{""},
+			want: []where{{clipID: 1, trackID: 1, length: 10},
+				{clipID: 2, trackID: 1, start: 20, length: 10}},
+		},
+		{
+			name:       "a Clip pasted onto a Track added for it",
+			newTracks:  []string{"Harmony"},
+			clips:      []ClipCopy{copied(OnTrack{NewTrack: placeOf(0)}, 0, 10)},
+			wantTracks: []string{"", "Harmony"},
+			want: []where{{clipID: 1, trackID: 1, length: 10},
+				{clipID: 2, trackID: 2, length: 10}},
+		},
+		{
+			name:      "two Clips pasted at once, one on a Track added for it",
+			newTracks: []string{"Harmony"},
+			clips: []ClipCopy{copied(OnTrack{TrackID: 1}, 20, 10),
+				copied(OnTrack{NewTrack: placeOf(0)}, 20, 10)},
+			wantTracks: []string{"", "Harmony"},
+			want: []where{{clipID: 1, trackID: 1, length: 10},
+				{clipID: 2, trackID: 1, start: 20, length: 10},
+				{clipID: 3, trackID: 2, start: 20, length: 10}},
+		},
+		{
+			name:    "a Clip pasted where another already is",
+			clips:   []ClipCopy{copied(OnTrack{TrackID: 1}, 5, 10)},
+			refusal: "Clips can't overlap on a Track",
+		},
+		{
+			name: "two Clips pasted at once, the second over the first",
+			clips: []ClipCopy{copied(OnTrack{TrackID: 1}, 20, 10),
+				copied(OnTrack{TrackID: 1}, 25, 10)},
+			refusal: "Clips can't overlap on a Track",
+		},
+		{
+			name:    "a Clip pasted onto a Track that isn't on the Timeline",
+			clips:   []ClipCopy{copied(OnTrack{TrackID: 9}, 20, 10)},
+			refusal: "there's no such Track on this Timeline",
+		},
+		{
+			name:    "a Clip pasted onto a Track no Track was added for",
+			clips:   []ClipCopy{copied(OnTrack{NewTrack: placeOf(0)}, 20, 10)},
+			refusal: "there's no such new Track",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tl := timelineOf(tracks...)
+			srcs := make([]clipSource, len(tt.clips))
+			for i := range srcs {
+				srcs[i] = clipSource{beat: &Beat{ID: 1, Duration: 60}}
+			}
+			after, err := edited(tl, func(tl Timeline, ids *ids) (Timeline, error) {
+				return tl.pasting(tt.newTracks, tt.clips, srcs, ids)
+			})
+			if tt.refusal != "" {
+				refused(t, err, tt.refusal)
+				return
+			}
+			if err != nil {
+				t.Fatalf("pasting error = %v", err)
+			}
+			if !reflect.DeepEqual(trackNames(after), tt.wantTracks) {
+				t.Errorf("the Tracks = %v, want %v", trackNames(after), tt.wantTracks)
+			}
+			if got := clipsIn(after); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("the Clips = %+v, want %+v", got, tt.want)
+			}
+		})
+	}
+}
+
+// placeOf is a pointer to a place among Tracks, as a pasted Clip names the
+// Track added for it.
+func placeOf(place int) *int { return &place }
+
+func TestPastingAClipOfTakes(t *testing.T) {
+	tl := timelineOf([]Clip{})
+	// The copies of the Clip's Takes, as the change stores them before the
+	// edit places them, in the order the Clipboard holds them.
+	copies := []Take{{ID: 9, Number: 2, Duration: 10}, {ID: 8, Number: 1, Duration: 20}}
+	pasted := ClipCopy{OnTrack: OnTrack{TrackID: 1}, ClipPlayback: asRecorded(),
+		Takes:        []TakeAt{{ID: 3, Position: 5, Nudge: 1}, {ID: 2, Position: -tolerance / 2}},
+		ActiveTakeID: idOf(3), Start: 10, Length: 15}
+	after, err := edited(tl, func(tl Timeline, ids *ids) (Timeline, error) {
+		return tl.pasting(nil, []ClipCopy{pasted},
+			[]clipSource{{takes: copies, activeTakeID: idOf(9)}}, ids)
+	})
+	if err != nil {
+		t.Fatalf("pasting error = %v", err)
+	}
+	_, c, ok := after.clip(1)
+	if !ok {
+		t.Fatal("the pasted Clip isn't on the Timeline")
+	}
+	// By number, each where it started in the Clip's source span, nudged as
+	// it was, and a position a rounding hair before the span's start taken
+	// as its start.
+	want := []Take{{ID: 8, Number: 1, Duration: 20}, {ID: 9, Number: 2, Duration: 10, Position: 5, Nudge: 1}}
+	if !reflect.DeepEqual(c.Takes, want) {
+		t.Errorf("the pasted Clip's Takes = %+v, want %+v", c.Takes, want)
+	}
+	if c.ActiveTakeID == nil || *c.ActiveTakeID != 9 {
+		t.Errorf("the pasted Clip plays Take %v, want 9", c.ActiveTakeID)
+	}
+}
+
+func TestRenaming(t *testing.T) {
+	named := func(name string) *string { return &name }
+	tests := []struct {
+		name string
+		clip Clip
+		to   string
+		want *string
+	}{
+		{
+			name: "a Clip given a name of its own",
+			clip: beatClip(1, 0, 10),
+			to:   "  Chorus  ",
+			want: named("Chorus"),
+		},
+		{
+			name: "a named Clip's name cleared, so it goes by its source's",
+			clip: func() Clip { c := beatClip(1, 0, 10); c.Name = named("Chorus"); return c }(),
+			to:   "   ",
+			want: nil,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tl := timelineOf([]Clip{tt.clip})
+			after, err := edited(tl, func(tl Timeline, _ *ids) (Timeline, error) {
+				return tl.renaming(1, tt.to)
+			})
+			if err != nil {
+				t.Fatalf("renaming error = %v", err)
+			}
+			_, c, ok := after.clip(1)
+			if !ok {
+				t.Fatal("the Clip isn't on the Timeline")
+			}
+			switch {
+			case tt.want == nil && c.Name != nil:
+				t.Errorf("the Clip is named %q, want no name of its own", *c.Name)
+			case tt.want != nil && (c.Name == nil || *c.Name != *tt.want):
+				t.Errorf("the Clip is named %v, want %q", c.Name, *tt.want)
+			}
+		})
+	}
+}
+
+func TestRenamingAClipThatIsntOnTheTimeline(t *testing.T) {
+	tl := timelineOf([]Clip{beatClip(1, 0, 10)})
+	_, err := edited(tl, func(tl Timeline, _ *ids) (Timeline, error) {
+		return tl.renaming(9, "Chorus")
+	})
+	refused(t, err, "not found")
+}
+
 func TestMergedSpan(t *testing.T) {
 	tl := timelineOf(
 		[]Clip{beatClip(1, 10, 5), beatClip(2, 30, 5)},

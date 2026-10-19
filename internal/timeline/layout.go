@@ -119,20 +119,6 @@ func storedRule(start, offset, length float64) placementRule {
 	return 0
 }
 
-// storable is p as it can be written for a Clip (0 for a new one), a start
-// or offset rounded a hair before 0:00 taken as 0:00. The database can't
-// hold a Clip that breaks storedRule's rules, so one is refused as it's
-// written, in the rule's words, rather than by checkLayout once the change
-// is made. That only looks at the Clip itself, never at the others, so the
-// order Clips are written in still never matters.
-func storable(clipID int64, p placement) (placement, error) {
-	if rule := storedRule(p.start, p.offset, p.length); rule != 0 {
-		return placement{}, violation{rule: rule, clipID: clipID}.err()
-	}
-	p.start, p.offset = roundedToZero(p.start), roundedToZero(p.offset)
-	return p, nil
-}
-
 // sourceDuration is how long c's source is on the Timeline tl, in seconds,
 // however c trims it: its Beat's or its Sound's, or the span up to where
 // the last of its Takes ends, whichever is active.

@@ -354,19 +354,6 @@ func checkVolume(volume float64) error {
 // errTrackNameRequired refuses a Track without a name.
 var errTrackNameRequired = domain.Invalid("a Track's name is required")
 
-// findTrack checks that a Track is on the Song's Timeline.
-func findTrack(ctx context.Context, tx *sql.Tx, songID, trackID int64) error {
-	var found int
-	err := tx.QueryRowContext(ctx, `SELECT 1 FROM tracks WHERE id = ? AND song_id = ?`, trackID, songID).Scan(&found)
-	if errors.Is(err, sql.ErrNoRows) {
-		return domain.ErrNotFound
-	}
-	if err != nil {
-		return fmt.Errorf("reading track: %w", err)
-	}
-	return nil
-}
-
 // NewTrack is a Track to add: by default empty, at the bottom of the
 // Timeline, at 0 dB and neither muted nor soloed. Undo uses the rest to
 // bring a deleted Track back as it was.
@@ -447,7 +434,7 @@ func (s *Store) SetLoop(ctx context.Context, songID int64, based songversion.Ver
 		return Timeline{}, domain.Invalid("a Loop's start must be before its end")
 	}
 	start = max(start, 0)
-	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
+	return s.changeLoop(ctx, songID, based, func(tx *sql.Tx) error {
 		if _, err := tx.ExecContext(ctx, `INSERT INTO loops (song_id, start, end, is_on) VALUES (?, ?, ?, ?)
 			ON CONFLICT (song_id) DO UPDATE SET start = excluded.start, end = excluded.end, is_on = excluded.is_on`,
 			songID, start, end, on); err != nil {
@@ -460,7 +447,7 @@ func (s *Store) SetLoop(ctx context.Context, songID int64, based songversion.Ver
 // SwitchLoop switches the Song's Loop on or off, keeping its stretch. The
 // Song must have a Loop.
 func (s *Store) SwitchLoop(ctx context.Context, songID int64, based songversion.Version, on bool) (Timeline, error) {
-	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
+	return s.changeLoop(ctx, songID, based, func(tx *sql.Tx) error {
 		res, err := tx.ExecContext(ctx, `UPDATE loops SET is_on = ? WHERE song_id = ?`, on, songID)
 		if err != nil {
 			return fmt.Errorf("switching loop: %w", err)
@@ -471,7 +458,7 @@ func (s *Store) SwitchLoop(ctx context.Context, songID int64, based songversion.
 
 // ClearLoop removes the Song's Loop.
 func (s *Store) ClearLoop(ctx context.Context, songID int64, based songversion.Version) (Timeline, error) {
-	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
+	return s.changeLoop(ctx, songID, based, func(tx *sql.Tx) error {
 		res, err := tx.ExecContext(ctx, `DELETE FROM loops WHERE song_id = ?`, songID)
 		if err != nil {
 			return fmt.Errorf("clearing loop: %w", err)
@@ -492,28 +479,14 @@ func roundedToZero(t float64) float64 {
 	return t
 }
 
-// placement is where a Clip is, what it plays, what it's named and how it
-// plays it, as stored. Its Fades are shortened to fit as it's stored.
+// placement is where a Clip is on the Timeline, what of its source it
+// plays and how it plays it: what the arithmetic of a change needs to turn
+// a Timeline time into a place in the source, and back (cliptime.go).
 type placement struct {
-	trackID int64
-	source  source
-	// name is null for a Clip that isn't named.
-	name sql.NullString
 	ClipPlayback
 	start  float64
 	offset float64
 	length float64
-}
-
-// source is what a Clip plays: a Beat, a Sound, or Takes, of which it
-// plays the active one. How long a source is, however a Clip trims it, is
-// answered on the Timeline instead (sourceDuration).
-type source struct {
-	beatID  sql.NullInt64
-	soundID sql.NullInt64
-	// activeTakeID is set for a Clip of Takes, and takeIDs are all of them.
-	activeTakeID sql.NullInt64
-	takeIDs      []int64
 }
 
 // MoveClip moves a Clip to start at a time on a Track of the same Timeline,
@@ -645,42 +618,12 @@ func checkTrackNames(names []string) ([]string, error) {
 	return trimmed, nil
 }
 
-// insertTrack adds a Track to the Song at a position, returning its id.
-func insertTrack(ctx context.Context, tx *sql.Tx, songID int64, name string, position int, volume float64,
-	muted, soloed bool) (int64, error) {
-	res, err := tx.ExecContext(ctx, `INSERT INTO tracks (song_id, name, position, volume, muted, soloed)
-		VALUES (?, ?, ?, ?, ?, ?)`, songID, name, position, volume, muted, soloed)
-	if err != nil {
-		return 0, fmt.Errorf("adding track: %w", err)
-	}
-	return res.LastInsertId()
-}
-
 // TrackAt is an empty Track to add at a position, from 0 (the top) to the
 // number of Tracks (the bottom), pushing those from there down, at 0 dB and
 // neither muted nor soloed: e.g. one a Merge adds for its Clip.
 type TrackAt struct {
 	Name     string `json:"name"`
 	Position int    `json:"position"`
-}
-
-// addTracksAtBottom adds empty Tracks with the names given, which must be
-// checked, at the bottom of the Timeline in order, at 0 dB and neither
-// muted nor soloed, returning their ids.
-func addTracksAtBottom(ctx context.Context, tx *sql.Tx, songID int64, names []string) ([]int64, error) {
-	var bottom int
-	if err := tx.QueryRowContext(ctx, `SELECT COALESCE(MAX(position), -1) + 1 FROM tracks WHERE song_id = ?`,
-		songID).Scan(&bottom); err != nil {
-		return nil, fmt.Errorf("reading tracks: %w", err)
-	}
-	ids := make([]int64, len(names))
-	for i, name := range names {
-		var err error
-		if ids[i], err = insertTrack(ctx, tx, songID, name, bottom+i, 0, false, false); err != nil {
-			return nil, err
-		}
-	}
-	return ids, nil
 }
 
 // PlacedClip is a Clip to place, and the Track it goes on.
@@ -725,93 +668,6 @@ func (s *Store) PlaceClips(ctx context.Context, songID int64, based songversion.
 		})
 }
 
-// placeOnTrack adds a new Clip to one of the Song's Tracks, as addClip does.
-func placeOnTrack(ctx context.Context, tx *sql.Tx, songID, trackID int64, c NewClip) error {
-	if err := findTrackToPlaceOn(ctx, tx, songID, trackID); err != nil {
-		return err
-	}
-	return addClip(ctx, tx, songID, trackID, c)
-}
-
-// findTrackToPlaceOn checks that a Track a Clip is to go on is one of the
-// Song's, refusing the request if not.
-func findTrackToPlaceOn(ctx context.Context, tx *sql.Tx, songID, trackID int64) error {
-	if err := findTrack(ctx, tx, songID, trackID); errors.Is(err, domain.ErrNotFound) {
-		return domain.Invalid("there's no such Track on this Timeline")
-	} else if err != nil {
-		return err
-	}
-	return nil
-}
-
-// addClip adds a new Clip to a Track of the Song, unchecked where: the
-// change it's part of checks the Timeline it leaves. Takes it's given are
-// attached to it.
-func addClip(ctx context.Context, tx *sql.Tx, songID, trackID int64, c NewClip) error {
-	src, err := newSource(ctx, tx, songID, c)
-	if err != nil {
-		return err
-	}
-	if err := c.ClipPlayback.check(c.Length); err != nil {
-		return err
-	}
-	p := placement{trackID: trackID, source: src, name: clipName(c.Name), ClipPlayback: c.ClipPlayback,
-		start: c.Start, offset: c.Offset, length: c.Length}
-	clipID, err := insertClip(ctx, tx, p)
-	if err != nil {
-		return err
-	}
-	return attachTakes(ctx, tx, clipID, c.TakeIDs)
-}
-
-// newSource checks what a new Clip is to play: a Beat, one of the Song's
-// Sounds, or detached Takes of the Song, the active one among them.
-func newSource(ctx context.Context, tx *sql.Tx, songID int64, c NewClip) (source, error) {
-	given := 0
-	for _, g := range []bool{c.BeatID != nil, c.SoundID != nil, len(c.TakeIDs) > 0} {
-		if g {
-			given++
-		}
-	}
-	switch {
-	case given != 1:
-		return source{}, domain.Invalid("a Clip plays one of a Beat, a Sound or Takes")
-	case c.BeatID != nil:
-		// Only a Beat in the Beat Library can be placed.
-		if _, err := readBeat(ctx, tx, *c.BeatID); err != nil {
-			return source{}, err
-		}
-		return source{beatID: sql.NullInt64{Int64: *c.BeatID, Valid: true}}, nil
-	case c.SoundID != nil:
-		if err := findSound(ctx, tx, songID, *c.SoundID); err != nil {
-			return source{}, err
-		}
-		return source{soundID: sql.NullInt64{Int64: *c.SoundID, Valid: true}}, nil
-	}
-	if c.ActiveTakeID == nil || !slices.Contains(c.TakeIDs, *c.ActiveTakeID) {
-		return source{}, domain.Invalid("a Clip of Takes plays one of them")
-	}
-	if err := checkTakes(ctx, tx, songID, 0, c.TakeIDs); err != nil {
-		return source{}, err
-	}
-	return source{activeTakeID: sql.NullInt64{Int64: *c.ActiveTakeID, Valid: true}, takeIDs: c.TakeIDs}, nil
-}
-
-// checkTakes checks that Takes of the Song can go in a Clip (0 for a new
-// one), each once: they must be detached or in it already.
-func checkTakes(ctx context.Context, tx *sql.Tx, songID, clipID int64, ids []int64) error {
-	in, err := takesOfSong(ctx, tx, songID, ids)
-	if err != nil {
-		return err
-	}
-	for _, c := range in {
-		if c.Valid && c.Int64 != clipID {
-			return domain.Conflict("a Take can only be in one Clip")
-		}
-	}
-	return nil
-}
-
 // takesOfSong checks that Takes are the Song's, each given once, and
 // returns the Clip each is in, or null for one detached.
 func takesOfSong(ctx context.Context, tx *sql.Tx, songID int64, ids []int64) ([]sql.NullInt64, error) {
@@ -830,37 +686,6 @@ func takesOfSong(ctx context.Context, tx *sql.Tx, songID int64, ids []int64) ([]
 		}
 	}
 	return in, nil
-}
-
-// attachTakes puts Takes in a Clip.
-func attachTakes(ctx context.Context, tx *sql.Tx, clipID int64, takeIDs []int64) error {
-	for _, id := range takeIDs {
-		if _, err := tx.ExecContext(ctx, `UPDATE takes SET clip_id = ?, detached_at = NULL WHERE id = ?`,
-			clipID, id); err != nil {
-			return fmt.Errorf("attaching take: %w", err)
-		}
-	}
-	return nil
-}
-
-// insertClip stores a new Clip as placed, without checking where, its
-// Fades shortened to fit, and returns its id.
-func insertClip(ctx context.Context, tx *sql.Tx, p placement) (int64, error) {
-	p, err := storable(0, p)
-	if err != nil {
-		return 0, err
-	}
-	fades := p.fades().fitted(p.length)
-	res, err := tx.ExecContext(ctx,
-		`INSERT INTO clips (track_id, beat_id, sound_id, name, gain, tempo, pitch, fade_in, fade_out, active_take_id,
-				start, source_offset, length)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		p.trackID, p.source.beatID, p.source.soundID, p.name, p.Gain, p.Tempo, p.Pitch, fades.In, fades.Out, p.source.activeTakeID,
-		p.start, p.offset, p.length)
-	if err != nil {
-		return 0, fmt.Errorf("adding clip: %w", err)
-	}
-	return res.LastInsertId()
 }
 
 // DuplicateClip adds a copy of a Clip, with the same trim, name, Gain,
@@ -926,59 +751,28 @@ func (s *Store) PasteClips(ctx context.Context, songID int64, based songversion.
 			return Timeline{}, err
 		}
 	}
-	return s.changeWithFiles(ctx, songID, based, func(tx *sql.Tx, changes *audio.FileChanges) error {
-		added, err := addTracksAtBottom(ctx, tx, songID, names)
-		if err != nil {
-			return err
-		}
-		for _, c := range clips {
-			trackID, err := c.trackOf(added)
-			if err != nil {
-				return err
-			}
-			nc := NewClip{BeatID: c.BeatID, SoundID: c.SoundID, Name: c.Name, ClipPlayback: c.ClipPlayback,
-				Start: c.Start, Offset: c.Offset, Length: c.Length}
-			if len(c.Takes) > 0 {
-				ids, active, err := s.copyTakesAt(ctx, tx, changes, songID, c.Takes, *c.ActiveTakeID)
-				if err != nil {
-					return err
+	return s.editTimelineReading(ctx, songID, based,
+		func(ctx context.Context, tx *sql.Tx, changes *audio.FileChanges, _ Timeline) (edit, error) {
+			srcs := make([]clipSource, len(clips))
+			for i, c := range clips {
+				var err error
+				if len(c.Takes) == 0 {
+					// A Beat or a Sound the Clip was copied playing.
+					if srcs[i], err = readClipSource(ctx, tx, songID, c.pasted(), nil); err != nil {
+						return nil, err
+					}
+					continue
 				}
-				nc.TakeIDs, nc.ActiveTakeID = ids, &active
+				takes, active, err := s.copyTakesAt(ctx, tx, changes, songID, c.Takes, *c.ActiveTakeID)
+				if err != nil {
+					return nil, err
+				}
+				srcs[i] = clipSource{takes: takes, activeTakeID: active}
 			}
-			if err := placeOnTrack(ctx, tx, songID, trackID, nc); err != nil {
-				return err
-			}
-		}
-		return nil
-	})
-}
-
-// copyTakesAt adds a detached copy of each of the Song's Takes, sharing its
-// file, linked by changes once committed, where it's given to start in its
-// span and nudged as given. It returns the copies' ids, in order, and the
-// id of the copy of active.
-func (s *Store) copyTakesAt(ctx context.Context, tx *sql.Tx, changes *audio.FileChanges, songID int64, takes []TakeAt,
-	active int64) ([]int64, int64, error) {
-	ids := make([]int64, len(takes))
-	for i, t := range takes {
-		ids[i] = t.ID
-	}
-	// In a Clip or detached, as a Clip cut leaves them.
-	if _, err := takesOfSong(ctx, tx, songID, ids); err != nil {
-		return nil, 0, err
-	}
-	copies, err := s.copyTakes(ctx, tx, changes, ids)
-	if err != nil {
-		return nil, 0, err
-	}
-	for i, t := range takes {
-		ids[i] = copies[t.ID]
-		if _, err := tx.ExecContext(ctx, `UPDATE takes SET position = ?, nudge = ? WHERE id = ?`,
-			max(t.Position, 0), t.Nudge, ids[i]); err != nil {
-			return nil, 0, fmt.Errorf("placing take: %w", err)
-		}
-	}
-	return ids, copies[active], nil
+			return func(tl Timeline, ids *ids) (Timeline, error) {
+				return tl.pasting(names, clips, srcs, ids)
+			}, nil
+		})
 }
 
 // copyTakes adds a detached copy of each of the Takes, sharing its file,
@@ -1017,13 +811,8 @@ func (s *Store) removeTakeFiles(ids []int64) {
 // RenameClip gives a Clip a name of its own, or, given a blank one, clears
 // it, so the Clip goes by its source's name again.
 func (s *Store) RenameClip(ctx context.Context, songID int64, based songversion.Version, clipID int64, name string) (Timeline, error) {
-	return s.change(ctx, songID, based, func(tx *sql.Tx) error {
-		res, err := tx.ExecContext(ctx, `UPDATE clips SET name = ?
-			WHERE id = ? AND track_id IN (SELECT id FROM tracks WHERE song_id = ?)`, clipName(&name), clipID, songID)
-		if err != nil {
-			return fmt.Errorf("renaming clip: %w", err)
-		}
-		return domain.ExpectOneRow(res)
+	return s.editTimeline(ctx, songID, based, func(tl Timeline, _ *ids) (Timeline, error) {
+		return tl.renaming(clipID, name)
 	})
 }
 
@@ -1159,44 +948,22 @@ func checkDeletedOnce(clipIDs []int64) error {
 	return nil
 }
 
-// change runs one change to a Song's Timeline through songversion.Change
-// and returns the updated Timeline, read within the change. If the Song is
-// no longer at the version the change was based on, or fn fails, nothing
-// changes.
-func (s *Store) change(ctx context.Context, songID int64, based songversion.Version, fn func(tx *sql.Tx) error) (Timeline, error) {
-	return s.changeWithFiles(ctx, songID, based, func(tx *sql.Tx, _ *audio.FileChanges) error {
-		return fn(tx)
-	})
-}
-
-// changeWithFiles is change for a change with files to keep, link or
-// remove, which fn adds to changes.
-//
-// It's the path the changes that haven't moved onto the edit path take: the
-// Timeline is read before fn runs and after, and checkLayout checks what fn
-// left.
-func (s *Store) changeWithFiles(ctx context.Context, songID int64, based songversion.Version,
-	fn func(tx *sql.Tx, changes *audio.FileChanges) error) (Timeline, error) {
+// changeLoop runs one change to a Song's Loop and returns the Timeline it
+// leaves, read within the change. The Loop is the Song's own, rather than
+// one of the Timeline's Tracks, Clips or Takes, so it's the one change that
+// writes its row itself; every change to the Tracks and Clips goes through
+// the edit path (edit.go). If the Song is no longer at the version the
+// change was based on, or fn fails, nothing changes.
+func (s *Store) changeLoop(ctx context.Context, songID int64, based songversion.Version,
+	fn func(tx *sql.Tx) error) (Timeline, error) {
 	var tl Timeline
-	if err := songversion.Change(ctx, s.db, songID, based, func(tx *sql.Tx, changes *audio.FileChanges) error {
-		before, err := read(ctx, tx, songID)
-		if err != nil {
+	if err := songversion.Change(ctx, s.db, songID, based, func(tx *sql.Tx, _ *audio.FileChanges) error {
+		if err := fn(tx); err != nil {
 			return err
 		}
-		if err := fn(tx, changes); err != nil {
-			return err
-		}
-		// Any change can leave a Sound unused, or, by undo, use it again.
-		if err := markUnusedSounds(ctx, tx, songID); err != nil {
-			return err
-		}
-		if tl, err = read(ctx, tx, songID); err != nil {
-			return err
-		}
-		if v := checkLayout(before, tl); v != nil {
-			return v.err()
-		}
-		return nil
+		var err error
+		tl, err = read(ctx, tx, songID)
+		return err
 	}); err != nil {
 		return Timeline{}, err
 	}

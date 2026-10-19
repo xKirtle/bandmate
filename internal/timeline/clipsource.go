@@ -1,7 +1,6 @@
 package timeline
 
 import (
-	"cmp"
 	"context"
 	"database/sql"
 	"errors"
@@ -171,16 +170,53 @@ func readTakes(ctx context.Context, tx *sql.Tx, songID int64, freeing []int64, i
 		if in[i].Valid && !slices.Contains(freeing, in[i].Int64) {
 			return nil, domain.Conflict("a Take can only be in one Clip")
 		}
-		take, err := scanTake(tx.QueryRowContext(ctx, `SELECT `+takeColumns+` FROM takes WHERE id = ?`, id))
+		take, err := readTakeRow(ctx, tx, id)
 		if err != nil {
-			return nil, fmt.Errorf("reading take: %w", err)
+			return nil, err
 		}
 		takes = append(takes, take)
 	}
-	slices.SortStableFunc(takes, func(a, b Take) int {
-		return cmp.Or(cmp.Compare(a.Number, b.Number), cmp.Compare(a.ID, b.ID))
-	})
+	sortTakes(takes)
 	return takes, nil
+}
+
+// copyTakesAt adds a detached copy of each of the Song's Takes given,
+// sharing its file, linked by changes once committed, and returns the
+// copies in the order they're given, with the id of the copy of active. The
+// copies are rows a Clip of Takes pasted plays; where each starts in the
+// Clip's source span is worked out by the edit that places them (takesAt),
+// as it is for any Clip of Takes.
+func (s *Store) copyTakesAt(ctx context.Context, tx *sql.Tx, changes *audio.FileChanges, songID int64,
+	takes []TakeAt, active int64) ([]Take, *int64, error) {
+	ids := make([]int64, len(takes))
+	for i, t := range takes {
+		ids[i] = t.ID
+	}
+	// In a Clip or detached, as a Clip cut leaves them.
+	if _, err := takesOfSong(ctx, tx, songID, ids); err != nil {
+		return nil, nil, err
+	}
+	copies, err := s.copyTakes(ctx, tx, changes, ids)
+	if err != nil {
+		return nil, nil, err
+	}
+	copied := make([]Take, len(ids))
+	for i, id := range ids {
+		if copied[i], err = readTakeRow(ctx, tx, copies[id]); err != nil {
+			return nil, nil, err
+		}
+	}
+	activeCopy := copies[active]
+	return copied, &activeCopy, nil
+}
+
+// readTakeRow reads a Take of the Song, as a Clip holds it.
+func readTakeRow(ctx context.Context, tx *sql.Tx, takeID int64) (Take, error) {
+	take, err := scanTake(tx.QueryRowContext(ctx, `SELECT `+takeColumns+` FROM takes WHERE id = ?`, takeID))
+	if err != nil {
+		return Take{}, fmt.Errorf("reading take: %w", err)
+	}
+	return take, nil
 }
 
 // copyTakesOf adds a detached copy of each of a Clip of Takes' Takes,
