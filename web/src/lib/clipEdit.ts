@@ -1,7 +1,10 @@
 // Where a Clip being dragged or trimmed may go: never over another Clip on
 // its Track, never before 0:00, and never beyond its source. Plain
 // arithmetic, so the Timeline only has to follow it. The server enforces
-// the same rules and rejects anything else.
+// the same rules and rejects anything else, but for how far a Clip of
+// Takes can be trimmed out, which is the Timeline's own bound: the server
+// lets such a Clip play past where its Takes end, so that nudging a Take
+// earlier never costs the Clip its window (ADR 0023).
 
 import type { Clip, ClipMove } from './api';
 import { activeTake } from './clipSource';

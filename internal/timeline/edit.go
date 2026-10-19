@@ -52,15 +52,6 @@ func always(change edit) func(context.Context, *sql.Tx, *audio.FileChanges, Time
 // edit that places them, so the pure part only works out placement.
 func (s *Store) editTimelineReading(ctx context.Context, songID int64, based songversion.Version,
 	prepare func(ctx context.Context, tx *sql.Tx, changes *audio.FileChanges, before Timeline) (edit, error)) (Timeline, error) {
-	return s.editTimelineRewording(ctx, songID, based, nil, prepare)
-}
-
-// editTimelineRewording is editTimelineReading, its refusal for breaking a
-// placement rule in reword's words, unless reword is nil or gives nil, when
-// it's in the rule's own.
-func (s *Store) editTimelineRewording(ctx context.Context, songID int64, based songversion.Version,
-	reword func(violation) error,
-	prepare func(ctx context.Context, tx *sql.Tx, changes *audio.FileChanges, before Timeline) (edit, error)) (Timeline, error) {
 	var tl Timeline
 	if err := songversion.Change(ctx, s.db, songID, based, func(tx *sql.Tx, changes *audio.FileChanges) error {
 		before, err := read(ctx, tx, songID)
@@ -80,11 +71,6 @@ func (s *Store) editTimelineRewording(ctx context.Context, songID int64, based s
 			return err
 		}
 		if v := checkLayout(before, after); v != nil {
-			if reword != nil {
-				if err := reword(*v); err != nil {
-					return err
-				}
-			}
 			return v.err()
 		}
 		if err := writeTimeline(ctx, tx, songID, after); err != nil {

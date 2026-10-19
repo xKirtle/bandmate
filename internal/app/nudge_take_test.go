@@ -67,8 +67,6 @@ func TestNudgingATakeFollowsItsRules(t *testing.T) {
 		"of a Clip of a Beat": {ts.nudgeTake(r.song.ID, beatClip, r.take.ID, 0.1), http.StatusBadRequest,
 			"only a Clip of Takes has Takes"},
 		"an unknown Clip": {ts.nudgeTake(r.song.ID, 999, r.take.ID, 0.1), http.StatusNotFound, ""},
-		"leaving the Clip past its Takes": {ts.nudgeTake(r.song.ID, r.clip.ID, r.take.ID, 0), http.StatusBadRequest,
-			"the Clip would play past where its Takes end; trim it first"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			if c.msg == "" {
@@ -82,6 +80,42 @@ func TestNudgingATakeFollowsItsRules(t *testing.T) {
 		fmt.Sprintf("%s/%d/nudge", clipTakesPath(r.song.ID, r.clip.ID), r.take.ID), map[string]any{"nudge": 0.5}))
 	if read := ts.getTimeline(r.song.ID); !reflect.DeepEqual(read, before) {
 		t.Errorf("timeline = %+v, want it unchanged: %+v", read, before)
+	}
+}
+
+// A Take nudged earlier out from under its Clip's end leaves the Clip
+// playing silence there, rather than being refused: the shape a Clip
+// trimmed out to a Take nudged later is in (ADR 0023).
+func TestATakeNudgesEarlierOutFromUnderItsClipsEnd(t *testing.T) {
+	ts := newTestServer(t)
+	r := recordATake(t, ts)
+	// Nudged a second later and trimmed out to reach it, the Clip plays
+	// 0:00.5 to 0:05 of a span its Take ends 0:05 into.
+	timelineChange(t, ts.nudgeTake(r.song.ID, r.clip.ID, r.take.ID, 1))
+	out := timelineChange(t, ts.trimClip(r.song.ID, r.clip.ID, 0.5, 4.5)).Tracks[1].Clips[0]
+
+	back := timelineChange(t, ts.nudgeTake(r.song.ID, r.clip.ID, r.take.ID, 0)).Tracks[1].Clips[0]
+
+	// The Take is where it was recorded, and the Clip's window hasn't moved,
+	// though its Take no longer reaches its end.
+	if tk := back.Takes[0]; !near(tk.Nudge, 0) || !near(tk.Position, 0) {
+		t.Errorf("take = %+v, want it back where it was recorded", tk)
+	}
+	if back.Start != out.Start || back.Offset != out.Offset || back.Length != out.Length {
+		t.Errorf("clip = %+v, want its window as it was: %+v", back, out)
+	}
+	// And on past where it was recorded, which takes its span back as ever.
+	earlier := timelineChange(t, ts.nudgeTake(r.song.ID, r.clip.ID, r.take.ID, -0.25)).Tracks[1].Clips[0]
+	if tk := earlier.Takes[0]; !near(tk.Nudge, -0.25) || !near(tk.Position, 0) {
+		t.Errorf("take = %+v, want it nudged a quarter second earlier", tk)
+	}
+	if earlier.Start != out.Start || !near(earlier.Offset, out.Offset+0.25) || earlier.Length != out.Length {
+		t.Errorf("clip = %+v, want its span taken back under its window: %+v", earlier, out)
+	}
+	// Setting its Takes back, as an undo does, puts the Clip back as it was.
+	undone := timelineChange(t, ts.setTakes(r.song.ID, r.clip.ID, takesAsIn(out))).Tracks[1].Clips[0]
+	if !reflect.DeepEqual(undone, out) {
+		t.Errorf("clip = %+v, want it as before the nudge: %+v", undone, out)
 	}
 }
 

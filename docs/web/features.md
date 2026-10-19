@@ -148,7 +148,7 @@ Sing over your beat, right in the browser, in full quality.
 
 1. **Retake**: record the part again. Every take is kept. If you've changed the clip's tempo or pitch, reset them first.
 2. **Takes**: choose the take the song plays.
-3. **Nudge**: shift a take by a few milliseconds, so it sits on the beat.
+3. **Nudge**: shift a take earlier or later by a few milliseconds, so it sits on the beat. Alt+drag the clip to do the same by hand. The clip itself stays put either way.
 4. **Input**: every input connected to this device, each channel of an audio interface on its own, its channel first. Pick the one you record from. Each device remembers its own.
 5. **Level**: of the input you picked. Sing your loudest, and keep the meter out of the red. Here it's in the red, from a test tone.
 

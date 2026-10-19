@@ -27,7 +27,7 @@
   import { PointerFollow, type PointerAt } from './pointerFollow';
   import { BoxDrag, type BoxAt } from './boxDrag.svelte';
   import { guideLanes, reachAt } from './snapping';
-  import { clipSources, clipTitle, playing } from './clipSource';
+  import { clipSources, clipTitle, playing, trimLimit } from './clipSource';
   import { formatCue } from './cues';
   import type { Saves } from './saves.svelte';
   import type { SongUndo } from './songUndo.svelte';
@@ -1115,7 +1115,7 @@
     playhead: () => position,
     loop: () => loop,
     reach: () => reachAt(view.scale),
-    sourceLength: (clip) => sources.of(clip).duration,
+    sourceLength: (clip) => trimLimit(clip, sources.of(clip)),
   });
 
   /** Where a point is, for ClipDrag: the time under it across the lanes and the Track whose lane is nearest. */

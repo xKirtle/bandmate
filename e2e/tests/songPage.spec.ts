@@ -353,6 +353,46 @@ test("a negative Nudge typed in the Clip menu moves the Take as dragging left by
   expect((await serverClips(bandmate, song.id, 'Lead vox'))[0]).toMatchObject({ start: 4, length: 21 });
 });
 
+test('a Clip trimmed out to a Take nudged later has it dragged back, past where it was recorded', async ({
+  page,
+  bandmate,
+}) => {
+  const song = await heroSong(bandmate);
+  const [was] = (await serverClips(bandmate, song.id, 'Lead vox')) as TakesClip[];
+  // The Take nudged 12 s later and the Clip trimmed out to 30 s to reach
+  // it: its Take now ends before the Clip does, which used to refuse any
+  // nudge back.
+  const other = was.takes.find((t) => t.id !== was.activeTakeId)!;
+  await bandmate.setClipTakes(song.id, was.id, {
+    takes: [
+      { id: other.id, position: 0, nudge: 0 },
+      { id: was.activeTakeId, position: 12, nudge: 12 },
+    ],
+    activeTakeId: was.activeTakeId,
+    start: was.start,
+    offset: 0,
+    length: 30,
+  });
+  await page.goto(`/songs/${song.id}`);
+  const take = clip(page, 'Take 2');
+  await expect(take).toHaveAccessibleName('Take 2, 0:04 to 0:34');
+
+  // Dragged two thirds of its width earlier: 20 s, so the Take lands well
+  // before where it was recorded.
+  const width = (await take.boundingBox())!.width;
+  await page.keyboard.down('Alt');
+  await dragClip(page, take, (-width * 2) / 3);
+  await page.keyboard.up('Alt');
+  await expect
+    .poll(async () => activeNudge((await serverClips(bandmate, song.id, 'Lead vox'))[0] as TakesClip))
+    .toBeCloseTo(-8, 0);
+  // The Clip is where it was, as long as it was: only the Take moved.
+  expect((await serverClips(bandmate, song.id, 'Lead vox'))[0]).toMatchObject({ start: 4, length: 30 });
+  await expect(take).toHaveAccessibleName('Take 2, 0:04 to 0:34');
+  // Nothing was refused.
+  await expect(page.getByRole('alert')).toHaveCount(0);
+});
+
 test('a Clip dragged in a Selection of several moves them all by as much, and one undo brings them back', async ({
   page,
   bandmate,

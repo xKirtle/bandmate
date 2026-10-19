@@ -276,24 +276,17 @@ func checkTakesAt(takes []TakeAt, active *int64) ([]int64, error) {
 // NudgeTake moves one of a Clip's Takes by hand, to be nudge seconds from
 // where it was recorded, later if positive. Only the Take moves: the Clip's
 // window stays where it is, and where the Take goes before the Clip's source
-// span, the span is taken back to where it starts, as for a Retake. It's
-// refused if the Clip would then play past where its Takes end, which only
-// a Clip trimmed out to a Take nudged later can.
+// span, the span is taken back to where it starts, as for a Retake. Nudged
+// earlier out from under the Clip's end, it leaves the Clip playing silence
+// there rather than being refused (ADR 0023), so a Take goes as far earlier
+// as it goes later.
 func (s *Store) NudgeTake(ctx context.Context, songID int64, based songversion.Version, clipID, takeID int64, nudge float64) (Timeline, error) {
 	if err := checkNudge(nudge); err != nil {
 		return Timeline{}, err
 	}
-	// Only a Clip trimmed out to its Take nudged later can play past where
-	// its Takes end once the Take is nudged back.
-	reword := func(v violation) error {
-		if v.rule == rulePastSource && v.clipID == clipID {
-			return domain.Invalid("the Clip would play past where its Takes end; trim it first")
-		}
-		return nil
-	}
-	return s.editTimelineRewording(ctx, songID, based, reword, always(func(tl Timeline, _ *ids) (Timeline, error) {
+	return s.editTimeline(ctx, songID, based, func(tl Timeline, _ *ids) (Timeline, error) {
 		return tl.nudgingTake(clipID, takeID, nudge)
-	}))
+	})
 }
 
 // checkNudge checks how far a Take is nudged.

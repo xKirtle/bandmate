@@ -1394,11 +1394,23 @@ func TestNudgingTake(t *testing.T) {
 		},
 		{
 			name: "a Clip trimmed out to a Take nudged later, nudged back",
-			// NudgeTake refuses this one in its own words.
-			clip:    takesClip(1, 10, 0, 15, Take{ID: 7, Number: 1, Position: 5, Nudge: 5}),
-			takeID:  7,
-			nudge:   0,
-			refusal: "a Clip can't play past the end of its source",
+			// The Clip keeps the window it was trimmed out to, playing
+			// silence where its Take no longer reaches (ADR 0023).
+			clip:   takesClip(1, 10, 0, 15, Take{ID: 7, Number: 1, Position: 5, Nudge: 5}),
+			takeID: 7,
+			nudge:  0,
+			want:   where{clipID: 1, trackID: 1, start: 10, length: 15},
+			wantAt: []float64{0},
+		},
+		{
+			name: "that Take nudged on earlier still, past where it was recorded",
+			// Its span starts earlier for it, as for any Take nudged before
+			// the span, and the Clip's window stays where it is.
+			clip:   takesClip(1, 10, 0, 15, Take{ID: 7, Number: 1, Position: 5, Nudge: 5}),
+			takeID: 7,
+			nudge:  -2,
+			want:   where{clipID: 1, trackID: 1, start: 10, offset: 2, length: 15},
+			wantAt: []float64{0},
 		},
 		{
 			name: "a Take nudged in a slowed Clip, which nudges it in the recording's own time",

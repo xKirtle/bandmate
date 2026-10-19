@@ -110,6 +110,17 @@ export function activeTake(clip: Clip): Take | undefined {
 }
 
 /**
+ * How far into its source a Clip's end can be dragged out, in seconds: the
+ * whole of a Beat's or a Sound's file. A Clip of Takes can go as far as its
+ * Takes reach, or as far as it already plays, whichever is more: nudging a
+ * Take earlier leaves the Clip playing silence past it (ADR 0023), and
+ * grabbing its edge then never pulls it in.
+ */
+export function trimLimit(clip: Clip, source: ClipSource): number {
+  return Math.max(source.duration, sourceAt(clip, clip.start + clip.length));
+}
+
+/**
  * Where in its source a Clip's audio file starts, in seconds: 0 for a Beat
  * or a Sound, and for a Take, its position in its span, which a nudge moves.
  */

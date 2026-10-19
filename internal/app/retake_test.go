@@ -219,8 +219,6 @@ func TestSettingAClipsTakesFollowsTheirRules(t *testing.T) {
 			http.StatusBadRequest, "there's no such Take in this Song"},
 		"a Take before the span": {ts.setTakes(r.song.ID, r.clip.ID, with(func(s *takesOf) { s.Takes[0].Position = -1 })),
 			http.StatusBadRequest, "a Take can't start before its Clip's source"},
-		"past the Takes' end": {ts.setTakes(r.song.ID, r.clip.ID, with(func(s *takesOf) { s.Length = 4 })),
-			http.StatusBadRequest, "a Clip can't play past the end of its source"},
 		"into a neighbour": {ts.setTakes(r.song.ID, r.clip.ID, with(func(s *takesOf) { s.Start = 8 })),
 			http.StatusConflict, "Clips can't overlap on a Track"},
 		"of a Clip of a Beat": {ts.setTakes(r.song.ID, beatClip, takesAsIn(r.clip)),
