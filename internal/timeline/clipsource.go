@@ -30,9 +30,10 @@ type clipSource struct {
 }
 
 // readClipSource reads and checks what a new Clip is to play: a Beat in the
-// Beat Library, one of the Song's Sounds, or detached Takes of the Song,
-// the active one among them.
-func readClipSource(ctx context.Context, tx *sql.Tx, songID int64, c NewClip) (clipSource, error) {
+// Beat Library, one of the Song's Sounds, or Takes of the Song, the active
+// one among them, each detached or in one of the Clips freeing its Takes.
+func readClipSource(ctx context.Context, tx *sql.Tx, songID int64, c NewClip,
+	freeing []int64) (clipSource, error) {
 	given := 0
 	for _, g := range []bool{c.BeatID != nil, c.SoundID != nil, len(c.TakeIDs) > 0} {
 		if g {
@@ -58,11 +59,36 @@ func readClipSource(ctx context.Context, tx *sql.Tx, songID int64, c NewClip) (c
 	if c.ActiveTakeID == nil || !slices.Contains(c.TakeIDs, *c.ActiveTakeID) {
 		return clipSource{}, domain.Invalid("a Clip of Takes plays one of them")
 	}
-	takes, err := readTakes(ctx, tx, songID, 0, c.TakeIDs)
+	takes, err := readTakes(ctx, tx, songID, freeing, c.TakeIDs)
 	if err != nil {
 		return clipSource{}, err
 	}
 	return clipSource{takes: takes, activeTakeID: c.ActiveTakeID}, nil
+}
+
+// readClipSources reads and checks what each of several new Clips is to
+// play, as readClipSource does one.
+func readClipSources(ctx context.Context, tx *sql.Tx, songID int64, clips []NewClip,
+	freeing []int64) ([]clipSource, error) {
+	sources := make([]clipSource, len(clips))
+	for i, c := range clips {
+		var err error
+		if sources[i], err = readClipSource(ctx, tx, songID, c, freeing); err != nil {
+			return nil, err
+		}
+	}
+	return sources, nil
+}
+
+// readPlacedSources reads and checks what each of several Clips to place is
+// to play, whichever Track each goes on.
+func readPlacedSources(ctx context.Context, tx *sql.Tx, songID int64, clips []PlacedClip,
+	freeing []int64) ([]clipSource, error) {
+	placing := make([]NewClip, len(clips))
+	for i, c := range clips {
+		placing[i] = c.NewClip
+	}
+	return readClipSources(ctx, tx, songID, placing, freeing)
 }
 
 // placed is c as a Clip of the Timeline, with the id given, playing src.
@@ -130,18 +156,19 @@ func readSound(ctx context.Context, tx *sql.Tx, songID, soundID int64) (Sound, e
 	return s, nil
 }
 
-// readTakes reads Takes of the Song to go in a Clip (0 for a new one), each
-// once, as checkTakes checks them: each must be detached or in that Clip
-// already. They come back in the order they're numbered, as the Timeline
-// holds them.
-func readTakes(ctx context.Context, tx *sql.Tx, songID, clipID int64, ids []int64) ([]Take, error) {
+// readTakes reads Takes of the Song to go in a Clip, each once, as
+// checkTakes checks them: each must be detached, or in one of the Clips
+// freeing its Takes, which are the Clip itself, where it's one already on
+// the Timeline, and any the same change takes off it. They come back in the
+// order they're numbered, as the Timeline holds them.
+func readTakes(ctx context.Context, tx *sql.Tx, songID int64, freeing []int64, ids []int64) ([]Take, error) {
 	in, err := takesOfSong(ctx, tx, songID, ids)
 	if err != nil {
 		return nil, err
 	}
 	takes := make([]Take, 0, len(ids))
 	for i, id := range ids {
-		if in[i].Valid && in[i].Int64 != clipID {
+		if in[i].Valid && !slices.Contains(freeing, in[i].Int64) {
 			return nil, domain.Conflict("a Take can only be in one Clip")
 		}
 		take, err := scanTake(tx.QueryRowContext(ctx, `SELECT `+takeColumns+` FROM takes WHERE id = ?`, id))

@@ -10,11 +10,13 @@ import (
 	"github.com/xKirtle/bandmate/internal/songversion"
 )
 
-// A Clip placement change to a Timeline is a pure change to the whole
+// A change to a Song's Tracks and Clips is a pure change to the whole
 // Timeline, checked by checkLayout (ADR 0023) and written by writeTimeline,
-// as every change to a Lyric Sheet is (ADR 0024). The operations that
-// haven't moved onto this path yet still write their own rows, through the
-// change helpers in timeline.go.
+// as every change to a Lyric Sheet is (ADR 0024), so no operation says
+// anything about the order its rows are written in. The Loop, which is the
+// Song's rather than a Track's or a Clip's, and the operations that haven't
+// moved onto this path yet (a paste, and a Clip renamed), still write their
+// own rows, through the change helpers in timeline.go.
 
 // edit is a pure change to the whole Timeline: it's handed a copy to change
 // as it likes, and ids for any rows it adds, and returns the Timeline it

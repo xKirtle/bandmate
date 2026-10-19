@@ -243,7 +243,7 @@ func (s *Store) SetTakes(ctx context.Context, songID int64, based songversion.Ve
 			}
 			// The Takes it's given may be detached, which the Timeline
 			// doesn't hold, so they're read and checked here.
-			takes, err := readTakes(ctx, tx, songID, clipID, takeIDs)
+			takes, err := readTakes(ctx, tx, songID, []int64{clipID}, takeIDs)
 			if err != nil {
 				return nil, err
 			}

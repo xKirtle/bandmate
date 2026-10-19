@@ -82,6 +82,27 @@ func (tl Timeline) findTrackToPlaceOn(id int64) error {
 	return nil
 }
 
+// trackPlace is where tl holds the Track with the id given, from the top,
+// and whether it's one of tl's at all: a Track added below it goes one
+// further down.
+func (tl Timeline) trackPlace(id int64) (int, bool) {
+	i := slices.IndexFunc(tl.Tracks, func(t Track) bool { return t.ID == id })
+	return i, i >= 0
+}
+
+// clipsLeaving are the ids of the Clips a change takes off tl: those named,
+// and any left on the Tracks named. They free their Takes to go in a Clip
+// the same change places.
+func (tl Timeline) clipsLeaving(clipIDs, trackIDs []int64) []int64 {
+	leaving := slices.Clone(clipIDs)
+	for _, id := range trackIDs {
+		for _, c := range tl.track(id).Clips {
+			leaving = append(leaving, c.ID)
+		}
+	}
+	return leaving
+}
+
 // trackEnd is where t's last Clip ends, or 0:00 if it has none: where a
 // Clip added to it goes.
 func trackEnd(t Track) float64 {
