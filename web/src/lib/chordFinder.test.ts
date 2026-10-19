@@ -799,10 +799,32 @@ describe('spelling suggestions', () => {
     expect(kind('Eb', 'borrowed')).toEqual(['iv Abm', 'bIII Gb', 'bVI B', 'bVII Db']);
   });
 
-  it('offers Keys it reads, each named from its own signature', () => {
+  it('offers Keys it reads, interleaved by tonic, each named from its own signature', () => {
     expect(keys.map(keyName)).toEqual([
-      ...['C', 'Db', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B'].map((k) => k + ' major'),
-      ...['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'Bb', 'B'].map((k) => k + ' minor'),
+      'C major',
+      'C minor',
+      'Db major',
+      'C# minor',
+      'D major',
+      'D minor',
+      'Eb major',
+      'D# minor',
+      'E major',
+      'E minor',
+      'F major',
+      'F minor',
+      'F# major',
+      'F# minor',
+      'G major',
+      'G minor',
+      'Ab major',
+      'G# minor',
+      'A major',
+      'A minor',
+      'Bb major',
+      'Bb minor',
+      'B major',
+      'B minor',
     ]);
   });
 });

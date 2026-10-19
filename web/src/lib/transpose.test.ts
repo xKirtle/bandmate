@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { commonKeys } from './api';
-import { readKey, transposeChord, transposeKey } from './transpose';
+import { keys as finderKeys } from './chordFinder';
+import { keys, readKey, transposeChord, transposeKey } from './transpose';
 
 describe('transposeChord', () => {
   it('moves the root by semitones', () => {
@@ -135,8 +136,48 @@ describe('transposeKey', () => {
 
 describe('the keys offered', () => {
   it('are all 24, each read as Transpose reads a key, once', () => {
-    const read = commonKeys.map((k) => readKey(k));
+    const read = keys.map((k) => readKey(k));
     expect(read.every((k) => k !== null)).toBe(true);
     expect(new Set(read.map((k) => `${k!.tonic} ${k!.minor}`)).size).toBe(24);
+  });
+
+  it('are interleaved by tonic, each spelled from its own signature', () => {
+    expect(keys).toEqual([
+      'C',
+      'Cm',
+      'Db',
+      'C#m',
+      'D',
+      'Dm',
+      'Eb',
+      'D#m',
+      'E',
+      'Em',
+      'F',
+      'Fm',
+      'F#',
+      'F#m',
+      'G',
+      'Gm',
+      'Ab',
+      'G#m',
+      'A',
+      'Am',
+      'Bb',
+      'Bbm',
+      'B',
+      'Bm',
+    ]);
+  });
+
+  it('offer no Key no signature can spell: not D#, G# or A# major', () => {
+    expect(keys).not.toContain('D#');
+    expect(keys).not.toContain('G#');
+    expect(keys).not.toContain('A#');
+  });
+
+  it('are the one list the Song and Beat Key field and the Finder both offer', () => {
+    expect(commonKeys).toBe(keys);
+    expect(finderKeys).toBe(keys);
   });
 });
