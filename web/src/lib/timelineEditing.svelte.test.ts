@@ -659,7 +659,7 @@ describe('Timeline editing, a Clip’s Gain and Fades as shown', () => {
       playhead: () => 0,
       loop: () => null,
       reach: () => 0.8,
-      sourceLength: () => 60,
+      trimLimit: () => 60,
     });
 
   /** The pointer at a time over Track 1's lane, `dy` px below its middle. */

@@ -83,6 +83,15 @@ export interface Loop {
   on: boolean;
 }
 
+/** A Clip of Takes' Takes and placement, as setClipTakes sets them. */
+export interface ClipTakes {
+  takes: { id: number; position: number; nudge: number }[];
+  activeTakeId: number;
+  start: number;
+  offset: number;
+  length: number;
+}
+
 /** What a new Song is made with; whatever is left out stays as New Song makes it. */
 export interface NewSong {
   title?: string;
@@ -156,6 +165,16 @@ export class Bandmate {
   /** A Song's Snapshots, newest first: why each was taken. */
   snapshots(songId: number): Promise<{ id: number; reason: string }[]> {
     return json<{ id: number; reason: string }[]>(this.api.get(`/api/songs/${songId}/snapshots`));
+  }
+
+  /**
+   * Sets a Clip of Takes' Takes, where each starts in its source span, how
+   * far each is nudged, the Take it plays and its placement, as undoing a
+   * Retake does: a test's way of putting a Clip in a shape that would take
+   * several edits to reach.
+   */
+  setClipTakes(songId: number, clipId: number, takes: ClipTakes): Promise<Timeline> {
+    return json<Timeline>(this.api.put(`/api/songs/${songId}/timeline/clips/${clipId}/takes`, { data: takes }));
   }
 
   /** A Song's Timeline, as it is now. */

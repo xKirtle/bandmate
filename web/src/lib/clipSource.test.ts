@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { api, type Clip, type ClipBeat, type Sound, type Take, type Timeline } from './api';
-import { clipSources, clipTitle, fileStart, heard, placementOf, playing } from './clipSource';
+import { clipSources, clipTitle, fileStart, heard, placementOf, playing, trimLimit } from './clipSource';
 
 const beat = (id: number, more: Partial<ClipBeat> = {}): ClipBeat => ({
   id,
@@ -205,6 +205,33 @@ describe('fileStart', () => {
   it("is where a Clip's active Take is in its span, or the start for a Beat", () => {
     expect(fileStart(takeClip(1, [take(3), take(4, { position: 1.5 })], 4))).toBe(1.5);
     expect(fileStart(clip(1, 7))).toBe(0);
+  });
+});
+
+describe('trimLimit', () => {
+  const source = (duration: number) => ({ key: 'k', title: 't', audio: 'a', duration, loadPeaks: async () => [] });
+
+  it("is its source's whole length while the Clip plays within it", () => {
+    // The Beat Clip plays 2s to 12s of a 90s Beat.
+    expect(trimLimit(clip(1, 7), source(90))).toBe(90);
+    // The Clip of Takes plays 2s to 12s of a span its Takes end 8s into.
+    expect(trimLimit(takeClip(1, [take(3)]), source(8))).toBe(12);
+  });
+
+  it("is a Beat's or a Sound's own length, which its Clip can never play past", () => {
+    // Stored playing past its Beat, it's still pulled back to the Beat's end.
+    expect(trimLimit(clip(1, 7), source(8))).toBe(8);
+  });
+
+  it('is as far as a Clip of Takes already plays, where a nudge left it past its Takes', () => {
+    // Its Take nudged earlier, the span ends before the Clip does: its end
+    // still goes back out to where it is, so grabbing it never pulls it in.
+    expect(trimLimit(takeClip(1, [take(3, { position: 0, nudge: -1 })]), source(9))).toBe(12);
+  });
+
+  it('counts the stretch of its source a slowed Clip plays', () => {
+    const slow = { ...takeClip(1, [take(3)]), tempo: 0.5 };
+    expect(trimLimit(slow, source(4))).toBe(7);
   });
 });
 

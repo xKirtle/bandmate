@@ -251,5 +251,7 @@ describe('nudging', () => {
   it('nudges by how far the Clip is dragged, in whole milliseconds', () => {
     expect(draggedNudge(clip, 0.1234)).toBe(0.143);
     expect(draggedNudge(clip, -0.02)).toBe(0);
+    // Dragged further left, the Take is nudged earlier than it was recorded.
+    expect(draggedNudge(clip, -0.1234)).toBe(-0.103);
   });
 });

@@ -157,12 +157,20 @@ func TestCheckLayoutClips(t *testing.T) {
 		{"a Clip playing past its Sound", func() Clip { c := soundClip; c.Length = 6; return c }(), rulePastSource},
 		{"a Clip playing up to where its last Take ends",
 			takesClip(1, 0, 0, 12, Take{ID: 1}, Take{ID: 2, Position: 2}), 0},
+		// A Clip of Takes plays the span its Takes are laid out in, and the
+		// span holds whatever the Clip plays: past them it plays silence.
 		{"a Clip playing past where its last Take ends",
-			takesClip(1, 0, 0, 13, Take{ID: 1}, Take{ID: 2, Position: 2}), rulePastSource},
-		{"a Clip playing up to where a Take nudged earlier used to end",
-			takesClip(1, 0, 0, 12, Take{ID: 1}, Take{ID: 2, Position: 0, Nudge: -2}), 0},
+			takesClip(1, 0, 0, 13, Take{ID: 1}, Take{ID: 2, Position: 2}), 0},
 		{"a Clip playing past where its nudged Take reaches",
-			takesClip(1, 0, 0, 13, Take{ID: 1}, Take{ID: 2, Position: 0, Nudge: -2}), rulePastSource},
+			takesClip(1, 0, 0, 13, Take{ID: 1}, Take{ID: 2, Position: 0, Nudge: -2}), 0},
+		{"a Clip of Takes starting before its span", offset(takesClip(1, 0, 0, 12, Take{ID: 1}), -1), ruleBeforeSource},
+		// Only a Clip of Takes is let past its source, so one playing
+		// nothing at all is still refused, as it always was.
+		{"a Clip with nothing to play", func() Clip {
+			c := takesClip(1, 0, 0, 12, Take{ID: 1})
+			c.Takes, c.ActiveTakeID = nil, nil
+			return c
+		}(), rulePastSource},
 		{"a Clip with Fades that fit", faded(beatClip(1, 0, 4), 1, 3), 0},
 		{"a Clip with Fades a rounding hair too long", faded(beatClip(1, 0, 4), 1, 3+tolerance/2), 0},
 		{"a Clip with Fades that don't fit", faded(beatClip(1, 0, 4), 2, 3), ruleFadesFit},
@@ -196,11 +204,11 @@ func TestCheckLayoutLeavesUntouchedClips(t *testing.T) {
 
 func TestCheckLayoutNudgedTake(t *testing.T) {
 	// The Clip is trimmed out to its Take nudged later, which is nudged
-	// back: only the Take moves.
+	// back: only the Take moves, and the Clip keeps the window it had,
+	// playing silence where the Take no longer reaches (ADR 0023).
 	before := timelineOf([]Clip{takesClip(1, 0, 0, 12, Take{ID: 1}, Take{ID: 2, Position: 2, Nudge: 1})})
 	after := timelineOf([]Clip{takesClip(1, 0, 0, 12, Take{ID: 1}, Take{ID: 2, Position: 1})})
-	want := violation{rule: rulePastSource, clipID: 1}
-	if got := checkLayout(before, after); got == nil || *got != want {
-		t.Errorf("checkLayout = %+v, want %+v", got, want)
+	if got := checkLayout(before, after); got != nil {
+		t.Errorf("checkLayout = %+v, want none", got)
 	}
 }

@@ -93,7 +93,7 @@ func clipRule(tl Timeline, t Track, c Clip) placementRule {
 		return rule
 	}
 	switch {
-	case c.sourceEnd() > sourceDuration(tl, c)+tolerance:
+	case playsPastSource(tl, c):
 		return rulePastSource
 	case !c.fades().fit(c.Length):
 		return ruleFadesFit
@@ -119,9 +119,21 @@ func storedRule(start, offset, length float64) placementRule {
 	return 0
 }
 
-// sourceDuration is how long c's source is on the Timeline tl, in seconds,
-// however c trims it: its Beat's or its Sound's, or the span up to where
-// the last of its Takes ends, whichever is active.
+// playsPastSource tells whether c stops after the end of its source. Only
+// a Clip of a Beat or a Sound can: those play a file, which runs out. A
+// Clip of Takes plays the span its Takes are laid out in, and the span
+// holds whatever the Clip plays, so a Take nudged earlier leaves silence
+// at the Clip's end rather than costing the Clip its window (ADR 0023).
+func playsPastSource(tl Timeline, c Clip) bool {
+	if c.ActiveTakeID != nil {
+		return false
+	}
+	return c.sourceEnd() > sourceDuration(tl, c)+tolerance
+}
+
+// sourceDuration is how long the file c plays lasts, in seconds, however c
+// trims it: its Beat's or its Sound's, as the Timeline tl holds them. A
+// Clip of Takes plays no file of its own, as playsPastSource says.
 func sourceDuration(tl Timeline, c Clip) float64 {
 	switch {
 	case c.BeatID != nil:
@@ -132,14 +144,14 @@ func sourceDuration(tl Timeline, c Clip) float64 {
 		if i := slices.IndexFunc(tl.Sounds, func(s Sound) bool { return s.ID == *c.SoundID }); i >= 0 {
 			return tl.Sounds[i].Duration
 		}
-	default:
-		return takesEnd(c.Takes)
 	}
 	return 0
 }
 
 // takesEnd is where in their Clip's source span the last of the Takes
-// ends. A Take nudged earlier still reaches where it ended before.
+// ends. A Take nudged earlier still reaches where it ended before, so the
+// Clips that shrink to their Takes, as deleting one does, keep the window
+// a nudge left them.
 func takesEnd(takes []Take) float64 {
 	var end float64
 	for _, t := range takes {

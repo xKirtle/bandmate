@@ -97,7 +97,7 @@ function timelineDrag(tracks: Track[] = song()) {
     playhead: () => state.playhead,
     loop: () => state.loop,
     reach: () => 8 / scale,
-    sourceLength: () => 60,
+    trimLimit: () => 60,
   });
   const clipOf = (id: number) => state.tracks.flatMap((t) => t.clips).find((c) => c.id === id)!;
   return {
@@ -270,6 +270,19 @@ describe('ClipDrag', () => {
       expect(shown.trackId).toBe(2);
       expect(shown.clip.takes[0]).toMatchObject({ nudge: 0.5, position: 0.5 });
       expect(drag.release()).toEqual({ edit: { kind: 'nudgeTake', clipId: 3, takeId: 103, nudge: 0.5 } });
+    });
+
+    it('nudges the active Take earlier, past zero, dragged left', () => {
+      const { drag, press } = timelineDrag();
+      press(3, 'move', 30, { nudges: true });
+
+      drag.move(at(29.5, 2));
+
+      expect(drag.mode).toBe('nudge');
+      const [shown] = drag.shown;
+      expect(shown.at).toMatchObject({ start: 25, length: 10 });
+      expect(shown.clip.takes[0]).toMatchObject({ nudge: -0.5, position: -0.5 });
+      expect(drag.release()).toEqual({ edit: { kind: 'nudgeTake', clipId: 3, takeId: 103, nudge: -0.5 } });
     });
 
     it('moves a Clip of a Beat with Alt held, as it has no Take to nudge', () => {
