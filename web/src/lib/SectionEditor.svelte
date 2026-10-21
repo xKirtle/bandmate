@@ -6,10 +6,11 @@
   import X from '@lucide/svelte/icons/x';
   import { tick, untrack, type Snippet } from 'svelte';
   import ActionsMenu from './ActionsMenu.svelte';
-  import AlternateText, { type Cueing } from './AlternateText.svelte';
+  import AlternateText, { type TrackRow } from './AlternateText.svelte';
   import type { CaretListener } from './lyricsLanguage';
   import { suggestedLabels, type Alternate, type Section } from './api';
   import Combobox from './Combobox.svelte';
+  import type { CueGutter } from './cueGutter.svelte';
   import type { LyricSheetEditing, SheetField } from './lyricSheetEditing.svelte';
   import type { MenuAction } from './menu';
   import type { Drop } from './sectionDrag';
@@ -25,7 +26,9 @@
     grip,
     actions,
     more,
-    cueing,
+    gutter,
+    current = null,
+    track,
     drag,
     places = [],
     onCaret,
@@ -44,8 +47,12 @@
     actions: Snippet;
     /** The actions after them, folded into a ⋯ menu on phones. */
     more: MenuAction[];
-    /** Given, the active Alternate's Lines are highlighted and cued as playback goes. */
-    cueing?: Cueing;
+    /** Given, the active Alternate's Lines are highlighted as playback goes, and cued through the Cue gutter. */
+    gutter?: CueGutter;
+    /** With the gutter, the Line playback is on, highlighted. */
+    current?: number | null;
+    /** With the gutter, keeps track of a Line's row, to follow playback to. */
+    track?: TrackRow;
     /** The drag of a Section, shared with the page: given, an inactive Alternate is dragged out by its card. */
     drag?: SectionDragging;
     /** Where in the Lyric Sheet an inactive Alternate can be moved to, as a Section of its own. */
@@ -327,7 +334,9 @@
         sectionId={section.id}
         label="Lines"
         {editing}
-        {cueing}
+        {gutter}
+        {current}
+        {track}
         {onCaret}
         tour={tour && `${tour}-lines`}
       />

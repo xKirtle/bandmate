@@ -9,7 +9,6 @@
   import X from '@lucide/svelte/icons/x';
   import { tick } from 'svelte';
   import { MediaQuery } from 'svelte/reactivity';
-  import type { Cueing } from './AlternateText.svelte';
   import type { Section, Song } from './api';
   import type { CueChange } from './cueChanges';
   import { CueGutter } from './cueGutter.svelte';
@@ -163,32 +162,6 @@
   // In Write mode, each Line is tracked, to follow playback to. Read mode
   // follows playback in LyricSheetView.
   const { track, follow } = follower();
-
-  /** How a Section's Cues show on its text box in Write mode. */
-  function cueingFor(section: Section): Cueing {
-    return {
-      current: current?.line ?? null,
-      track: (el, line) => track(el, lineKey(line)),
-      gutter: gutter.offered
-        ? {
-            labelSuffix: gutter.labelSuffix(section.id),
-            save: (line, cue) => gutter.save({ section: section.id, line: line.id }, cue),
-            has: (line) => gutter.has(line),
-            field: (line, field) => gutter.setField(line, field),
-            next: (line) => gutter.editAfter(line),
-            play: gutter.play,
-            outOfOrder: (line) => gutter.outOfOrder(line),
-          }
-        : undefined,
-      sync: gutter.syncing
-        ? {
-            next: gutter.upNext,
-            now: () => gutter.now(),
-            pick: (line) => gutter.pick({ section: section.id, line }),
-          }
-        : undefined,
-    };
-  }
 
   // Sync mode cues the next Line at the playhead with Enter, or its Now
   // button, in Write mode on wider screens only, and only once there's a
@@ -429,7 +402,9 @@
               dropped={dropSection}
               autofocus={focusing === section.id}
               {editing}
-              cueing={cueingFor(section)}
+              {gutter}
+              current={current?.line ?? null}
+              track={(el, line) => track(el, lineKey(line))}
               {onCaret}
               more={sectionActions(section, i)}
               {drag}
