@@ -32,7 +32,8 @@ import {
 // of Clips outside it.
 //
 // Holding the Clips as they were dropped is one of the five As shown
-// layers, each collapsing its own way: see saves.svelte.ts.
+// layers, each falling back to what's saved its own way: see
+// saves.svelte.ts.
 //
 // It works in seconds and Tracks: the Timeline measures the page, listens
 // to the pointer, scrolls at the edges, saves and offers to move the Cues.

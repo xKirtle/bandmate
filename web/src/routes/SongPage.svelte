@@ -89,8 +89,8 @@
   // a Merge keeps the Song as it is, as the Timeline says.
   let freeze = $state<Freeze>(null);
   // A Status picked, shown until its save ends. With the Languages below,
-  // it's one of the five As shown layers, each collapsing its own way (see
-  // lib/saves.svelte.ts).
+  // it's one of the five As shown layers, each falling back to what's saved
+  // its own way (see lib/saves.svelte.ts).
   let statusSent = $state<Status | null>(null);
   const status = $derived(statusSent ?? savedSong?.status ?? 'idea');
   // The Languages picked, shown until their save ends.

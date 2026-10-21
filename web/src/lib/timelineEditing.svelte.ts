@@ -21,7 +21,7 @@
 //   switch resolves. A refresh replacing the Song drops them all; undo and
 //   redo leave them be. What's worked out to send (Merge rendering, undo)
 //   goes by the Timeline as saved. It's one of the five As shown layers,
-//   each collapsing its own way: see saves.svelte.ts.
+//   each falling back to what's saved its own way: see saves.svelte.ts.
 // - What follows an edit: Clips it adds are selected, and a Track it adds
 //   chosen.
 // - Merge and Sound import, the rarer edits whose audio the browser makes
