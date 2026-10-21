@@ -252,6 +252,10 @@ _Avoid_: Bounce, export, render
 A key, or a key held with the mouse, that does something on a Song page without reaching for a button, like Space to play or R to record. Shortcuts are for a keyboard and mouse, so a phone or a narrow window never shows them, though they still work there. A control's usual keys, like arrows in a menu or Esc in a text field, work as they do everywhere and aren't Bandmate's Shortcuts. Holding a Shortcut's keys down does it once, however long they're held, except for seeking on the ruler, going to the start or the end, and nudging a Cue, which go on while held. No two Shortcuts have the same key.
 _Avoid_: Keybind, hotkey, key binding
 
+**Two-way Shortcut**:
+A Shortcut that goes back or forward, like seeking or going to the start or the end, so it has two sets of keys: its **Back** keys and its **Forward** keys, listed and changed separately in Settings' Shortcuts tab. Every other Shortcut does one thing and has one set. A key belongs to one way of one Shortcut: a key one way has can't be given to the other.
+_Avoid_: Two-key Shortcut, bidirectional Shortcut, pair
+
 **Device**:
 The browser, on a computer or phone, that Bandmate is opened in. What's kept "on each device" stays in that browser alone: the same laptop's other browser keeps its own. The hardware a Take is recorded from is an audio device, never just a device.
 _Avoid_: Browser (in the UI), machine
