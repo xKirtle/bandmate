@@ -37,7 +37,7 @@ func (s *Store) PutDemoBack(ctx context.Context, file []byte) (int64, error) {
 	if err != nil {
 		return 0, fmt.Errorf("opening the built-in demo: %w", err)
 	}
-	defer r.close()
+	defer r.Close()
 	songs, err := queryIDs(ctx, r.db, `SELECT id FROM songs`)
 	if err != nil {
 		return 0, err
@@ -45,7 +45,7 @@ func (s *Store) PutDemoBack(ctx context.Context, file []byte) (int64, error) {
 	if len(songs) != 1 {
 		return 0, fmt.Errorf("the built-in demo holds %d songs, not one", len(songs))
 	}
-	restored, err := s.restore(ctx, r, Picks{Songs: songs}, Replace{}, true)
+	restored, err := r.restore(ctx, Picks{Songs: songs}, Replace{}, true)
 	if err != nil {
 		return 0, fmt.Errorf("putting the demo back: %w", err)
 	}
