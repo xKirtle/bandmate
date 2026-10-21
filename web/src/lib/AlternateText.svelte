@@ -44,7 +44,8 @@
   import type { Alternate } from './api';
   import CueField from './CueField.svelte';
   import { isBlank, linesByRow } from './cues';
-  import { rowAt, type GutterField } from './gutter';
+  import type { GutterField } from './cueGutter.svelte';
+  import { rowAt } from './gutter';
   import { keyHints } from './keyHints';
   import type { LyricSheetEditing } from './lyricSheetEditing.svelte';
   import { sameKey } from './shortcuts';
