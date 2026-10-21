@@ -10,9 +10,12 @@ export interface DeviceSettingStorage<T> {
   store: (storage: Storage | undefined, value: T) => void;
   /**
    * Shows the value, for a setting with somewhere to show it, e.g. the
-   * Palette on the page: called with the value read on construction, with
-   * one set, and with one another tab's change or a cleared storage brings
-   * in. A setting that shows itself wherever it's read leaves this out.
+   * Palette on the page: called with the value read on construction, from
+   * the constructor itself, with one set, and with one another tab's change
+   * or a cleared storage brings in. It's called every time, whether or not
+   * the value differs from the one held, so a tab keeping the value this
+   * one already has shows it again. A setting that shows itself wherever
+   * it's read leaves this out.
    */
   shown?: (value: T) => void;
 }
@@ -41,8 +44,9 @@ export class DeviceSetting<T> {
 
   /** Sets the value on this device, and keeps it. */
   set(value: T) {
-    this.#take(value);
+    // Kept first, so a setting shown the value sees it already kept.
     this.#kind.store(this.#storage, value);
+    this.#take(value);
   }
 
   // Takes a new value, and shows it where the setting says how.

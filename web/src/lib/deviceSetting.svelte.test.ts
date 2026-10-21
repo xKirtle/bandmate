@@ -19,8 +19,11 @@ function storage(values: Record<string, string> = {}, blocked = false): Storage 
 // again where what's kept can't be read.
 const standInKey = 'bandmate.standIn';
 const standInDefault = 1;
-const otherKey = 'bandmate.palette';
+/** Another setting's key, whatever it is: this one's changes are the ones to follow. */
+const otherKey = 'bandmate.otherSetting';
 
+// Catching what storage throws is the setting's own, as it is in every
+// setting the app has: the module leaves the catching to the contract.
 function standInStorage(shown?: (value: number) => void): DeviceSettingStorage<number> {
   return {
     key: standInKey,
@@ -43,56 +46,63 @@ function standInStorage(shown?: (value: number) => void): DeviceSettingStorage<n
   };
 }
 
+/** How a case starts: what this device's storage holds, whether the browser refuses it, and a hook to show the value. */
+interface StandInCase {
+  values?: Record<string, string>;
+  refused?: boolean;
+  shown?: (value: number) => void;
+}
+
 /** The stand-in setting as the app keeps it, in a stand-in Storage this device's other tabs share. */
-function setting(values: Record<string, string> = {}, blocked = false, shown?: (value: number) => void) {
+function standInSetting({ values = {}, refused = false, shown }: StandInCase = {}) {
   const tabs = new EventTarget();
-  const kept = new DeviceSetting(standInStorage(shown), storage(values, blocked), tabs);
+  const standIn = new DeviceSetting(standInStorage(shown), storage(values, refused), tabs);
   /** Another tab keeps a value, or clears storage with a null key, as the browser tells this one. */
   const otherTab = (key: string | null) => tabs.dispatchEvent(Object.assign(new Event('storage'), { key }));
-  return { kept, values, otherTab };
+  return { standIn, values, otherTab };
 }
 
 describe('A Device Setting, reading and keeping its value', () => {
   it('is the value in this device storage, read as the setting reads it', () => {
-    expect(setting({ [standInKey]: '7' }).kept.value).toBe(7);
+    expect(standInSetting({ values: { [standInKey]: '7' } }).standIn.value).toBe(7);
   });
 
   it('falls back to the default until a value is kept on this device', () => {
-    expect(setting().kept.value).toBe(standInDefault);
+    expect(standInSetting().standIn.value).toBe(standInDefault);
   });
 
   it("falls back to the default when what's kept can't be read", () => {
-    expect(setting({ [standInKey]: 'nope' }).kept.value).toBe(standInDefault);
+    expect(standInSetting({ values: { [standInKey]: 'nope' } }).standIn.value).toBe(standInDefault);
   });
 
   it('is the value set, and keeps it to read back after a reload', () => {
-    const { kept, values } = setting();
-    kept.set(7);
-    expect(kept.value).toBe(7);
-    expect(setting(values).kept.value).toBe(7);
+    const { standIn, values } = standInSetting();
+    standIn.set(7);
+    expect(standIn.value).toBe(7);
+    expect(standInSetting({ values }).standIn.value).toBe(7);
   });
 });
 
 describe("A Device Setting, following this device's other tabs", () => {
   it('picks up another tab keeping this setting', () => {
-    const { kept, values, otherTab } = setting();
+    const { standIn, values, otherTab } = standInSetting();
     values[standInKey] = '7';
     otherTab(standInKey);
-    expect(kept.value).toBe(7);
+    expect(standIn.value).toBe(7);
   });
 
   it('ignores another tab keeping another setting', () => {
-    const { kept, values, otherTab } = setting({ [standInKey]: '7' });
+    const { standIn, values, otherTab } = standInSetting({ values: { [standInKey]: '7' } });
     values[standInKey] = '9';
     otherTab(otherKey);
-    expect(kept.value).toBe(7);
+    expect(standIn.value).toBe(7);
   });
 
   it('re-reads, and so falls back, when another tab clears storage', () => {
-    const { kept, values, otherTab } = setting({ [standInKey]: '7' });
+    const { standIn, values, otherTab } = standInSetting({ values: { [standInKey]: '7' } });
     delete values[standInKey];
     otherTab(null);
-    expect(kept.value).toBe(standInDefault);
+    expect(standIn.value).toBe(standInDefault);
   });
 });
 
@@ -100,7 +110,7 @@ describe("A Device Setting's hook for showing the value", () => {
   /** The stand-in setting with a hook, and every value it was told to show, in order. */
   function withShown(values: Record<string, string> = {}) {
     const shown: number[] = [];
-    return { ...setting(values, false, (value) => shown.push(value)), shown };
+    return { ...standInSetting({ values, shown: (value) => shown.push(value) }), shown };
   }
 
   it('shows the value read on construction', () => {
@@ -108,8 +118,8 @@ describe("A Device Setting's hook for showing the value", () => {
   });
 
   it('shows the value set', () => {
-    const { kept, shown } = withShown();
-    kept.set(7);
+    const { standIn, shown } = withShown();
+    standIn.set(7);
     expect(shown).toEqual([standInDefault, 7]);
   });
 
@@ -156,14 +166,14 @@ describe("The Shortcuts' keys, as the Device Setting holds them", () => {
 
 describe('A Device Setting where storage is refused', () => {
   it('falls back to the default', () => {
-    expect(setting({}, true).kept.value).toBe(standInDefault);
+    expect(standInSetting({ refused: true }).standIn.value).toBe(standInDefault);
   });
 
   it('is the value set, kept in memory alone, whatever else another tab changes', () => {
-    const { kept, otherTab } = setting({}, true);
-    expect(() => kept.set(7)).not.toThrow();
-    expect(kept.value).toBe(7);
+    const { standIn, otherTab } = standInSetting({ refused: true });
+    expect(() => standIn.set(7)).not.toThrow();
+    expect(standIn.value).toBe(7);
     otherTab(otherKey);
-    expect(kept.value).toBe(7);
+    expect(standIn.value).toBe(7);
   });
 });
