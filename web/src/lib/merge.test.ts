@@ -11,6 +11,7 @@ const clip = (id: number, start: number, more: Partial<Clip> = {}): Clip => ({
   gain: 0,
   tempo: 1,
   pitch: 0,
+  nudge: 0,
   fadeIn: 0,
   fadeOut: 0,
   takes: [],
@@ -31,7 +32,7 @@ const track = (id: number, clips: Clip[] = [], more: Partial<Track> = {}): Track
   ...more,
 });
 
-const take = (id: number, position: number, nudge = 0): Take => ({
+const take = (id: number, position: number): Take => ({
   id,
   number: id,
   size: 0,
@@ -39,7 +40,6 @@ const take = (id: number, position: number, nudge = 0): Take => ({
   sampleRate: 48000,
   latencyOffset: 0,
   position,
-  nudge,
   recordedAt: '',
 });
 
@@ -185,10 +185,12 @@ describe('mergeWarning', () => {
 
 describe('mergedClips', () => {
   it('plays only the Clips merged, each as trimmed and at its Gain, a Take Clip only its active Take with its Nudge', () => {
-    // Take 41 starts 1s into its span, nudged 0.25s later; Take 42 isn't active.
+    // Take 41 starts 1s into its span, the Clip nudged 0.25s later; Take
+    // 42 isn't active.
     const takes = clip(6, 20, {
       beatId: null,
-      takes: [take(41, 1.25, 0.25), take(42, 0)],
+      nudge: 0.25,
+      takes: [take(41, 1), take(42, 0)],
       activeTakeId: 41,
       offset: 0.5,
       length: 6,

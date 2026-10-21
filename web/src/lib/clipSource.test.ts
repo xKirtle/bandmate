@@ -20,6 +20,7 @@ const clip = (id: number, beatId: number, name: string | null = null): Clip => (
   gain: 0,
   tempo: 1,
   pitch: 0,
+  nudge: 0,
   fadeIn: 0,
   fadeOut: 0,
   takes: [],
@@ -37,7 +38,6 @@ const take = (id: number, more: Partial<Take> = {}): Take => ({
   sampleRate: 48000,
   latencyOffset: 0.01,
   position: 0,
-  nudge: 0,
   recordedAt: '',
   ...more,
 });
@@ -51,6 +51,7 @@ const takeClip = (id: number, takes: Take[], active = takes[0].id, name: string 
   gain: 0,
   tempo: 1,
   pitch: 0,
+  nudge: 0,
   fadeIn: 0,
   fadeOut: 0,
   takes,
@@ -78,6 +79,7 @@ const soundClip = (id: number, soundId: number, name: string | null = null): Cli
   gain: 0,
   tempo: 1,
   pitch: 0,
+  nudge: 0,
   fadeIn: 0,
   fadeOut: 0,
   takes: [],
@@ -184,8 +186,13 @@ describe('clipSources of Takes', () => {
     expect(sources.all()).toHaveLength(3);
   });
 
-  it('reaches where a Take nudged earlier ended before its nudge', () => {
-    const c = takeClip(1, [take(3, { duration: 30, nudge: -0.5 }), take(4, { position: 1, duration: 20, nudge: 0.5 })]);
+  it('reaches where the span ended before a Nudge took its audio earlier', () => {
+    const c = { ...takeClip(1, [take(3, { duration: 30 }), take(4, { position: 1, duration: 20 })]), nudge: -0.5 };
+    expect(clipSources(timeline([c], [])).of(c).duration).toBe(30);
+  });
+
+  it('reaches as far as a Nudge took its audio later', () => {
+    const c = { ...takeClip(1, [take(3, { duration: 30 })]), nudge: 0.5 };
     expect(clipSources(timeline([c], [])).of(c).duration).toBe(30.5);
   });
 
@@ -206,6 +213,11 @@ describe('fileStart', () => {
     expect(fileStart(takeClip(1, [take(3), take(4, { position: 1.5 })], 4))).toBe(1.5);
     expect(fileStart(clip(1, 7))).toBe(0);
   });
+
+  it("moves with the Clip's Nudge, whatever the Clip plays", () => {
+    expect(fileStart({ ...takeClip(1, [take(3, { position: 1.5 })]), nudge: 0.25 })).toBe(1.75);
+    expect(fileStart({ ...clip(1, 7), nudge: -0.25 })).toBe(-0.25);
+  });
 });
 
 describe('trimLimit', () => {
@@ -224,9 +236,9 @@ describe('trimLimit', () => {
   });
 
   it('is as far as a Clip of Takes already plays, where a nudge left it past its Takes', () => {
-    // Its Take nudged earlier, the span ends before the Clip does: its end
+    // Its audio nudged earlier, the span ends before the Clip does: its end
     // still goes back out to where it is, so grabbing it never pulls it in.
-    expect(trimLimit(takeClip(1, [take(3, { position: 0, nudge: -1 })]), source(9))).toBe(12);
+    expect(trimLimit({ ...takeClip(1, [take(3, { position: 0 })]), nudge: -1 }, source(9))).toBe(12);
   });
 
   it('counts the stretch of its source a slowed Clip plays', () => {
@@ -262,6 +274,31 @@ describe('heard', () => {
 
   it('plays nothing of a Take trimmed out of the Clip', () => {
     expect(heard(takeClip(1, [take(3, { duration: 1.5 })]))).toBeNull();
+  });
+
+  it("plays a Beat Clip's audio from earlier in its file, nudged later", () => {
+    // The Clip keeps its window: it plays its 10s from 0:05, from 1s into
+    // the Beat rather than 2s, so the second it held before is heard a
+    // second later.
+    expect(heard({ ...clip(1, 7), nudge: 1 })).toEqual({ start: 5, offset: 1, length: 10, tempo: 1 });
+    expect(heard({ ...clip(1, 7), nudge: -1 })).toEqual({ start: 5, offset: 3, length: 10, tempo: 1 });
+  });
+
+  it("moves a Take's audio inside its Clip, the window staying put", () => {
+    // The Take fills the Clip's window exactly: the span from 2s for 10s.
+    // Nudged a second later its audio comes in a second after the Clip
+    // starts; nudged a second earlier it runs out a second before it ends.
+    const c = { ...takeClip(1, [take(3, { position: 2, duration: 10 })]), nudge: 1 };
+    expect(heard(c)).toEqual({ start: 31, offset: 0, length: 9, tempo: 1 });
+    expect(heard({ ...c, nudge: -1 })).toEqual({ start: 30, offset: 1, length: 9, tempo: 1 });
+  });
+
+  it("nudges a slowed Clip's audio in the audio's own time, not the Timeline's", () => {
+    // At 50% the Clip plays 5s of its span over its 10s, and its Take
+    // comes in right at its start, so a 1s Nudge of the audio delays it by
+    // 2s of the Timeline.
+    const slow = { ...takeClip(1, [take(3, { position: 2, duration: 12 })]), tempo: 0.5, nudge: 1 };
+    expect(heard(slow)).toEqual({ start: 32, offset: 0, length: 8, tempo: 0.5 });
   });
 });
 

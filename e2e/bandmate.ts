@@ -85,7 +85,7 @@ export interface Loop {
 
 /** A Clip of Takes' Takes and placement, as setClipTakes sets them. */
 export interface ClipTakes {
-  takes: { id: number; position: number; nudge: number }[];
+  takes: { id: number; position: number }[];
   activeTakeId: number;
   start: number;
   offset: number;
@@ -168,13 +168,17 @@ export class Bandmate {
   }
 
   /**
-   * Sets a Clip of Takes' Takes, where each starts in its source span, how
-   * far each is nudged, the Take it plays and its placement, as undoing a
-   * Retake does: a test's way of putting a Clip in a shape that would take
-   * several edits to reach.
+   * Sets a Clip of Takes' Takes, where each starts in its source span, the
+   * Take it plays and its placement, as undoing a Retake does: a test's way
+   * of putting a Clip in a shape that would take several edits to reach.
    */
   setClipTakes(songId: number, clipId: number, takes: ClipTakes): Promise<Timeline> {
     return json<Timeline>(this.api.put(`/api/songs/${songId}/timeline/clips/${clipId}/takes`, { data: takes }));
+  }
+
+  /** Moves a Clip's audio by hand inside it, in seconds, as the Clip menu's Nudge field does. */
+  setClipNudge(songId: number, clipId: number, nudge: number): Promise<Timeline> {
+    return json<Timeline>(this.api.put(`/api/songs/${songId}/timeline/clips/${clipId}/nudge`, { data: { nudge } }));
   }
 
   /** A Song's Timeline, as it is now. */

@@ -21,9 +21,9 @@ const everyKind: ClipCommandKind[] = [
   'tempo',
   'pitch',
   'gain',
+  'nudge',
   'chooseTake',
   'deleteTake',
-  'nudgeTake',
   'clearInactiveTakes',
 ];
 
@@ -59,7 +59,6 @@ group('clipActions', () => {
     sampleRate: 48000,
     latencyOffset: 0,
     position: 0,
-    nudge: 0,
     recordedAt: '',
   });
   const clip = (over: Partial<Clip>): Clip => ({
@@ -70,6 +69,7 @@ group('clipActions', () => {
     gain: 0,
     tempo: 1,
     pitch: 0,
+    nudge: 0,
     fadeIn: 0,
     fadeOut: 0,
     takes: [],
@@ -109,6 +109,7 @@ group('clipActions', () => {
       'Gain',
       'Tempo',
       'Pitch',
+      'Nudge',
       'Copy',
       'Cut',
       'Duplicate',
@@ -120,6 +121,7 @@ group('clipActions', () => {
       'Gain',
       'Tempo',
       'Pitch',
+      'Nudge',
       'Copy',
       'Cut',
       'Duplicate',
@@ -133,12 +135,12 @@ group('clipActions', () => {
   it('offers no Take choices on a Clip of one Take', () => {
     expect(labels(oneTake)).toEqual([
       'Retake',
-      'Nudge',
       'Download Take',
       'Rename',
       'Gain',
       'Tempo',
       'Pitch',
+      'Nudge',
       'Copy',
       'Cut',
       'Duplicate',
@@ -152,13 +154,13 @@ group('clipActions', () => {
       'Retake',
       'Takes',
       'Delete Take',
-      'Nudge',
       'Clear inactive Takes',
       'Download Take',
       'Rename',
       'Gain',
       'Tempo',
       'Pitch',
+      'Nudge',
       'Copy',
       'Cut',
       'Duplicate',
@@ -185,13 +187,13 @@ group('clipActions', () => {
       'chooseTake clip 1 10',
       'deleteTake clip 1 10',
       'deleteTake clip 1 11',
-      'nudgeTake clip 1 11 5',
       'clearInactiveTakes clip 1',
       'download take 11',
       'rename',
       'gain clip 1 5',
       'tempo clip 1 5',
       'pitch clip 1 5',
+      'nudge clip 1 5',
       'copy clip 1',
       'cut clip 1',
       'duplicate clip 1',
@@ -230,12 +232,12 @@ group('clipActions', () => {
     expect(off).toEqual([
       ['Takes', hint],
       ['Delete Take', hint],
-      ['Nudge', hint],
       ['Clear inactive Takes', hint],
       ['Rename', hint],
       ['Gain', hint],
       ['Tempo', hint],
       ['Pitch', hint],
+      ['Nudge', hint],
       ['Copy', hint],
       ['Cut', hint],
       ['Duplicate', hint],
@@ -245,6 +247,7 @@ group('clipActions', () => {
       ['Gain', hint],
       ['Tempo', hint],
       ['Pitch', hint],
+      ['Nudge', hint],
       ['Copy', hint],
       ['Cut', hint],
       ['Duplicate', hint],
@@ -260,6 +263,7 @@ group('clipActions', () => {
       { label: 'Gain' },
       { label: 'Tempo' },
       { label: 'Pitch' },
+      { label: 'Nudge' },
       { label: 'Copy', title: 'Or Ctrl+C' },
       { label: 'Cut', title: 'Or Ctrl+X' },
       { label: 'Duplicate' },
@@ -301,6 +305,24 @@ group('clipActions', () => {
     });
   });
 
+  it('takes an exact Nudge in whole milliseconds, with a reset to 0, for every kind of Clip', () => {
+    const nudgeField = (c: Clip) => {
+      const entry = menu({ ...c, nudge: -0.25 }).find((a) => a.label === 'Nudge')!;
+      expect(entry.title).toBe(
+        "Move the Clip's audio within it, in milliseconds, later if positive; or Alt+←/→ the Clip",
+      );
+      return 'field' in entry ? entry.field : null;
+    };
+    for (const c of [beatClip, soundClip, oneTake]) {
+      expect(nudgeField(c)).toMatchObject({
+        value: -250,
+        unit: 'ms',
+        step: 1,
+        reset: { value: 0, label: 'Reset to 0 ms', offered: true },
+      });
+    }
+  });
+
   it('offers each reset only while the Clip isn’t there already', () => {
     const field = (label: string) => {
       const entry = menu(beatClip).find((a) => a.label === label)!;
@@ -308,6 +330,7 @@ group('clipActions', () => {
     };
     expect(field('Tempo')?.reset?.offered).toBe(false);
     expect(field('Pitch')?.reset?.offered).toBe(false);
+    expect(field('Nudge')?.reset?.offered).toBe(false);
   });
 
   it('turns Retake off, saying why, while the Clip’s Pitch isn’t 0', () => {
@@ -350,6 +373,7 @@ group('selectionActions', () => {
     gain: 0,
     tempo: 1,
     pitch: 0,
+    nudge: 0,
     fadeIn: 0,
     fadeOut: 0,
     takes: [],

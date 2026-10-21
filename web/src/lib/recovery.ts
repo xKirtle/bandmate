@@ -21,7 +21,7 @@ export interface Unsaved {
   clipId: number | null;
   /**
    * The Takes already in the Clip retaken, each with the Timeline time it
-   * was recorded to start at (before any nudge), to keep the Retake in step
+   * was recorded to start at (before its Clip's Nudge), to keep the Retake in step
    * with them; none for a new one.
    */
   takes: { id: number; at: number }[];
@@ -43,12 +43,12 @@ export interface RecoveredPlacement {
 type PlacedClip = Placed & {
   id: number;
   activeTakeId: number | null;
-  takes: readonly Pick<Take, 'id' | 'position' | 'nudge'>[];
+  takes: readonly Pick<Take, 'id' | 'position'>[];
 };
 
-/** The Timeline time each of a Clip's Takes was recorded to start at, before any nudge. */
+/** The Timeline time each of a Clip's Takes was recorded to start at, which its position is, before its Clip's Nudge. */
 export function takesAt(clip: PlacedClip): { id: number; at: number }[] {
-  return clip.takes.map((t) => ({ id: t.id, at: timelineAt(clip, t.position - t.nudge) }));
+  return clip.takes.map((t) => ({ id: t.id, at: timelineAt(clip, t.position) }));
 }
 
 /**

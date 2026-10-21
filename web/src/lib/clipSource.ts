@@ -8,8 +8,13 @@
 // are laid out in: each Take starts at its position in it, and the span
 // starts the Clip's offset before the Clip does. The span holds whatever
 // the Clip plays, so a Clip may run on past where its Takes end, as it may
-// start before they do: nudged earlier, a Take leaves silence behind it
+// start before they do: nudged earlier, its audio leaves silence behind it
 // (ADR 0023).
+//
+// A Clip's Nudge moves the audio inside its window, in the audio's own
+// time, and never the window itself (ADR 0028), so it's layered on here:
+// where its audio file starts, and what of it is heard, both move with it,
+// while its start, offset, length and Fades don't.
 import { api, type Clip, type NewClip, type OwnOfClip, type Take, type Timeline } from './api';
 import type { PlacedFades } from './clipFade';
 import { gainFactor } from './clipGain';
@@ -73,7 +78,7 @@ export function clipSources(timeline: Timeline): ClipSources {
       key,
       title: `Take ${take.number}`,
       audio: api.takeAudioUrl(timeline.songId, take.id),
-      duration: Math.max(...clip.takes.map((t) => t.position + t.duration + Math.max(0, -t.nudge))),
+      duration: takesSpan(clip),
       loadPeaks: () => api.getTake(timeline.songId, take.id).then((full) => full.peaks ?? []),
     });
   }
@@ -81,6 +86,16 @@ export function clipSources(timeline: Timeline): ClipSources {
     of: (clip) => byKey.get(sourceKey(clip))!,
     all: () => [...byKey.values()],
   };
+}
+
+/**
+ * How long the span a Clip's Takes are laid out in lasts, in seconds: where
+ * the last of them ends as recorded, and, nudged later, as far as its audio
+ * now reaches. Nudged earlier the span keeps the end it had, so a Nudge
+ * never pulls in an edge the next drag touches (ADR 0023).
+ */
+function takesSpan(clip: Clip): number {
+  return Math.max(...clip.takes.map((t) => t.position + t.duration)) + Math.max(0, clip.nudge);
 }
 
 /** The key of the source a Clip plays. */
@@ -114,8 +129,8 @@ export function activeTake(clip: Clip): Take | undefined {
  * How far into its source a Clip's end can be dragged out, in seconds: the
  * whole of a Beat's or a Sound's file, which it can never play past. A Clip
  * of Takes can go as far as its Takes reach, or as far as it already plays,
- * whichever is more: nudging a Take earlier leaves the Clip playing silence
- * past it (ADR 0023), and grabbing its edge then never pulls it in.
+ * whichever is more: nudging its audio earlier leaves the Clip playing
+ * silence past it (ADR 0023), and grabbing its edge then never pulls it in.
  */
 export function trimLimit(clip: Clip, source: ClipSource): number {
   if (clip.activeTakeId === null) return source.duration;
@@ -123,11 +138,12 @@ export function trimLimit(clip: Clip, source: ClipSource): number {
 }
 
 /**
- * Where in its source a Clip's audio file starts, in seconds: 0 for a Beat
- * or a Sound, and for a Take, its position in its span, which a nudge moves.
+ * Where in its source a Clip's audio file starts, in seconds: its Nudge for
+ * a Beat or a Sound, which start at the source's origin unnudged, and for a
+ * Take, its position in its span, nudged.
  */
 export function fileStart(clip: Clip): number {
-  return activeTake(clip)?.position ?? 0;
+  return (activeTake(clip)?.position ?? 0) + clip.nudge;
 }
 
 /**
@@ -138,12 +154,14 @@ export function fileStart(clip: Clip): number {
 export function heard(clip: Clip): Required<Placed> | null {
   const take = activeTake(clip);
   const { tempo } = clip;
-  if (!take) return { start: clip.start, offset: clip.offset, length: clip.length, tempo };
+  // Where its audio file starts in its source, as its Nudge moved it.
+  const at = fileStart(clip);
+  if (!take) return { start: clip.start, offset: clip.offset - at, length: clip.length, tempo };
   // Where the Take starts and ends in the span, on the Timeline.
-  const start = Math.max(clip.start, timelineAt(clip, take.position));
-  const end = Math.min(clip.start + clip.length, timelineAt(clip, take.position + take.duration));
+  const start = Math.max(clip.start, timelineAt(clip, at));
+  const end = Math.min(clip.start + clip.length, timelineAt(clip, at + take.duration));
   if (end <= start) return null;
-  return { start, offset: sourceAt(clip, start) - take.position, length: end - start, tempo };
+  return { start, offset: sourceAt(clip, start) - at, length: end - start, tempo };
 }
 
 /**
@@ -190,7 +208,7 @@ export function clipTitle(clip: Clip, source: ClipSource): string {
 
 /**
  * What a Clip has of its own, as placing or pasting it gives them: its
- * name, its Gain, its Tempo, its Pitch and its Fades, each left out while it has none.
+ * name, its Gain, its Tempo, its Pitch, its Nudge and its Fades, each left out while it has none.
  */
 export function ownOf(clip: Clip): OwnOfClip {
   return {
@@ -198,12 +216,13 @@ export function ownOf(clip: Clip): OwnOfClip {
     ...(clip.gain !== 0 ? { gain: clip.gain } : {}),
     ...(clip.tempo !== 1 ? { tempo: clip.tempo } : {}),
     ...(clip.pitch !== 0 ? { pitch: clip.pitch } : {}),
+    ...(clip.nudge !== 0 ? { nudge: clip.nudge } : {}),
     ...(clip.fadeIn !== 0 ? { fadeIn: clip.fadeIn } : {}),
     ...(clip.fadeOut !== 0 ? { fadeOut: clip.fadeOut } : {}),
   };
 }
 
-/** What places a Clip back as it is: its source, trim, name, Gain, Tempo, Pitch and Fades, without its id. */
+/** What places a Clip back as it is: its source, trim, name, Gain, Tempo, Pitch, Nudge and Fades, without its id. */
 export function placementOf(clip: Clip): NewClip {
   const { start, offset, length } = clip;
   const own = ownOf(clip);

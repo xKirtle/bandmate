@@ -67,9 +67,8 @@ import { rightHalves } from './split';
 // back. Deleting Takes, or clearing a
 // Clip's inactive ones, is undone the same way, as they're only detached,
 // or, if it deleted the Clip with its last Take, by placing the Clip back.
-// A nudge is undone the same way, since nudging before the Clip's span
-// moves the other Takes in it too, and redone as the nudge, which says
-// where the Take goes rather than how far it moves.
+// Setting a Clip's Nudge is undone by setting the one it had back, as
+// nothing else about the Clip changes.
 //
 // A Merge is kept as replacing the Clips it merged with its Clip, which
 // plays a Sound, so redoing it never renders or uploads it again. It's
@@ -152,6 +151,12 @@ export type Edit =
   | { kind: 'renameClip'; clipId: number; name: string }
   /** In dB, from minGain to maxGain. */
   | { kind: 'setClipGain'; clipId: number; gain: number }
+  /**
+   * A Clip's audio moved by hand inside it, to be nudge seconds from where
+   * it plays unnudged, in the audio's own time, later if positive. Only the
+   * audio moves: the Clip keeps its window, its edges and its Fades.
+   */
+  | { kind: 'setClipNudge'; clipId: number; nudge: number }
   /** In seconds; 0 for none. */
   | { kind: 'setClipFades'; clipId: number; fadeIn: number; fadeOut: number }
   /**
@@ -194,11 +199,6 @@ export type Edit =
   | { kind: 'setTakes'; clipId: number; takes: ClipTakes }
   /** One of a Clip's Takes made the one it plays. */
   | { kind: 'chooseTake'; clipId: number; takeId: number }
-  /**
-   * One of a Clip's Takes moved to be nudge seconds from where it was
-   * recorded, later if positive. The Clip's window stays where it is.
-   */
-  | { kind: 'nudgeTake'; clipId: number; takeId: number; nudge: number }
   /**
    * One of a Clip's Takes detached. If it was active, the most recent one
    * left is; if it was the last, the Clip is deleted.
@@ -584,9 +584,12 @@ function inverse(edit: Edit, before: Timeline, after: Timeline): Step {
       return { edit: { kind: 'replaceClips', clipIds: halves, clips: back.clips }, adds: back.adds };
     }
     case 'setTakes':
-    case 'nudgeTake':
     case 'clearInactiveTakes':
       return { edit: settingTakes(before, edit.clipId), adds: none };
+    case 'setClipNudge': {
+      const { clip } = findClip(before, edit.clipId);
+      return { edit: { kind: 'setClipNudge', clipId: clip.id, nudge: clip.nudge }, adds: none };
+    }
     case 'deleteTake':
       // Its last Take deletes the Clip.
       return clipIds(after).has(edit.clipId)
@@ -688,7 +691,7 @@ export function addedClips(before: Timeline, after: Timeline): number[] {
 export function settingTakes(tl: Timeline, clipId: number): Edit {
   const { clip } = findClip(tl, clipId);
   const { activeTakeId, start, offset, length } = clip;
-  const takes = clip.takes.map(({ id, position, nudge }) => ({ id, position, nudge }));
+  const takes = clip.takes.map(({ id, position }) => ({ id, position }));
   return { kind: 'setTakes', clipId, takes: { takes, activeTakeId, start, offset, length, ...fadesIfAny(clip) } };
 }
 
@@ -804,12 +807,12 @@ function remap(edit: HistoryEdit, ids: IdMaps): HistoryEdit {
     case 'trimClip':
     case 'renameClip':
     case 'setClipGain':
+    case 'setClipNudge':
     case 'setClipFades':
     case 'duplicateClip':
     case 'deleteClip':
     case 'setTakes':
     case 'chooseTake':
-    case 'nudgeTake':
     case 'deleteTake':
     case 'clearInactiveTakes':
       return { ...edit, clipId: ids.clip(edit.clipId) };

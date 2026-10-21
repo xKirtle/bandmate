@@ -40,7 +40,7 @@ export interface Paste {
   clips: PastedClip[];
 }
 
-/** A Clip as it is: its source, trim, name and Gain, and a Clip of Takes' Takes as they are in it. */
+/** A Clip as it is: its source, trim and what it has of its own, and a Clip of Takes' Takes as they are in it. */
 function copyOf(clip: Clip): ClipCopy {
   const { start, offset, length } = clip;
   const own = ownOf(clip);
@@ -48,7 +48,7 @@ function copyOf(clip: Clip): ClipCopy {
   if (clip.soundId !== null) return { soundId: clip.soundId, ...own, start, offset, length };
   return {
     ...own,
-    takes: clip.takes.map(({ id, position, nudge }) => ({ id, position, nudge })),
+    takes: clip.takes.map(({ id, position }) => ({ id, position })),
     activeTakeId: clip.activeTakeId!,
     start,
     offset,
