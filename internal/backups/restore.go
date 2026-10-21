@@ -175,7 +175,9 @@ type Restored struct {
 // into the Folder of the same name as its Folder in the Backup, ignoring
 // case, made if there's none, or into none if it's in none there. It
 // carries exactly the Tags it carries in the Backup, each the Tag of the
-// same name, ignoring case, made if there's none.
+// same name, ignoring case, made if there's none. It's the last thing
+// asked of the opened Backup: ask it its Songs, its Beats and what's
+// already in Bandmate first, and close it after.
 func (r *OpenedBackup) Restore(ctx context.Context, picks Picks, replace Replace) (Restored, error) {
 	return r.restore(ctx, picks, replace, false)
 }
@@ -337,12 +339,13 @@ func (r *OpenedBackup) present(ctx context.Context, table, query string, args ..
 
 // OpenedBackup is a Backup's database, brought up to this Bandmate's schema
 // in a staging directory, beside the files unpacked from it. It's what the
-// Backup's Songs, its Beats, what of them is already in Bandmate, and a
-// Restore are all asked of, so they're asked of one unpacking, and it's
-// closed once they've been asked.
+// Backup's Songs, its Beats, and what of them is already in Bandmate are
+// asked of, so they're asked of one unpacking, and it's closed once they
+// have been. A Restore is the last thing asked of it: it reads the
+// Backup's database attached to the live one, so nothing can be asked of
+// it afterwards.
 type OpenedBackup struct {
 	store   *Store
-	backup  Backup
 	file    *zip.ReadCloser
 	staging string
 	db      *sql.DB
@@ -350,18 +353,13 @@ type OpenedBackup struct {
 
 // OpenBackup opens the Backup with the given id: it unpacks its database
 // into a staging directory and runs the migrations on it, leaving the
-// Backup's file as it is. The caller closes it.
+// Backup's file as it is. A Backup there's no row for isn't found. The
+// caller closes it.
 func (s *Store) OpenBackup(ctx context.Context, id int64) (*OpenedBackup, error) {
-	b, err := s.get(ctx, id)
-	if err != nil {
+	if _, err := s.get(ctx, id); err != nil {
 		return nil, err
 	}
-	r, err := s.openFile(ctx, s.path(id))
-	if err != nil {
-		return nil, err
-	}
-	r.backup = b
-	return r, nil
+	return s.openFile(ctx, s.path(id))
 }
 
 // A Backup's file that can't be restored is refused whole, saying why.
