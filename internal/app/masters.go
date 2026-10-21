@@ -3,7 +3,7 @@ package app
 import (
 	"net/http"
 
-	"github.com/xKirtle/bandmate/internal/lyricsheet"
+	"github.com/xKirtle/bandmate/internal/song"
 	"github.com/xKirtle/bandmate/internal/songversion"
 )
 
@@ -20,7 +20,7 @@ func (a *App) addMaster(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var details struct {
-		lyricsheet.MasterDetails
+		song.MasterDetails
 		uploadDetails
 	}
 	file, ok := a.readUpload(w, r, a.masterFiles, &details)
@@ -54,8 +54,8 @@ func (a *App) updateMaster(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	var changes lyricsheet.MasterChanges
-	a.changeSheet(w, r, &changes, func(id int64, based songversion.Version) (lyricsheet.Song, error) {
+	var changes song.MasterChanges
+	a.changeSheet(w, r, &changes, func(id int64, based songversion.Version) (song.Song, error) {
 		return a.songs.UpdateMaster(r.Context(), id, based, masterID, changes)
 	})
 }
@@ -65,7 +65,7 @@ func (a *App) makeMainMaster(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	a.changeSheet(w, r, nil, func(id int64, based songversion.Version) (lyricsheet.Song, error) {
+	a.changeSheet(w, r, nil, func(id int64, based songversion.Version) (song.Song, error) {
 		return a.songs.MakeMainMaster(r.Context(), id, based, masterID)
 	})
 }
@@ -75,7 +75,7 @@ func (a *App) deleteMaster(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	a.changeSheet(w, r, nil, func(id int64, based songversion.Version) (lyricsheet.Song, error) {
+	a.changeSheet(w, r, nil, func(id int64, based songversion.Version) (song.Song, error) {
 		return a.songs.DeleteMaster(r.Context(), id, based, masterID)
 	})
 }

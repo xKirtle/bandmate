@@ -6,7 +6,7 @@ import (
 	"net/http"
 
 	"github.com/xKirtle/bandmate/internal/audio"
-	"github.com/xKirtle/bandmate/internal/lyricsheet"
+	"github.com/xKirtle/bandmate/internal/song"
 	"github.com/xKirtle/bandmate/internal/songversion"
 )
 
@@ -23,19 +23,19 @@ func (a *App) replaceCover(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *App) removeCover(w http.ResponseWriter, r *http.Request) {
-	a.changeSheet(w, r, nil, func(id int64, based songversion.Version) (lyricsheet.Song, error) {
+	a.changeSheet(w, r, nil, func(id int64, based songversion.Version) (song.Song, error) {
 		return a.songs.RemoveCover(r.Context(), id, based)
 	})
 }
 
 // coverPut gives a Song a Cover: Store.AddCover or Store.ReplaceCover.
-type coverPut func(ctx context.Context, songID int64, based songversion.Version, details lyricsheet.CoverDetails,
-	pictures map[lyricsheet.CoverPicture]lyricsheet.UploadedPicture) (lyricsheet.Song, error)
+type coverPut func(ctx context.Context, songID int64, based songversion.Version, details song.CoverDetails,
+	pictures map[song.CoverPicture]song.UploadedPicture) (song.Song, error)
 
 // putCover reads a Cover's pictures and details and gives them to put.
 func (a *App) putCover(w http.ResponseWriter, r *http.Request, put coverPut) {
-	var details lyricsheet.CoverDetails
-	a.readCover(w, r, lyricsheet.CoverPictures, &details, func(id int64, based songversion.Version, pictures map[lyricsheet.CoverPicture]lyricsheet.UploadedPicture) (lyricsheet.Song, error) {
+	var details song.CoverDetails
+	a.readCover(w, r, song.CoverPictures, &details, func(id int64, based songversion.Version, pictures map[song.CoverPicture]song.UploadedPicture) (song.Song, error) {
 		return put(r.Context(), id, based, details, pictures)
 	})
 }
@@ -44,18 +44,18 @@ func (a *App) putCover(w http.ResponseWriter, r *http.Request, put coverPut) {
 // from, and the list and header pictures made from it.
 func (a *App) adjustCoverCrop(w http.ResponseWriter, r *http.Request) {
 	var details struct {
-		Cover int64                `json:"cover"`
-		Crop  lyricsheet.CoverCrop `json:"crop"`
+		Cover int64          `json:"cover"`
+		Crop  song.CoverCrop `json:"crop"`
 	}
-	a.readCover(w, r, lyricsheet.SquarePictures, &details, func(id int64, based songversion.Version, pictures map[lyricsheet.CoverPicture]lyricsheet.UploadedPicture) (lyricsheet.Song, error) {
+	a.readCover(w, r, song.SquarePictures, &details, func(id int64, based songversion.Version, pictures map[song.CoverPicture]song.UploadedPicture) (song.Song, error) {
 		return a.songs.AdjustCoverCrop(r.Context(), id, based, details.Cover, details.Crop, pictures)
 	})
 }
 
 // readCover reads the given pictures of a Cover and its details, decoded
 // into details, and answers with the Song change makes with them.
-func (a *App) readCover(w http.ResponseWriter, r *http.Request, pictures []lyricsheet.CoverPicture, details any,
-	change func(id int64, based songversion.Version, pictures map[lyricsheet.CoverPicture]lyricsheet.UploadedPicture) (lyricsheet.Song, error)) {
+func (a *App) readCover(w http.ResponseWriter, r *http.Request, pictures []song.CoverPicture, details any,
+	change func(id int64, based songversion.Version, pictures map[song.CoverPicture]song.UploadedPicture) (song.Song, error)) {
 	id, ok := songID(w, r)
 	if !ok {
 		return
@@ -73,10 +73,10 @@ func (a *App) readCover(w http.ResponseWriter, r *http.Request, pictures []lyric
 	if !ok {
 		return
 	}
-	uploaded := map[lyricsheet.CoverPicture]lyricsheet.UploadedPicture{}
+	uploaded := map[song.CoverPicture]song.UploadedPicture{}
 	for _, p := range pictures {
 		f := files[string(p)]
-		uploaded[p] = lyricsheet.UploadedPicture{File: f.Received, ContentType: f.contentType}
+		uploaded[p] = song.UploadedPicture{File: f.Received, ContentType: f.contentType}
 	}
 	song, err := change(id, based, uploaded)
 	if err != nil {
@@ -92,7 +92,7 @@ func (a *App) coverPicture(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	picture := lyricsheet.CoverPicture(r.PathValue("picture"))
+	picture := song.CoverPicture(r.PathValue("picture"))
 	if err := a.songs.ServeCover(w, r, id, picture); err != nil {
 		writeDomainError(w, err)
 	}

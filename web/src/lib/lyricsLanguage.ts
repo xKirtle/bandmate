@@ -159,7 +159,7 @@ function trimApostrophes(word: string): string {
   return word.replace(/^'+|'+$/g, '');
 }
 
-// A Chord as the server reads one in a Line's text (internal/lyricsheet/chords.go).
+// A Chord as the server reads one in a Line's text (internal/song/chords.go).
 const chordNote = '[A-G][#b♯♭]?';
 const chordToken = '(?:maj|min|ma|mi|dim|aug|sus|add|alt|m|M|\\+|-|°|ø|Δ|6/9|[#b♯♭]?[0-9]+)';
 const chordName = new RegExp(`^${chordNote}(?:${chordToken}|\\((?:${chordToken}|,)+\\))*(?:/${chordNote})?$`, 'u');

@@ -1,9 +1,9 @@
-// Package lyricsheet owns a Song, with its Lyric Sheet, Masters and Cover, as one
+// Package song owns a Song, with its Lyric Sheet, Masters and Cover, as one
 // aggregate and exposes intent-level operations on it. All domain rules
 // live here; the HTTP layer only maps requests onto these operations.
 // Deleting Songs lives here too, a Folder's included: deleting a Folder with
 // its Songs is one operation, so it can't be left half done.
-package lyricsheet
+package song
 
 import (
 	"context"

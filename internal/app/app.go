@@ -21,8 +21,8 @@ import (
 	"github.com/xKirtle/bandmate/internal/domain"
 	"github.com/xKirtle/bandmate/internal/fetches"
 	"github.com/xKirtle/bandmate/internal/folders"
-	"github.com/xKirtle/bandmate/internal/lyricsheet"
 	"github.com/xKirtle/bandmate/internal/releases"
+	"github.com/xKirtle/bandmate/internal/song"
 	"github.com/xKirtle/bandmate/internal/songfiles"
 	"github.com/xKirtle/bandmate/internal/tags"
 	"github.com/xKirtle/bandmate/internal/timeline"
@@ -88,7 +88,7 @@ const DefaultMaxCoverBytes = 25 << 20
 // App is a running Bandmate instance.
 type App struct {
 	db    *sql.DB
-	songs *lyricsheet.Store
+	songs *song.Store
 	beats *beats.Store
 	// folders keep some Songs together on the Songs page.
 	folders *folders.Store
@@ -105,7 +105,7 @@ type App struct {
 	masterFiles *audio.Files
 	takeFiles   *audio.Files
 	soundFiles  *audio.Files
-	coverFiles  lyricsheet.CoverFiles
+	coverFiles  song.CoverFiles
 	maxUpload   int64
 	maxCover    int64
 	build       build.Info
@@ -174,7 +174,7 @@ func New(cfg Config) (*App, error) {
 	}
 	a := &App{
 		db:          conn,
-		songs:       lyricsheet.NewStore(conn, songFiles, now),
+		songs:       song.NewStore(conn, songFiles, now),
 		beats:       beats.NewStore(conn, beatFiles),
 		folders:     folders.NewStore(conn),
 		tags:        tags.NewStore(conn),
@@ -184,7 +184,7 @@ func New(cfg Config) (*App, error) {
 		masterFiles: masterFiles,
 		takeFiles:   takeFiles,
 		soundFiles:  soundFiles,
-		coverFiles:  lyricsheet.CoverFilesIn(songFiles),
+		coverFiles:  song.CoverFilesIn(songFiles),
 		maxUpload:   cfg.MaxUploadBytes,
 		maxCover:    cfg.MaxCoverBytes,
 		build:       running,

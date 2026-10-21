@@ -4,7 +4,7 @@ import (
 	"net/http"
 
 	"github.com/xKirtle/bandmate/internal/domain"
-	"github.com/xKirtle/bandmate/internal/lyricsheet"
+	"github.com/xKirtle/bandmate/internal/song"
 	"github.com/xKirtle/bandmate/internal/songversion"
 )
 
@@ -78,7 +78,7 @@ func (a *App) restoreSnapshot(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	a.changeSheet(w, r, nil, func(id int64, based songversion.Version) (lyricsheet.Song, error) {
+	a.changeSheet(w, r, nil, func(id int64, based songversion.Version) (song.Song, error) {
 		return a.songs.RestoreSnapshot(r.Context(), id, based, snapshotID)
 	})
 }
@@ -87,8 +87,8 @@ func (a *App) restoreSnapshot(w http.ResponseWriter, r *http.Request) {
 // Undo and Redo put them back, taking no Snapshot of its own, and answers
 // with the Song.
 func (a *App) putSheetBack(w http.ResponseWriter, r *http.Request) {
-	var sheet lyricsheet.LyricSheet
-	a.changeSheet(w, r, &sheet, func(id int64, based songversion.Version) (lyricsheet.Song, error) {
+	var sheet song.LyricSheet
+	a.changeSheet(w, r, &sheet, func(id int64, based songversion.Version) (song.Song, error) {
 		return a.songs.PutSheetBack(r.Context(), id, based, sheet)
 	})
 }

@@ -1,4 +1,4 @@
-package lyricsheet
+package song
 
 import (
 	"testing"

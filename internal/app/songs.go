@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/xKirtle/bandmate/internal/lyricsheet"
+	"github.com/xKirtle/bandmate/internal/song"
 	"github.com/xKirtle/bandmate/internal/songversion"
 )
 
@@ -14,9 +14,9 @@ func (a *App) listSongs(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query()
 	// Several Statuses keep the Songs with any of them.
 	// Several Tags keep the Songs carrying all of them.
-	filter := lyricsheet.SongFilter{Title: query.Get("q"), Tags: query["tag"]}
+	filter := song.SongFilter{Title: query.Get("q"), Tags: query["tag"]}
 	for _, status := range query["status"] {
-		filter.Statuses = append(filter.Statuses, lyricsheet.Status(status))
+		filter.Statuses = append(filter.Statuses, song.Status(status))
 	}
 	switch hasMaster := query.Get("hasMaster"); hasMaster {
 	case "":
@@ -31,7 +31,7 @@ func (a *App) listSongs(w http.ResponseWriter, r *http.Request) {
 	switch folder := query.Get("folder"); folder {
 	case "":
 	case "none":
-		none := lyricsheet.NoFolder
+		none := song.NoFolder
 		filter.Folder = &none
 	default:
 		id, err := strconv.ParseInt(folder, 10, 64)
@@ -92,7 +92,7 @@ func (a *App) updateSong(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	var changes lyricsheet.SongChanges
+	var changes song.SongChanges
 	if !readJSON(w, r, &changes) {
 		return
 	}
