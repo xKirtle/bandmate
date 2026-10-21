@@ -1,6 +1,15 @@
 import { describe, expect, it, vi } from 'vitest';
 import { api, type Clip, type ClipBeat, type Sound, type Take, type Timeline } from './api';
-import { clipSources, clipTitle, fileStart, heard, placementOf, playing, trimLimit } from './clipSource';
+import {
+  clipSources,
+  clipTitle,
+  fileStart,
+  heard,
+  placementOf,
+  playing,
+  trimLimit,
+  type ClipSource,
+} from './clipSource';
 
 const beat = (id: number, more: Partial<ClipBeat> = {}): ClipBeat => ({
   id,
@@ -87,6 +96,15 @@ const soundClip = (id: number, soundId: number, name: string | null = null): Cli
   start: 50,
   offset: 1,
   length: 4,
+});
+
+/** A source of some length, for the functions that only ask how long one is. */
+const source = (duration: number): ClipSource => ({
+  key: 'k',
+  title: 't',
+  audio: 'a',
+  duration,
+  loadPeaks: async () => [],
 });
 
 const timeline = (clips: Clip[], beats: ClipBeat[], sounds: Sound[] = []): Timeline => ({
@@ -221,8 +239,6 @@ describe('fileStart', () => {
 });
 
 describe('trimLimit', () => {
-  const source = (duration: number) => ({ key: 'k', title: 't', audio: 'a', duration, loadPeaks: async () => [] });
-
   it("is its source's whole length while the Clip plays within it", () => {
     // The Beat Clip plays 2s to 12s of a 90s Beat.
     expect(trimLimit(clip(1, 7), source(90))).toBe(90);
@@ -233,6 +249,13 @@ describe('trimLimit', () => {
   it("is a Beat's or a Sound's own length, which its Clip can never play past", () => {
     // Stored playing past its Beat, it's still pulled back to the Beat's end.
     expect(trimLimit(clip(1, 7), source(8))).toBe(8);
+  });
+
+  it("is a Beat's or a Sound's own length however its audio is nudged, which never lends it room", () => {
+    // Trimming stays bounded by the file as it always was: only the audio
+    // slides out of the window (ADR 0028).
+    expect(trimLimit({ ...clip(1, 7), nudge: 4 }, source(90))).toBe(90);
+    expect(trimLimit({ ...clip(1, 7), nudge: -4 }, source(90))).toBe(90);
   });
 
   it('is as far as a Clip of Takes already plays, where a nudge left it past its Takes', () => {
@@ -248,18 +271,25 @@ describe('trimLimit', () => {
 });
 
 describe('heard', () => {
+  /**
+   * What a Clip plays, from a source duration seconds long: a Beat's or a
+   * Sound's file, or the span a Clip of Takes lies in, which is as long as
+   * its Takes reach and so never cuts one short.
+   */
+  const played = (c: Clip, duration = 90) => heard(c, source(duration));
+
   it("is a Beat Clip's placement as it is", () => {
-    expect(heard(clip(1, 7))).toEqual({ start: 5, offset: 2, length: 10, tempo: 1 });
+    expect(played(clip(1, 7))).toEqual({ start: 5, offset: 2, length: 10, tempo: 1 });
   });
 
   it('plays a Take from as far into its file as the Clip is trimmed', () => {
     // The Take fills the span from 0 for 12s: the Clip plays 2s to 12s of it.
-    expect(heard(takeClip(1, [take(3, { duration: 12 })]))).toEqual({ start: 30, offset: 2, length: 10, tempo: 1 });
+    expect(played(takeClip(1, [take(3, { duration: 12 })]))).toEqual({ start: 30, offset: 2, length: 10, tempo: 1 });
   });
 
   it('starts a Take that starts later in the span where it comes in', () => {
     // It comes in 5s into the span, 3s into the Clip, and plays to the Clip's end.
-    expect(heard(takeClip(1, [take(3, { position: 5, duration: 20 })]))).toEqual({
+    expect(played(takeClip(1, [take(3, { position: 5, duration: 20 })]))).toEqual({
       start: 33,
       offset: 0,
       length: 7,
@@ -269,19 +299,38 @@ describe('heard', () => {
 
   it("stops a Take that ends before the Clip does, and plays its active Take's only", () => {
     const c = takeClip(1, [take(3, { duration: 20 }), take(4, { position: 1, duration: 6 })], 4);
-    expect(heard(c)).toEqual({ start: 30, offset: 1, length: 5, tempo: 1 });
+    expect(played(c)).toEqual({ start: 30, offset: 1, length: 5, tempo: 1 });
   });
 
   it('plays nothing of a Take trimmed out of the Clip', () => {
-    expect(heard(takeClip(1, [take(3, { duration: 1.5 })]))).toBeNull();
+    expect(played(takeClip(1, [take(3, { duration: 1.5 })]))).toBeNull();
   });
 
   it("plays a Beat Clip's audio from earlier in its file, nudged later", () => {
     // The Clip keeps its window: it plays its 10s from 0:05, from 1s into
     // the Beat rather than 2s, so the second it held before is heard a
     // second later.
-    expect(heard({ ...clip(1, 7), nudge: 1 })).toEqual({ start: 5, offset: 1, length: 10, tempo: 1 });
-    expect(heard({ ...clip(1, 7), nudge: -1 })).toEqual({ start: 5, offset: 3, length: 10, tempo: 1 });
+    expect(played({ ...clip(1, 7), nudge: 1 })).toEqual({ start: 5, offset: 1, length: 10, tempo: 1 });
+    expect(played({ ...clip(1, 7), nudge: -1 })).toEqual({ start: 5, offset: 3, length: 10, tempo: 1 });
+  });
+
+  it("leaves a Beat Clip silence at its head, nudged past its file's start", () => {
+    // Its window is 2s to 12s of the Beat, so nudged 3s later its audio
+    // only reaches the window a second in: the Clip plays silence until
+    // then, and its audio from the Beat's start.
+    expect(played({ ...clip(1, 7), nudge: 3 })).toEqual({ start: 6, offset: 0, length: 9, tempo: 1 });
+  });
+
+  it("leaves a Beat Clip silence at its tail, nudged past its file's end", () => {
+    // Its window is 2s to 12s of the 90s Beat, so nudged 82s earlier its
+    // audio runs out 6s in and the Clip plays silence for its last 4s.
+    expect(played({ ...clip(1, 7), nudge: -82 })).toEqual({ start: 5, offset: 84, length: 6, tempo: 1 });
+  });
+
+  it('plays nothing of a Beat Clip nudged clear of its window, either way', () => {
+    // Nudged later than the window ends, and earlier than it starts.
+    expect(played({ ...clip(1, 7), nudge: 15 })).toBeNull();
+    expect(played({ ...clip(1, 7), nudge: -95 })).toBeNull();
   });
 
   it("moves a Take's audio inside its Clip, the window staying put", () => {
@@ -289,8 +338,8 @@ describe('heard', () => {
     // Nudged a second later its audio comes in a second after the Clip
     // starts; nudged a second earlier it runs out a second before it ends.
     const c = { ...takeClip(1, [take(3, { position: 2, duration: 10 })]), nudge: 1 };
-    expect(heard(c)).toEqual({ start: 31, offset: 0, length: 9, tempo: 1 });
-    expect(heard({ ...c, nudge: -1 })).toEqual({ start: 30, offset: 1, length: 9, tempo: 1 });
+    expect(played(c)).toEqual({ start: 31, offset: 0, length: 9, tempo: 1 });
+    expect(played({ ...c, nudge: -1 })).toEqual({ start: 30, offset: 1, length: 9, tempo: 1 });
   });
 
   it("nudges a slowed Clip's audio in the audio's own time, not the Timeline's", () => {
@@ -298,7 +347,7 @@ describe('heard', () => {
     // comes in right at its start, so a 1s Nudge of the audio delays it by
     // 2s of the Timeline.
     const slow = { ...takeClip(1, [take(3, { position: 2, duration: 12 })]), tempo: 0.5, nudge: 1 };
-    expect(heard(slow)).toEqual({ start: 32, offset: 0, length: 8, tempo: 0.5 });
+    expect(played(slow)).toEqual({ start: 32, offset: 0, length: 8, tempo: 0.5 });
   });
 });
 
@@ -365,6 +414,21 @@ describe('playing', () => {
   it('keeps the Clip being retaken silent, and plays the rest', () => {
     expect(played(2)).toEqual([['/api/beats/7/audio?v=beat-7.mp3-1000-90', 5]]);
     expect(played(1)).toEqual([['/api/songs/1/takes/3/audio', 30]]);
+  });
+
+  it('leaves out a Beat Clip nudged clear of its window, and plays it again nudged back', () => {
+    // Its Fades, its edges and its window are the same throughout: only
+    // its audio went, and came back (ADR 0028).
+    const faded = { ...clip(1, 7), fadeIn: 1, fadeOut: 2, nudge: 20 };
+    const t = timeline([faded], [beat(7)]);
+    expect(playing(t, clipSources(t))).toEqual([]);
+    const back = timeline([{ ...faded, nudge: 0 }], [beat(7)]);
+    expect(playing(back, clipSources(back))[0]).toMatchObject({
+      start: 5,
+      offset: 2,
+      length: 10,
+      fades: { start: 5, end: 15, fadeIn: 1, fadeOut: 2 },
+    });
   });
 
   it('leaves out a Clip with nothing of its Take in it', () => {

@@ -103,6 +103,15 @@ describe('clipBars', () => {
       want: [2, 10, 20, 30],
     },
     {
+      // Nudged clear of its window, the Clip draws silence throughout, as
+      // it plays it (ADR 0028).
+      name: 'a Beat Clip nudged clear of its window',
+      over: { nudge: 5 },
+      stretch: [0, 4, 4],
+      count: 4,
+      want: [2, 2, 2, 2],
+    },
+    {
       name: 'a Fade in',
       over: { fadeIn: 2 },
       stretch: [0, 4, 4],
