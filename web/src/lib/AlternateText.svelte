@@ -136,8 +136,8 @@
     {#each rows as row, i (i)}
       {@const line = rowLines[i]}
       {@const gridRow = i + 2}
-      <!-- Which Lines Sync mode picks is the gutter's: it skips a blank Line and a Chord Line. -->
-      {@const picks = !!line && gutter.syncing && gutter.pickable(line.id)}
+      <!-- Which Lines Sync mode picks is the gutter's to say, not the markup's. -->
+      {@const canPick = !!line && gutter.syncing && gutter.pickable(line.id)}
       {#if line}
         <!-- Picking a Line is also in its gutter slot, which takes the keyboard. -->
         <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
@@ -145,11 +145,11 @@
           bind:this={rowEls[i]}
           class="row"
           class:current={line.id === current}
-          class:pickable={picks}
+          class:pickable={canPick}
           style:grid-row={gridRow}
           aria-hidden="true"
-          title={picks ? 'Cue this Line next' : undefined}
-          onclick={picks ? () => gutter.pick({ section: sectionId, line: line.id }) : undefined}
+          title={canPick ? 'Cue this Line next' : undefined}
+          onclick={canPick ? () => gutter.pick({ section: sectionId, line: line.id }) : undefined}
           {@attach (el) => track?.(el, line.id)}
         >
           {row || ' '}
@@ -185,7 +185,7 @@
               play={gutter.play}
               current={line.id === current}
               hovered={i === hoveredRow}
-              pick={picks ? () => gutter.pick({ section: sectionId, line: line.id }) : undefined}
+              pick={canPick ? () => gutter.pick({ section: sectionId, line: line.id }) : undefined}
               syncing={gutter.syncing}
               outOfOrder={gutter.outOfOrder(line.id)}
             />
