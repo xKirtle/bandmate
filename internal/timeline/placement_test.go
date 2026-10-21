@@ -1365,8 +1365,10 @@ func TestSettingANudge(t *testing.T) {
 		return c
 	}()
 	tests := []struct {
-		name    string
-		clip    Clip
+		name string
+		clip Clip
+		// clipID is the Clip nudged, 1 for the one on the Timeline.
+		clipID  int64
 		nudge   float64
 		want    where
 		wantAt  []float64
@@ -1407,15 +1409,16 @@ func TestSettingANudge(t *testing.T) {
 		{
 			name:    "a Clip that isn't on the Timeline",
 			clip:    takesClip(1, 10, 0, 10, Take{ID: 7, Number: 1}),
+			clipID:  9,
 			nudge:   1,
 			refusal: "not found",
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			clipID := int64(1)
-			if tt.refusal != "" {
-				clipID = 9
+			clipID := tt.clipID
+			if clipID == 0 {
+				clipID = 1
 			}
 			tl := timelineOf([]Clip{tt.clip})
 			after, err := edited(tl, func(tl Timeline, _ *ids) (Timeline, error) {

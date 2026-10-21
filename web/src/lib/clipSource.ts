@@ -138,9 +138,10 @@ export function trimLimit(clip: Clip, source: ClipSource): number {
 }
 
 /**
- * Where in its source a Clip's audio file starts, in seconds: its Nudge for
- * a Beat or a Sound, which start at the source's origin unnudged, and for a
- * Take, its position in its span, nudged.
+ * Where in its source a Clip's audio file starts, in seconds, as its Nudge
+ * moved it: its Nudge for a Beat or a Sound, which start at the source's
+ * origin unnudged, and for a Take, its position in its span, nudged. It's
+ * negative where a Nudge took the audio earlier than the source's origin.
  */
 export function fileStart(clip: Clip): number {
   return (activeTake(clip)?.position ?? 0) + clip.nudge;

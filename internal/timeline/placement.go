@@ -331,7 +331,7 @@ func (tl Timeline) keepingTakes(clipID int64, keep []int64) (Timeline, error) {
 	// Where the Clip's window sits is worked out from where it was, so the
 	// window it had is kept while it's changed.
 	was := c
-	end := takesEnd(c.Takes, c.Nudge)
+	end := takesEnd(c)
 	if end <= was.Offset+tolerance {
 		// Its audio stays where it is on the Timeline.
 		offset := max(0, end-was.sourceLength(was.Length))

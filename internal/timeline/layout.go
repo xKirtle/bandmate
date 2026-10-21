@@ -150,17 +150,17 @@ func sourceDuration(tl Timeline, c Clip) float64 {
 	return 0
 }
 
-// takesEnd is where in their Clip's source span the last of the Takes
-// ends, as recorded, and nudge is their Clip's Nudge. Nudged later, the
-// audio reaches further into the span; nudged earlier it still reaches
-// where it did unnudged, so the Clips that shrink to their Takes, as
-// deleting one does, keep the window a Nudge left them.
-func takesEnd(takes []Take, nudge float64) float64 {
+// takesEnd is where in c's source span the last of its Takes ends, its
+// Nudge included. Nudged later, the audio reaches further into the span;
+// nudged earlier it still reaches where it did unnudged, so the Clips that
+// shrink to their Takes, as deleting one does, keep the window a Nudge
+// left them. The browser's clipSource works the span out the same way.
+func takesEnd(c Clip) float64 {
 	var end float64
-	for _, t := range takes {
+	for _, t := range c.Takes {
 		end = max(end, t.Position+t.Duration)
 	}
-	return end + max(0, nudge)
+	return end + max(0, c.Nudge)
 }
 
 // placed is a Clip and the Track it's on.

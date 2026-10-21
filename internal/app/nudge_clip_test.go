@@ -78,13 +78,19 @@ func TestANudgeIsUndoneAndRedoneExactly(t *testing.T) {
 	}
 }
 
+// nudgedOutAndTrimmedToIt nudges a recording's Clip a second later and
+// trims it out to reach its Take there, so the Clip plays 0:00.5 to 0:05 of
+// a span its Take ends 0:04 into: the shape the rules are tried in.
+func nudgedOutAndTrimmedToIt(t *testing.T, ts *testServer, r recordedTake) timeline {
+	t.Helper()
+	timelineChange(t, ts.setClipNudge(r.song.ID, r.clip.ID, 1))
+	return timelineChange(t, ts.trimClip(r.song.ID, r.clip.ID, 0.5, 4.5))
+}
+
 func TestNudgingAClipFollowsItsRules(t *testing.T) {
 	ts := newTestServer(t)
 	r := recordATake(t, ts)
-	// Nudged later and trimmed to its end: the Clip the other rules are
-	// tried on, a Take's worth of Timeline away from where it started.
-	timelineChange(t, ts.setClipNudge(r.song.ID, r.clip.ID, 1))
-	before := timelineChange(t, ts.trimClip(r.song.ID, r.clip.ID, 0.5, 4.5))
+	before := nudgedOutAndTrimmedToIt(t, ts, r)
 	other := ts.createSong("Other")
 
 	for name, c := range map[string]struct {
@@ -120,10 +126,7 @@ func TestNudgingAClipFollowsItsRules(t *testing.T) {
 func TestAClipsAudioNudgesEarlierOutFromUnderItsEnd(t *testing.T) {
 	ts := newTestServer(t)
 	r := recordATake(t, ts)
-	// Nudged a second later and trimmed out to reach it, the Clip plays
-	// 0:00.5 to 0:05 of a span its Take ends 0:04 into.
-	timelineChange(t, ts.setClipNudge(r.song.ID, r.clip.ID, 1))
-	out := timelineChange(t, ts.trimClip(r.song.ID, r.clip.ID, 0.5, 4.5)).Tracks[1].Clips[0]
+	out := nudgedOutAndTrimmedToIt(t, ts, r).Tracks[1].Clips[0]
 
 	back := timelineChange(t, ts.setClipNudge(r.song.ID, r.clip.ID, 0)).Tracks[1].Clips[0]
 
