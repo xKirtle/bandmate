@@ -8,40 +8,27 @@
   // on; the plain drag that selects with a box can't be changed at all. A
   // key or a modifier that's refused says why under them, naming the
   // Shortcut that has it as a button leading there, and a key keeps waiting
-  // for another try. The message goes on the next key or modifier taken, on
-  // Esc, or once focus leaves, unless it's to that button; the fold
-  // unmounts this as it closes, which clears it too.
+  // for another try.
+  //
+  // Which slot is waiting, what's showing and when each goes are
+  // rebinding.svelte.ts's rules; this draws them, and tells it of the
+  // presses, clicks and focus it hears.
   import Plus from '@lucide/svelte/icons/plus';
   import X from '@lucide/svelte/icons/x';
   import { tick } from 'svelte';
+  import { Rebinding } from './rebinding.svelte';
   import { shortcutKeys } from './sharedShortcutKeys.svelte';
+  import { keysLabel, modifierName, modifiers, platform, shortcuts, type Gesture, type Key } from './shortcuts';
   import {
-    keysLabel,
-    modifierName,
-    modifiers,
-    platform,
-    shortcuts,
-    type Gesture,
-    type Key,
-    type Modifier,
-  } from './shortcuts';
-  import {
-    choose,
     defaultKeyset,
     heldWith,
     isChanged,
     isFixed,
     isMouse,
-    keyChosen,
     keysIn,
     listsOf,
-    refusalMessage,
-    removeKey,
-    reset,
-    toggleModifier,
     type KeyList,
     type ShortcutId,
-    type Slot,
   } from './shortcutKeys';
 
   let { id, onreveal }: { id: ShortcutId; onreveal: (id: ShortcutId) => void } = $props();
@@ -49,9 +36,7 @@
   const uid = $props.id();
   const on = platform();
   let root = $state<HTMLElement>();
-  /** Where the next key pressed goes, while waiting for one. */
-  let listening = $state<Slot | null>(null);
-  let message = $state<{ text: string; by: ShortcutId | null } | null>(null);
+  const rebinding = new Rebinding({ id: () => id, keys: shortcutKeys, on });
 
   const lists = $derived(listsOf(id));
   /** What a mouse Shortcut is held with, or null for a keyboard one. */
@@ -59,91 +44,41 @@
   const gestures: Record<Gesture, string> = { click: 'click', drag: 'drag', wheel: 'scroll the wheel' };
   const names: Record<KeyList, string> = { keys: 'Keys', back: 'Back', forward: 'Forward' };
   const label = (key: Key) => keysLabel([key], on);
-  const isListening = (list: KeyList, index: number) => listening?.list === list && listening.index === index;
-
-  function listen(list: KeyList, index: number) {
-    // Space lets go of the button it's pressed on, clicking it again.
-    if (isListening(list, index)) return;
-    message = null;
-    listening = { id, list, index };
-  }
 
   function onkeydown(event: KeyboardEvent) {
-    if (!listening || event.isComposing) return;
-    // The key is for choosing, not for the button or the page.
-    event.preventDefault();
-    event.stopPropagation();
-    if (event.repeat) return;
-    if (event.key === 'Escape' && !event.ctrlKey && !event.metaKey && !event.altKey && !event.shiftKey) {
-      listening = null;
-      message = null;
-      return;
+    if (rebinding.takesPress(event)) {
+      // The key is for choosing, not for the button or the page.
+      event.preventDefault();
+      event.stopPropagation();
     }
-    const key = keyChosen(event);
-    if (!key) return;
-    const choice = choose(shortcutKeys.value, listening, key);
-    if (!choice.ok) {
-      message = refusalMessage(choice.refusal, on);
-      return;
-    }
-    shortcutKeys.set(choice.keys);
-    listening = null;
-    message = null;
+    rebinding.press(event);
   }
 
   // Space would click the button again as it's let go.
   function onkeyup(event: KeyboardEvent) {
-    if (listening) event.preventDefault();
+    if (rebinding.listening) event.preventDefault();
   }
 
-  // Focus leaving stops the waiting, and clears the message, unless it's to
-  // the Shortcut the message names.
+  // Only this knows where focus went: the button naming the Shortcut that
+  // has the key refused is the one that keeps the message (see .holder).
   function onfocusout(event: FocusEvent) {
     const to = event.relatedTarget;
-    if (to instanceof Element && to.closest('.holder')) {
-      listening = null;
-      return;
-    }
-    listening = null;
-    message = null;
+    rebinding.focusLeft(to instanceof Element && to.closest('.holder') ? 'holder' : 'elsewhere');
   }
 
   async function remove(list: KeyList, index: number) {
-    shortcutKeys.set(removeKey(shortcutKeys.value, { id, list, index }));
-    message = null;
+    rebinding.remove(list, index);
     // The key's buttons are gone: Add key takes the focus they had.
     await tick();
     root?.querySelector<HTMLElement>(`[data-add="${list}"]`)?.focus();
   }
 
-  function toggle(modifier: Modifier) {
-    const choice = toggleModifier(shortcutKeys.value, id, modifier);
-    if (choice.ok) {
-      shortcutKeys.set(choice.keys);
-      message = null;
-    } else {
-      message = refusalMessage(choice.refusal, on);
-    }
-  }
-
-  function resetKeys() {
-    const choice = reset(shortcutKeys.value, id);
-    if (choice.ok) {
-      shortcutKeys.set(choice.keys);
-      message = null;
-    } else {
-      message = refusalMessage(choice.refusal, on, true);
-    }
-  }
-
-  // Esc clears a message from a modifier, Reset or the Shortcut it names
-  // too, as it does a refused key's while waiting (see onkeydown).
   function escape(event: KeyboardEvent) {
-    if (event.key === 'Escape' && message && !listening) message = null;
+    rebinding.escape(event);
   }
 
   function reveal(by: ShortcutId) {
-    message = null;
+    rebinding.holderRevealed();
     onreveal(by);
   }
 </script>
@@ -162,8 +97,8 @@
           type="button"
           class="button toggle"
           aria-pressed={held[modifier]}
-          aria-describedby={message ? `${uid}-message` : undefined}
-          onclick={() => toggle(modifier)}
+          aria-describedby={rebinding.message ? `${uid}-message` : undefined}
+          onclick={() => rebinding.toggle(modifier)}
           onkeydown={escape}>{modifierName(modifier, on)}</button
         >
       {/each}
@@ -177,15 +112,15 @@
           <span class="way" class:visually-hidden={lists.length === 1} id="{uid}-{list}">{names[list]}</span>
           <span class="keys">
             {#each keys as key, k (k)}
-              <span class="key" class:listening={isListening(list, k)}>
+              <span class="key" class:listening={rebinding.isListening(list, k)}>
                 <button
                   type="button"
                   class="rebind"
-                  aria-label={isListening(list, k) ? 'Press a key' : `Change ${label(key)}`}
-                  aria-describedby={message ? `${uid}-message` : undefined}
-                  onclick={() => listen(list, k)}
+                  aria-label={rebinding.isListening(list, k) ? 'Press a key' : `Change ${label(key)}`}
+                  aria-describedby={rebinding.message ? `${uid}-message` : undefined}
+                  onclick={() => rebinding.listen(list, k)}
                   {onkeydown}
-                  {onkeyup}>{isListening(list, k) ? 'Press a key…' : label(key)}</button
+                  {onkeyup}>{rebinding.isListening(list, k) ? 'Press a key…' : label(key)}</button
                 >
                 <button
                   type="button"
@@ -201,20 +136,21 @@
             <button
               type="button"
               class="add"
-              class:listening={isListening(list, keys.length)}
+              class:listening={rebinding.isListening(list, keys.length)}
               data-add={list}
-              aria-describedby={message ? `${uid}-message` : undefined}
-              onclick={() => listen(list, keys.length)}
+              aria-describedby={rebinding.message ? `${uid}-message` : undefined}
+              onclick={() => rebinding.listen(list, keys.length)}
               {onkeydown}
               {onkeyup}
-              >{#if isListening(list, keys.length)}Press a key…{:else}<Plus /> Add key{/if}</button
+              >{#if rebinding.isListening(list, keys.length)}Press a key…{:else}<Plus /> Add key{/if}</button
             >
           </span>
         </div>
       {/each}
     </div>
   {/if}
-  {#if message}
+  {#if rebinding.message}
+    {@const message = rebinding.message}
     <p class="message" id="{uid}-message" role="status">
       {message.text}{#if message.by}
         {@const by = message.by}{' '}<button type="button" class="holder" onclick={() => reveal(by)} onkeydown={escape}
@@ -223,7 +159,7 @@
     </p>
   {/if}
   {#if isChanged(shortcutKeys.value.keys, id)}
-    <button type="button" class="button quiet reset" onclick={resetKeys} onkeydown={escape}>Reset</button>
+    <button type="button" class="button quiet reset" onclick={() => rebinding.reset()} onkeydown={escape}>Reset</button>
   {/if}
 </div>
 
