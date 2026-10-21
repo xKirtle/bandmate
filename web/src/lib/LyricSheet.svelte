@@ -10,21 +10,11 @@
   import { tick } from 'svelte';
   import { MediaQuery } from 'svelte/reactivity';
   import type { Cueing } from './AlternateText.svelte';
-  import type { Line, Section, Song } from './api';
+  import type { Section, Song } from './api';
   import type { CueChange } from './cueChanges';
-  import {
-    canShiftCuesEarlier,
-    currentPosition,
-    everyCue,
-    hasCues,
-    isBlank,
-    leadIn,
-    outOfOrderCues,
-    outOfOrderReason,
-    type Position,
-  } from './cues';
+  import { CueGutter } from './cueGutter.svelte';
+  import { canShiftCuesEarlier, currentPosition, everyCue, hasCues } from './cues';
   import { follower, lineKey } from './follow';
-  import { gutterFields } from './gutter';
   import { keyHints } from './keyHints';
   import { chordsInRead } from './chordChart';
   import ChordChart from './ChordChart.svelte';
@@ -40,7 +30,7 @@
   import type { SectionDragging } from './sectionDragging.svelte';
   import { dropMove, sectionMove, type Landing, type SectionMove } from './sectionMoves';
   import type { SheetNotice } from './sheetNotice.svelte';
-  import { activeAlternate, describe, isEmpty, lineName, ofSection, places, sectionsInArrangement } from './sections';
+  import { describe, isEmpty, places, sectionsInArrangement } from './sections';
   import type { Mode } from './songMode';
   import { rebound } from './shortcutKeys';
   import { cuesNextLine } from './syncKeys';
@@ -119,7 +109,7 @@
       { icon: Plus, label: 'Add a Section below', run: () => add(i + 1) },
       { icon: CopyPlus, label: 'Duplicate this Section below', run: () => duplicate(section.id, i + 1) },
     ];
-    if (canCue && hasCues({ arrangement: [section.id], sections: song.sections })) {
+    if (gutter.offered && hasCues({ arrangement: [section.id], sections: song.sections })) {
       // Doesn't ask first: it can be undone. It clears dormant Cues too.
       actions.push({
         icon: Eraser,
@@ -152,64 +142,49 @@
   const inArrangement = $derived(sectionsInArrangement(song, sections));
   // Where an Alternate can be moved out to, as a Section of its own.
   const placesOut = $derived(places(inArrangement));
-  // Cues are edited in Write mode, on wider screens only, and only once
-  // there's something to cue to or a Cue already set.
+  // Cues are edited in Write mode, on wider screens only; whether the gutter
+  // is offered at all, and everything else it keeps, is the Cue gutter's
+  // own: see cueGutter.svelte.ts. It's made once here, for the whole page,
+  // and each Section's Lines ask it.
   const wide = new MediaQuery('min-width: 40.0625rem');
-  const canCue = $derived(wide.current && (hasClips || hasCues(song)));
-  // Playing from a Cue's ▶, or a cued Line in Read mode, leads into it.
-  const leadInto = $derived(playFrom && ((cue: number) => playFrom(leadIn(cue))));
+  const gutter = new CueGutter({
+    song: () => song,
+    wide: () => wide.current,
+    hasClips: () => hasClips,
+    cue: (change, what) => changeCues(change, what),
+    playFrom: () => playFrom,
+    // Read as it's asked for, like the rest, so the gutter never holds a
+    // Sync mode the page has moved on from.
+    get sync() {
+      return syncMode;
+    },
+  });
 
-  /** Sets or, with null, clears the Cue of a Line, as the gutter names it. */
-  function setLineCue(line: Position, cue: number | null) {
-    changeCues({ kind: 'setLineCue', lineId: line.line, cue }, `the Cue of ${lineName(song, line)}`);
-  }
-
-  // In Write mode, each Line is tracked, to follow playback to, and each
-  // Line's Cue field, to go on to with Enter. Read mode follows playback in
-  // LyricSheetView, and has no Cue fields.
+  // In Write mode, each Line is tracked, to follow playback to. Read mode
+  // follows playback in LyricSheetView.
   const { track, follow } = follower();
-  const writeFields = gutterFields();
-  /** The Lines of a Section's active Alternate: those whose Cues are in effect. */
-  function activeLines(section: Section | undefined): Line[] {
-    return activeAlternate(section)?.lines ?? [];
-  }
-  // The Line Cue fields in order down the page.
-  const writeFieldOrder = $derived(
-    inArrangement.flatMap((s) =>
-      activeLines(s)
-        .filter((l) => !isBlank(l))
-        .map((l) => lineKey(l.id)),
-    ),
-  );
-
-  // Cues out of order are marked in the gutter, each naming the Line it's
-  // out of order with as the gutter names Lines, e.g. "Line 6 of Chorus".
-  const outOfOrder = $derived(new Map(outOfOrderCues(song).map((c) => [c.line, c])));
 
   /** How a Section's Cues show on its text box in Write mode. */
   function cueingFor(section: Section): Cueing {
     return {
       current: current?.line ?? null,
       track: (el, line) => track(el, lineKey(line)),
-      gutter: canCue
+      gutter: gutter.offered
         ? {
-            labelSuffix: ofSection(section.label),
-            save: (line, cue) => setLineCue({ section: section.id, line: line.id }, cue),
-            has: (line) => song.sections.some((s) => s.alternates.some((a) => a.lines.some((l) => l.id === line))),
-            field: (line, field) => writeFields.set(lineKey(line), field),
-            next: (line) => writeFields.editAfter(writeFieldOrder, lineKey(line)),
-            play: leadInto,
-            outOfOrder: (line) => {
-              const mark = outOfOrder.get(line);
-              return mark ? outOfOrderReason(mark, (at) => lineName(song, at)) : null;
-            },
+            labelSuffix: gutter.labelSuffix(section.id),
+            save: (line, cue) => gutter.save({ section: section.id, line: line.id }, cue),
+            has: (line) => gutter.has(line),
+            field: (line, field) => gutter.setField(line, field),
+            next: (line) => gutter.editAfter(line),
+            play: gutter.play,
+            outOfOrder: (line) => gutter.outOfOrder(line),
           }
         : undefined,
-      sync: syncMode.on
+      sync: gutter.syncing
         ? {
-            next: upNext?.line ?? null,
-            now: () => syncMode.cue(),
-            pick: (line) => syncMode.pick({ section: section.id, line }),
+            next: gutter.upNext,
+            now: () => gutter.now(),
+            pick: (line) => gutter.pick({ section: section.id, line }),
           }
         : undefined,
     };
@@ -392,7 +367,7 @@
             : 'Add a Beat to the Timeline to sync lyrics to it'}>Sync lyrics</button
       >
     {/if}
-    {#if mode === 'write' && canCue && hasCues(song)}
+    {#if mode === 'write' && gutter.offered && hasCues(song)}
       <CuesMenu
         shift={(by) => changeCues({ kind: 'shiftCues', ...everyCue, by }, 'shifting every Cue')}
         clear={() => changeCues({ kind: 'clearCues' }, 'clearing every Cue')}
@@ -428,7 +403,7 @@
       {transpose}
       {size}
       {current}
-      play={leadInto}
+      play={gutter.play}
       opener={chordPopover?.opener}
     />
   {:else}
