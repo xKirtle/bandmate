@@ -8,10 +8,12 @@ UPDATE clips SET nudge = (SELECT nudge FROM takes WHERE takes.id = clips.active_
 WHERE active_take_id IS NOT NULL;
 
 -- A Take's position held the Nudge it was moved by, so it gives it up: the
--- position is where the Take was recorded again, and the Clip's Nudge is
+-- position is where the Take was recorded again, and its Clip's Nudge is
 -- what moves its audio. The active Take's audio stays exactly where it was;
 -- a Take that had a different Nudge shifts by the difference, which is
--- silent until that Take is chosen.
-UPDATE takes SET position = position - nudge;
+-- silent until that Take is chosen. A detached Take is left as it is: it's
+-- in no Clip, so no Nudge would put back what this took off, and whatever
+-- places it again says where it goes.
+UPDATE takes SET position = position - nudge WHERE clip_id IS NOT NULL;
 
 ALTER TABLE takes DROP COLUMN nudge;

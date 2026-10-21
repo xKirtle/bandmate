@@ -108,7 +108,11 @@ export function clipActions(
     ...stretchActions(clip, commands, target, command),
     command(
       'nudge',
-      nudgeAction(clip.nudge, state.nudgeKeys, (ms) => void commands.run({ kind: 'nudge', target, ms })),
+      // The keys are named on a Clip of Takes, which is where the drag
+      // nudges: dragging another Clip with them held moves it instead.
+      nudgeAction(clip.nudge, clip.activeTakeId === null ? null : state.nudgeKeys, (ms) => {
+        void commands.run({ kind: 'nudge', target, ms });
+      }),
     ),
     ...clipboardActions(command, state, run),
     command('duplicate', { icon: CopyPlus, label: 'Duplicate', run: run({ kind: 'duplicate' }) }),

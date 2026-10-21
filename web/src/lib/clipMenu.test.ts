@@ -306,21 +306,22 @@ group('clipActions', () => {
   });
 
   it('takes an exact Nudge in whole milliseconds, with a reset to 0, for every kind of Clip', () => {
-    const nudgeField = (c: Clip) => {
-      const entry = menu({ ...c, nudge: -0.25 }).find((a) => a.label === 'Nudge')!;
-      expect(entry.title).toBe(
-        "Move the Clip's audio within it, in milliseconds, later if positive; or Alt+←/→ the Clip",
-      );
-      return 'field' in entry ? entry.field : null;
-    };
+    const nudgeEntry = (c: Clip) => menu({ ...c, nudge: -0.25 }).find((a) => a.label === 'Nudge')!;
     for (const c of [beatClip, soundClip, oneTake]) {
-      expect(nudgeField(c)).toMatchObject({
+      const entry = nudgeEntry(c);
+      expect('field' in entry && entry.field).toMatchObject({
         value: -250,
         unit: 'ms',
         step: 1,
         reset: { value: 0, label: 'Reset to 0 ms', offered: true },
       });
     }
+    // The keys are named only on a Clip of Takes, which is where dragging
+    // with them held nudges rather than moving.
+    expect(nudgeEntry(oneTake).title).toBe(
+      "Move the Clip's audio within it, in milliseconds, later if positive; or Alt+←/→ the Clip",
+    );
+    expect(nudgeEntry(beatClip).title).toBe("Move the Clip's audio within it, in milliseconds, later if positive");
   });
 
   it('offers each reset only while the Clip isn’t there already', () => {
