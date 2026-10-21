@@ -52,6 +52,9 @@ func (ts *testServer) replaceClips(songID int64, clipIDs []int64, clips ...map[s
 func TestMergingClipsOnATrackMakesOneClipOfANewSound(t *testing.T) {
 	ts := newTestServer(t)
 	p := placeTwoClips(t, ts)
+	// One of them nudged: the new Sound already hears it, so the merged
+	// Clip starts unnudged.
+	timelineChange(t, ts.setClipNudge(p.song.ID, p.first, -0.25))
 
 	// Short plays 0:00 to 0:10 and Long 0:30 to 0:50, with a gap between.
 	got := timelineChange(t, ts.mergeClips(p.song.ID, mergedAudio(50, onTrack(p.tl.Tracks[0].ID), p.first, p.second)))
@@ -61,16 +64,17 @@ func TestMergingClipsOnATrackMakesOneClipOfANewSound(t *testing.T) {
 		t.Fatalf("clips = %+v, want one Clip of a Sound in their place", clips)
 	}
 	c := clips[0]
-	if c.ID == p.first || c.ID == p.second || c.Start != 0 || c.Offset != 0 || c.Length != 50 || c.Name != nil {
-		t.Errorf("clip = %+v, want a new, unnamed Clip from the first's start to the last's end", c)
+	if c.ID == p.first || c.ID == p.second || c.Start != 0 || c.Offset != 0 || c.Length != 50 || c.Name != nil ||
+		c.Nudge != 0 {
+		t.Errorf("clip = %+v, want a new, unnamed, unnudged Clip from the first's start to the last's end", c)
 	}
 	want := []sound{{ID: *c.SoundID, Name: "Merged Clip", FileName: "Merged Clip.wav",
 		Size: int64(len(wavFile(50, 2, 24))), Duration: 50}}
 	if !reflect.DeepEqual(got.Sounds, want) {
 		t.Errorf("sounds = %+v, want %+v", got.Sounds, want)
 	}
-	if got.Version != p.tl.Version+1 {
-		t.Errorf("version = %d, want one more than %d", got.Version, p.tl.Version)
+	if got.Version != p.tl.Version+2 {
+		t.Errorf("version = %d, want two more than %d", got.Version, p.tl.Version)
 	}
 	if read := ts.getTimeline(p.song.ID); !reflect.DeepEqual(read, got) {
 		t.Errorf("read timeline = %+v, want %+v", read, got)
