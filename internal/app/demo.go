@@ -15,10 +15,10 @@ func (a *App) putDemoBack(w http.ResponseWriter, r *http.Request) {
 		writeDomainError(w, err)
 		return
 	}
-	song, err := a.songs.GetSong(r.Context(), id)
+	s, err := a.songs.GetSong(r.Context(), id)
 	if err != nil {
 		writeDomainError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, song)
+	writeJSON(w, http.StatusOK, s)
 }

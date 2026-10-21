@@ -45,7 +45,7 @@ func TestMovingAClipsPitchKeepsItsPlaceLengthTempoAndFades(t *testing.T) {
 	timelineChange(t, ts.trimClip(p.song.ID, p.second, 2, 16))
 	timelineChange(t, ts.setClipFades(p.song.ID, p.second, 4, 3))
 	timelineChange(t, ts.setClipTempo(p.song.ID, p.second, 0.8))
-	song := ts.getSong(p.song.ID)
+	s := ts.getSong(p.song.ID)
 
 	got := timelineChange(t, ts.setClipPitch(p.song.ID, p.second, -2))
 
@@ -60,8 +60,8 @@ func TestMovingAClipsPitchKeepsItsPlaceLengthTempoAndFades(t *testing.T) {
 		t.Errorf("read timeline = %+v, want %+v", read, got)
 	}
 	after := ts.getSong(p.song.ID)
-	if after.Key != song.Key || !reflect.DeepEqual(after.BPM, song.BPM) {
-		t.Errorf("song = %+v, want its Key and BPM as they were: %+v", after, song)
+	if after.Key != s.Key || !reflect.DeepEqual(after.BPM, s.BPM) {
+		t.Errorf("song = %+v, want its Key and BPM as they were: %+v", after, s)
 	}
 
 	// The Tempo can still change on its own.

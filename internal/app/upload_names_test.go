@@ -25,9 +25,9 @@ func TestAnUploadIsNamedFromItsFileName(t *testing.T) {
 				t.Errorf("sounds = %+v, want one named %q", got.Sounds, tc.sound)
 			}
 
-			song := ts.uploadMaster(s.ID, fakeAudio(tc.fileName).with(map[string]any{"name": tc.given}))
-			if len(song.Masters) != 1 || song.Masters[0].Name != tc.master {
-				t.Errorf("masters = %+v, want one named %q", song.Masters, tc.master)
+			s = ts.uploadMaster(s.ID, fakeAudio(tc.fileName).with(map[string]any{"name": tc.given}))
+			if len(s.Masters) != 1 || s.Masters[0].Name != tc.master {
+				t.Errorf("masters = %+v, want one named %q", s.Masters, tc.master)
 			}
 		})
 	}
