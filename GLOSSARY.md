@@ -100,7 +100,11 @@ How large the Chord Chart's diagrams show in Read mode, for reading at whatever 
 _Avoid_: Zoom, diagram size
 
 **Key**:
-The key a Song is written in, one of its Details. A Key is a tonic with major or minor on it, so there are 24, and its spelling follows its signature, which takes sharps wherever one can write them and flats where it can't: the same Key is C# and never Db, and Eb and never D#, a spelling no signature can write. The same 24 are offered wherever a Key is picked, a Song's or a Beat's Details and the Chord Finder's Suggest, in the same order. The field stays free text, so a Key typed by hand is kept as written. Like a Chord, with a capo on it names the shapes fingered, not the pitch that sounds: capo 2 in G sounds in A.
+The key a Song is written in, one of its Details. A Key is a Tonic with major or minor on it, so there are 24, and its spelling follows its signature, which takes sharps wherever one can write them and flats where it can't: the same Key is C# and never Db, and Eb and never D#, a spelling no signature can write. The same 24 are offered wherever a Key is picked, a Song's or a Beat's Details and the Chord Finder's Suggest, though not in the same shape: Details lists all 24, and Suggest picks a Tonic and a quality, which is those 24 in twelve rows. A Song's Key field stays free text, so a Key typed by hand is kept as written. Like a Chord, with a capo on it names the shapes fingered, not the pitch that sounds: capo 2 in G sounds in A.
+
+**Tonic**:
+The note a Key is built on and is named after: the Tonic of C# minor is C#. There are twelve, and a Tonic is a pitch rather than a spelling, so a Key spells its own from its signature: the same Tonic is Eb in Eb major and D# in D# minor. The Chord Finder's Suggest picks a Key as a Tonic and a quality, so the twelve it offers re-spell when the quality changes, and it never offers a Tonic a Key can't be built on: there is no D# major.
+_Avoid_: Root (a Root is a Chord's), key centre, home note
 
 **Languages**:
 The languages a Song's Lines are sung in, one of its Details; a Song that mixes them has several, and each word is read in the first of them, in the Song's order, whose rhyming dictionary downloaded to this Device has it. Any Language Bandmate rhymes in can be picked, downloaded or not; one that isn't downloaded is never guessed at. Variants of a language that sound different are separate Languages, named for where they're spoken, such as Portuguese (Portugal).

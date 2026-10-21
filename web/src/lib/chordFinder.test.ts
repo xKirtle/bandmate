@@ -9,6 +9,10 @@ import {
   plucks,
   keyName,
   keys,
+  tonics,
+  splitKey,
+  joinKey,
+  flipQuality,
   standard,
   suggest,
   tuningName,
@@ -887,5 +891,62 @@ describe("Keys it can't read", () => {
   it('says so, never a guess', () => {
     expect(suggest('Do', 'C')).toEqual({ kind: 'unreadable', key: 'Do' });
     expect(suggest('')).toEqual({ kind: 'unreadable', key: '' });
+  });
+});
+
+describe('a Key as a Tonic and a Quality', () => {
+  it('offers twelve Tonics, spelled from the signature of the Quality picked', () => {
+    expect(tonics(false)).toEqual(['C', 'C#', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B']);
+    expect(tonics(true)).toEqual(['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']);
+  });
+
+  it('is the shared list of 24, projected: the two put back together are it exactly', () => {
+    expect(tonics(false).flatMap((tonic, at) => [tonic, tonics(true)[at] + 'm'])).toEqual(keys);
+  });
+
+  it('never offers a Key no signature can write, nor the same Key twice', () => {
+    expect(tonics(false)).not.toContain('D#');
+    expect(tonics(false)).not.toContain('G#');
+    expect(tonics(true)).not.toContain('Eb');
+    expect(new Set(tonics(false)).size).toBe(12);
+    expect(new Set(tonics(true)).size).toBe(12);
+  });
+
+  it('splits a Key into the Tonic and Quality the pickers hold', () => {
+    expect(splitKey('G')).toEqual({ tonic: 'G', minor: false });
+    expect(splitKey('Em')).toEqual({ tonic: 'E', minor: true });
+    expect(splitKey('Eb')).toEqual({ tonic: 'Eb', minor: false });
+    expect(splitKey('D#m')).toEqual({ tonic: 'D#', minor: true });
+  });
+
+  it('splits a Key typed the other way into its own spelling', () => {
+    expect(splitKey('Db')).toEqual({ tonic: 'C#', minor: false });
+    expect(splitKey('Ebm')).toEqual({ tonic: 'D#', minor: true });
+    expect(splitKey('Bbm')).toEqual({ tonic: 'A#', minor: true });
+  });
+
+  it("says nothing of a Key it can't read", () => {
+    expect(splitKey('Do')).toBeNull();
+    expect(splitKey('')).toBeNull();
+  });
+
+  it('joins a Tonic and a Quality as the pickers write it', () => {
+    expect(joinKey('G', false)).toBe('G');
+    expect(joinKey('E', true)).toBe('Em');
+    expect(keys).toContain(joinKey('D#', true));
+  });
+
+  it('keeps the pitch and re-spells the Tonic when the Quality changes', () => {
+    expect(flipQuality('Eb', false)).toBe('D#');
+    expect(flipQuality('D#', true)).toBe('Eb');
+    expect(flipQuality('Ab', false)).toBe('G#');
+    expect(flipQuality('Bb', false)).toBe('A#');
+    expect(flipQuality('C', false)).toBe('C');
+    expect(flipQuality('F#', true)).toBe('F#');
+  });
+
+  it('round-trips every Tonic through a change of Quality', () => {
+    for (const minor of [false, true])
+      for (const tonic of tonics(minor)) expect(flipQuality(flipQuality(tonic, minor), !minor)).toBe(tonic);
   });
 });

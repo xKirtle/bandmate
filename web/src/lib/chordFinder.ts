@@ -22,10 +22,11 @@ import {
   readGuitarTuning,
   standardTuning,
 } from './guitarTuning';
+import { keys } from './transpose';
 
 export { qualities, roots, type Quality, type Suggestion } from './chordTheory';
-/** The Keys Suggest's picker offers: the one list of Keys (transpose.ts), the same list a Song's and a Beat's Key field offers. */
-export { keys } from './transpose';
+/** The one list of Keys (transpose.ts), the list a Song's and a Beat's Key field offers, and what Suggest's Tonics are projected from. */
+export { keys };
 export type { Pluck, Voicing } from './guitar';
 
 /** Standard tuning, its strings' pitches low to high, as MIDI note numbers (E2 A2 D3 G3 B3 E4). */
@@ -180,6 +181,47 @@ function sameFrets(a: Frets, b: Frets): boolean {
 /** A Key's name, tidied (G major, E minor), read as Transpose reads the Song's Key, or null if it can't be read. */
 export function keyName(text: string): string | null {
   return readKey(text)?.name ?? null;
+}
+
+/** A Key split into the Tonic and the Quality Suggest's pickers hold. */
+export interface KeyParts {
+  /** The Tonic as this Key's own signature spells it: Eb in Eb major, D# in D# minor. */
+  tonic: string;
+  minor: boolean;
+}
+
+/**
+ * The twelve Tonics a Key of this Quality can have, each spelled from its
+ * own signature: C C# D Eb E F F# G Ab A Bb B major, and C C# D D# E F F# G
+ * G# A A# B minor. It's the shared list of 24 (keys) projected by Quality,
+ * not a list of its own, so the two can never drift apart. Three of the
+ * twelve change with the Quality, which is why Suggest never shows a
+ * Tonic's two spellings at once, and why no Tonic here is a Key that
+ * doesn't exist: there is no D# major, so the major list never offers one.
+ */
+export function tonics(minor: boolean): readonly string[] {
+  return keys.filter((key) => key.endsWith('m') === minor).map((key) => (minor ? key.slice(0, -1) : key));
+}
+
+/** A Key split into the Tonic and Quality the pickers hold, or null if it can't be read. */
+export function splitKey(text: string): KeyParts | null {
+  const read = readKey(text);
+  return read && { tonic: read.signature[read.tonic], minor: read.minor };
+}
+
+/** The Key a Tonic and a Quality name, as the pickers write it (G, Em). */
+export function joinKey(tonic: string, minor: boolean): string {
+  return tonic + (minor ? 'm' : '');
+}
+
+/**
+ * The same Tonic in the other Quality, re-spelled for it: Eb major flips to
+ * D# minor, never Eb minor. The pitch is what's kept; the spelling follows
+ * the signature of the Quality it lands in.
+ */
+export function flipQuality(tonic: string, minor: boolean): string {
+  const at = tonics(minor).indexOf(tonic);
+  return at < 0 ? tonic : tonics(!minor)[at];
 }
 
 export type Suggest =
