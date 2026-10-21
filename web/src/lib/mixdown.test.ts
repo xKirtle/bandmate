@@ -10,6 +10,7 @@ import {
   sampleBits,
   storeMixdownFormat,
 } from './mixdown';
+import { storage } from './storageFake';
 
 const channel = (...samples: number[]) => new Float32Array(samples);
 
@@ -117,18 +118,6 @@ group('mixdownFormats', () => {
     ]);
   });
 });
-
-/** A Storage holding some values, or one that throws like a blocked one. */
-function storage(values: Record<string, string> = {}, blocked = false): Storage {
-  const fail = () => {
-    throw new DOMException('Blocked', 'SecurityError');
-  };
-  return {
-    getItem: (key: string) => (blocked ? fail() : (values[key] ?? null)),
-    setItem: (key: string, value: string) => (blocked ? fail() : void (values[key] = value)),
-    removeItem: (key: string) => (blocked ? fail() : void delete values[key]),
-  } as Storage;
-}
 
 group('readMixdownFormat and storeMixdownFormat', () => {
   it('picks WAV · 24-bit until a format has been picked', () => {

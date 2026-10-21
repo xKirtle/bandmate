@@ -1,18 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { readTuning, standard } from './chordFinder';
 import { preferredVoicingsKey, readPreferredVoicings, storePreferredVoicing } from './preferredVoicings';
-
-/** A Storage holding some values, or one that throws like a blocked one. */
-function storage(values: Record<string, string> = {}, blocked = false): Storage {
-  const fail = () => {
-    throw new DOMException('Blocked', 'SecurityError');
-  };
-  return {
-    getItem: (key: string) => (blocked ? fail() : (values[key] ?? null)),
-    setItem: (key: string, value: string) => (blocked ? fail() : void (values[key] = value)),
-    removeItem: (key: string) => (blocked ? fail() : void delete values[key]),
-  } as Storage;
-}
+import { storage } from './storageFake';
 
 const dropD = readTuning('Drop D')!;
 const barreG = [3, 5, 5, 4, 3, 3];
