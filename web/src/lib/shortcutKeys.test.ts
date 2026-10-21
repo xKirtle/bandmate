@@ -201,15 +201,15 @@ group('choosing what is held with the mouse', () => {
     expect(refused(off, 'skipSnapping', 'shift')).toEqual({
       kind: 'taken',
       key: { key: 'drag', alt: true },
-      by: 'nudgeTake',
+      by: 'nudgeClip',
     });
     expect(refusalMessage(refused(off, 'skipSnapping', 'shift'), 'mac')).toEqual({
       text: '⌥+drag is already used by',
-      by: 'nudgeTake',
+      by: 'nudgeClip',
     });
     // Wherever each works: Ctrl+drag adds Clips with a box, on empty lane space.
-    const mod = toggled(defaultShortcutKeys, 'nudgeTake', 'mod');
-    expect(refused(mod, 'nudgeTake', 'alt')).toEqual({ kind: 'taken', key: { key: 'drag', mod: true }, by: 'addBox' });
+    const mod = toggled(defaultShortcutKeys, 'nudgeClip', 'mod');
+    expect(refused(mod, 'nudgeClip', 'alt')).toEqual({ kind: 'taken', key: { key: 'drag', mod: true }, by: 'addBox' });
   });
 
   it('refuses Shift alone with the wheel, which scrolls the Timeline sideways', () => {
@@ -337,6 +337,19 @@ group('keeping the keys on this device', () => {
     // Seen, it's no longer new, and stays without the key.
     storeShortcutKeys(kept, seen(read, 'record'));
     expect(readShortcutKeys(kept)).toEqual({ keys: read.keys, fresh: [] });
+  });
+
+  it('reads a nudge gesture rebound before the Nudge became the Clip’s under its new id', () => {
+    // It was kept as nudgeTake until a Nudge became the Clip's, not the Take's.
+    const kept = storage();
+    const held = [{ key: 'drag', mod: true, alt: true }];
+    kept.setItem(shortcutKeysKey, JSON.stringify({ keys: { nudgeTake: { keys: held } } }));
+    const read = readShortcutKeys(kept);
+    expect(read.keys.nudgeClip.keys).toEqual(held);
+    expect(read.fresh).toEqual([]);
+    // Kept again, it's under the new id alone.
+    storeShortcutKeys(kept, read);
+    expect(JSON.parse(kept.getItem(shortcutKeysKey)!).keys).toEqual({ nudgeClip: { keys: held } });
   });
 
   it('keeps a new Shortcut new while other keys change, until it is seen', () => {

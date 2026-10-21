@@ -1385,7 +1385,7 @@
       {
         canRecord,
         soundName: clip.soundId === null ? null : sources.of(clip).title,
-        nudgeKeys: hints.label(shortcuts.nudgeTake.keys),
+        nudgeKeys: hints.label(shortcuts.nudgeClip.keys),
         ...menuKeys(),
         selected: selection.size,
         frozen: freeze,

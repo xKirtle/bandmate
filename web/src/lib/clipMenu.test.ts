@@ -316,12 +316,11 @@ group('clipActions', () => {
         reset: { value: 0, label: 'Reset to 0 ms', offered: true },
       });
     }
-    // The keys are named only on a Clip of Takes, which is where dragging
-    // with them held nudges rather than moving.
-    expect(nudgeEntry(oneTake).title).toBe(
-      "Move the Clip's audio within it, in milliseconds, later if positive; or Alt+←/→ the Clip",
-    );
-    expect(nudgeEntry(beatClip).title).toBe("Move the Clip's audio within it, in milliseconds, later if positive");
+    // The keys are named on every Clip: dragging any of them with the keys
+    // held nudges its audio.
+    const title =
+      "How far the Clip's audio is moved within it, in milliseconds, later if positive; or Alt+←/→ the Clip";
+    for (const c of [beatClip, soundClip, oneTake]) expect(nudgeEntry(c).title).toBe(title);
   });
 
   it('offers each reset only while the Clip isn’t there already', () => {

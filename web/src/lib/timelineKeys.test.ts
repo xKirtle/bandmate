@@ -394,7 +394,7 @@ group('Keys as rebound', () => {
     rebind({
       toggleClip: { keys: [{ key: 'click', alt: true }] },
       addBox: { keys: [{ key: 'drag', shift: true }] },
-      nudgeTake: { keys: [{ key: 'drag', mod: true, alt: true }] },
+      nudgeClip: { keys: [{ key: 'drag', mod: true, alt: true }] },
       skipSnapping: { keys: [{ key: 'drag', alt: true }] },
       zoom: { keys: [{ key: 'wheel', shift: true }] },
     });

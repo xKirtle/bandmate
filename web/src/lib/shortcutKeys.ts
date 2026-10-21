@@ -310,6 +310,19 @@ export const shortcutKeysKey = 'bandmate.shortcutKeys';
 
 type Kept = { keys?: Record<string, unknown>; fresh?: unknown };
 
+/**
+ * What a Shortcut was kept as before it was renamed, so keys rebound then
+ * are still rebound now rather than quietly back at their defaults. The
+ * nudge gesture became a Clip's rather than a Take's (ADR 0028).
+ */
+const formerIds: Partial<Record<ShortcutId, string>> = { nudgeClip: 'nudgeTake' };
+
+/** What a Shortcut is kept as on this device, under its id or the one it had before it was renamed. */
+function keptAs(kept: Kept, id: ShortcutId): unknown {
+  const former = formerIds[id];
+  return kept.keys?.[id] ?? (former === undefined ? undefined : kept.keys?.[former]);
+}
+
 function readKey(value: unknown): Key | null {
   if (typeof value !== 'object' || value === null) return null;
   const { key, mod, alt, shift } = value as Record<string, unknown>;
@@ -330,7 +343,8 @@ function readList(value: unknown): Key[] | null {
 /**
  * Reads the keys kept on this device: the defaults for any Shortcut not
  * kept, but for its defaults another Shortcut was given, which it goes
- * without, marked new. What can't be read is left at its defaults.
+ * without, marked new. What can't be read is left at its defaults. A
+ * Shortcut renamed since takes what it was kept as under its old id.
  */
 export function readShortcutKeys(storage: Storage | undefined): ShortcutKeys {
   let kept: Kept;
@@ -343,14 +357,15 @@ export function readShortcutKeys(storage: Storage | undefined): ShortcutKeys {
   const keys = { ...defaultKeyset } as Record<ShortcutId, OneWay | TwoWay>;
   const changed = new Set<ShortcutId>();
   for (const id of ids) {
-    const value = kept.keys?.[id];
+    const value = keptAs(kept, id);
     if (typeof value !== 'object' || value === null) continue;
     const lists = listsOf(id).map((list) => readList((value as Record<string, unknown>)[list]));
     if (lists.some((l) => l === null)) continue;
     keys[id] = fromLists(id, lists as Key[][]);
     changed.add(id);
   }
-  const fresh = new Set(Array.isArray(kept.fresh) ? ids.filter((id) => (kept.fresh as unknown[]).includes(id)) : []);
+  const marked: unknown[] = Array.isArray(kept.fresh) ? kept.fresh : [];
+  const fresh = new Set(ids.filter((id) => marked.includes(id) || marked.includes(formerIds[id])));
   // A Shortcut at its defaults goes without those the user gave another.
   const given = ids.filter((id) => changed.has(id)).flatMap((id) => allOf(keys as Keyset, id));
   for (const id of ids) {

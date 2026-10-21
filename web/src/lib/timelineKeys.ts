@@ -113,9 +113,9 @@ export function isModifier(key: string): boolean {
   return key === 'Shift' || key === 'Alt' || key === 'Control' || key === 'Meta';
 }
 
-/** Whether a Clip dragged with these modifiers nudges its active Take inside it, rather than moving. */
+/** Whether a Clip dragged with these modifiers nudges its audio inside it, rather than moving the Clip. */
 export function nudges(e: Modifiers): boolean {
-  return matches(mouse('drag', e), rebound().nudgeTake.keys);
+  return matches(mouse('drag', e), rebound().nudgeClip.keys);
 }
 
 /** Whether a Clip or the Loop dragged with these modifiers goes anywhere, snapping to nothing. */

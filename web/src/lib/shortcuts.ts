@@ -224,11 +224,11 @@ export const shortcuts = {
     worksIn: 'empty lane space on the Timeline.',
     keys: [{ key: 'drag', mod: true }],
   },
-  nudgeTake: {
-    name: 'Nudge a Take inside its Clip',
+  nudgeClip: {
+    name: "Nudge a Clip's audio inside it",
     group: 'Mouse',
-    description: 'Moves the Take inside the Clip being dragged, keeping the Clip where it is.',
-    worksIn: 'a Clip being dragged.',
+    description: 'Moves the audio inside the Clip being dragged, whatever it holds, keeping the Clip where it is.',
+    worksIn: 'any Clip being dragged.',
     keys: [{ key: 'drag', alt: true }],
   },
   skipSnapping: {
