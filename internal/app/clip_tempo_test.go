@@ -47,7 +47,7 @@ func TestSlowingAClipKeepsItsStartAndAudioAndScalesItsLengthAndFades(t *testing.
 	timelineChange(t, ts.trimClip(p.song.ID, p.second, 2, 16))
 	// Long plays 0:32 to 0:48, from 2 s into its Beat.
 	timelineChange(t, ts.setClipFades(p.song.ID, p.second, 4, 3))
-	song := ts.getSong(p.song.ID)
+	s := ts.getSong(p.song.ID)
 
 	got := timelineChange(t, ts.setClipTempo(p.song.ID, p.second, 0.8))
 
@@ -65,8 +65,8 @@ func TestSlowingAClipKeepsItsStartAndAudioAndScalesItsLengthAndFades(t *testing.
 		t.Errorf("read timeline = %+v, want %+v", read, got)
 	}
 	after := ts.getSong(p.song.ID)
-	if after.Key != song.Key || !reflect.DeepEqual(after.BPM, song.BPM) {
-		t.Errorf("song = %+v, want its Key and BPM as they were: %+v", after, song)
+	if after.Key != s.Key || !reflect.DeepEqual(after.BPM, s.BPM) {
+		t.Errorf("song = %+v, want its Key and BPM as they were: %+v", after, s)
 	}
 
 	got = timelineChange(t, ts.setClipTempo(p.song.ID, p.second, 2))
