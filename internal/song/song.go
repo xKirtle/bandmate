@@ -27,6 +27,8 @@ var (
 	errTitleRequired = domain.Invalid("title is required")
 	errUnknownStatus = domain.Invalid("status must be idea, drafting, finished or shelved")
 	errNoSuchFolder  = domain.Invalid("there's no such Folder")
+
+	errUnknownFolderSongs = domain.Invalid(`songs must be "keep" or "delete"`)
 )
 
 // Status is where a Song stands in its lifecycle.
@@ -477,16 +479,41 @@ func (s *Store) DeleteSong(ctx context.Context, id int64, based songversion.Vers
 	return nil
 }
 
-// AnyCount skips DeleteFolderWithSongs's check of how many Songs the Folder
-// holds.
-const AnyCount = -1
+// FolderSongs is what becomes of a Folder's Songs when the Folder is
+// deleted.
+type FolderSongs string
 
-// DeleteFolderWithSongs removes a Folder and every Song in it, each as
-// DeleteSong does, all at once: if any of it fails, nothing is deleted. With
-// a count other than AnyCount, the number of Songs the user was asked about,
-// it deletes nothing unless the Folder still holds that many, so none filed
-// into it since goes unseen. A missing Folder is domain.ErrNotFound.
-func (s *Store) DeleteFolderWithSongs(ctx context.Context, folderID int64, count int) error {
+const (
+	// KeepSongs keeps the Songs that were in the Folder, in no Folder.
+	KeepSongs FolderSongs = "keep"
+	// DeleteSongs deletes them along with the Folder.
+	DeleteSongs FolderSongs = "delete"
+)
+
+// ParseFolderSongs reads what becomes of a Folder's Songs, refusing, as
+// invalid, anything but the two it can be. Nothing said keeps them: the
+// choice that destroys nothing.
+func ParseFolderSongs(text string) (FolderSongs, error) {
+	switch choice := FolderSongs(text); choice {
+	case "":
+		return KeepSongs, nil
+	case KeepSongs, DeleteSongs:
+		return choice, nil
+	}
+	return "", errUnknownFolderSongs
+}
+
+// DeleteFolder removes a Folder. With KeepSongs, the Songs in it are kept,
+// in no Folder; with DeleteSongs they're deleted too, each as DeleteSong
+// does. Either way it's all at once: if any of it fails, nothing is
+// deleted. A missing Folder is domain.ErrNotFound.
+//
+// count, the number of Songs the user was asked about, guards deleting
+// them: nothing is deleted unless the Folder still holds that many, so none
+// filed into it since goes unseen. nil asks for no such guard, and a count
+// given with KeepSongs is ignored, since keeping the Songs destroys none of
+// them.
+func (s *Store) DeleteFolder(ctx context.Context, folderID int64, songs FolderSongs, count *int) error {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
@@ -500,21 +527,23 @@ func (s *Store) DeleteFolderWithSongs(ctx context.Context, folderID int64, count
 	if err != nil {
 		return fmt.Errorf("reading folder: %w", err)
 	}
-	songIDs, err := queryIDs(ctx, tx, `SELECT id FROM songs WHERE folder_id = ?`, folderID)
-	if err != nil {
-		return fmt.Errorf("listing folder's songs: %w", err)
-	}
-	if count != AnyCount && len(songIDs) != count {
-		return domain.Conflict(fmt.Sprintf("“%s” now holds %s, not %d", name, songCount(len(songIDs)), count))
-	}
 	files := ownedFiles{}
-	for _, songID := range songIDs {
-		if err := files.add(ctx, tx, songID); err != nil {
-			return err
+	if songs == DeleteSongs {
+		songIDs, err := queryIDs(ctx, tx, `SELECT id FROM songs WHERE folder_id = ?`, folderID)
+		if err != nil {
+			return fmt.Errorf("listing folder's songs: %w", err)
 		}
-	}
-	if _, err := tx.ExecContext(ctx, `DELETE FROM songs WHERE folder_id = ?`, folderID); err != nil {
-		return fmt.Errorf("deleting folder's songs: %w", err)
+		if count != nil && len(songIDs) != *count {
+			return domain.Conflict(fmt.Sprintf("“%s” now holds %s, not %d", name, songCount(len(songIDs)), *count))
+		}
+		for _, songID := range songIDs {
+			if err := files.add(ctx, tx, songID); err != nil {
+				return err
+			}
+		}
+		if _, err := tx.ExecContext(ctx, `DELETE FROM songs WHERE folder_id = ?`, folderID); err != nil {
+			return fmt.Errorf("deleting folder's songs: %w", err)
+		}
 	}
 	if _, err := tx.ExecContext(ctx, `DELETE FROM folders WHERE id = ?`, folderID); err != nil {
 		return fmt.Errorf("deleting folder: %w", err)

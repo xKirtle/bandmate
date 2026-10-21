@@ -19,7 +19,7 @@ Reversing the Song's latest edits on this visit to it, newest first, whether to 
 _Avoid_: Snapshot (a Snapshot outlasts the visit), revert
 
 **Folder**:
-A named place on the Songs page that keeps some Songs together, like an EP's, so a growing list stays in order. A Song sits in one Folder at most, or in none, and Folders don't hold other Folders. A Folder is only a name: deleting it can leave its Songs in no Folder, or delete them too.
+A named place on the Songs page that keeps some Songs together, like an EP's, so a growing list stays in order. A Song sits in one Folder at most, or in none, and Folders don't hold other Folders. A Folder is only a name: deleting it can leave its Songs in no Folder, or delete them too; deleting them is refused if the Folder holds a different number of Songs by then than the user was asked about, so none filed into it meanwhile goes unseen.
 _Avoid_: Album (a release), Playlist, Collection, Group
 
 **Tag**:

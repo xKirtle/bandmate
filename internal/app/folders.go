@@ -75,30 +75,21 @@ func (a *App) deleteFolder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	query := r.URL.Query()
-	var deleteSongs bool
-	switch query.Get("songs") {
-	case "", "keep":
-	case "delete":
-		deleteSongs = true
-	default:
-		writeError(w, http.StatusBadRequest, `songs must be "keep" or "delete"`)
+	songs, err := song.ParseFolderSongs(query.Get("songs"))
+	if err != nil {
+		writeDomainError(w, err)
 		return
 	}
-	count := song.AnyCount
+	var count *int
 	if text := query.Get("count"); text != "" {
 		n, err := strconv.Atoi(text)
 		if err != nil || n < 0 {
 			writeError(w, http.StatusBadRequest, "count must be a whole number")
 			return
 		}
-		count = n
+		count = &n
 	}
-	if deleteSongs {
-		if err := a.songs.DeleteFolderWithSongs(r.Context(), id, count); err != nil {
-			writeDomainError(w, err)
-			return
-		}
-	} else if err := a.folders.Delete(r.Context(), id); err != nil {
+	if err := a.songs.DeleteFolder(r.Context(), id, songs, count); err != nil {
 		writeDomainError(w, err)
 		return
 	}
