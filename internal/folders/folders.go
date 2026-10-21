@@ -2,6 +2,11 @@
 // some Songs together. A Folder is only a name, unique ignoring case, and a
 // Song sits in one at most. Filing a Song is organising, not editing it, so
 // it leaves the Song's version and when it was edited as they were.
+//
+// Deleting a Folder isn't here: it's song.Store.DeleteFolder, because the
+// user can ask for its Songs to go with it, and deleting a Song means
+// removing the files it owns once the delete commits — machinery the song
+// package holds, and that the one transaction can't be split across.
 package folders
 
 import (
@@ -124,15 +129,6 @@ func (s *Store) Rename(ctx context.Context, id int64, name string) (Folder, erro
 		return Folder{}, err
 	}
 	return s.Get(ctx, id)
-}
-
-// Delete removes a Folder, leaving any Songs still in it in none.
-func (s *Store) Delete(ctx context.Context, id int64) error {
-	res, err := s.db.ExecContext(ctx, `DELETE FROM folders WHERE id = ?`, id)
-	if err != nil {
-		return fmt.Errorf("deleting folder: %w", err)
-	}
-	return domain.ExpectOneRow(res)
 }
 
 // checkName refuses, as a conflict, a name another Folder already has,
