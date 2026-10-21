@@ -8,6 +8,16 @@ export interface DeviceSettingStorage<T> {
   key: string;
   read: (storage: Storage | undefined) => T;
   store: (storage: Storage | undefined, value: T) => void;
+  /**
+   * Shows the value, for a setting with somewhere to show it, e.g. the
+   * Palette on the page: called with the value read on construction, from
+   * the constructor itself, with one set, and with one another tab's change
+   * or a cleared storage brings in. It's called every time, whether or not
+   * the value differs from the one held, so a tab keeping the value this
+   * one already has shows it again. A setting that shows itself wherever
+   * it's read leaves this out.
+   */
+  shown?: (value: T) => void;
 }
 
 export class DeviceSetting<T> {
@@ -19,11 +29,11 @@ export class DeviceSetting<T> {
   constructor(kind: DeviceSettingStorage<T>, storage: Storage | undefined, tabs: EventTarget) {
     this.#kind = kind;
     this.#storage = storage;
-    this.#value = kind.read(storage);
+    this.#take(kind.read(storage));
     // Another tab kept this setting, or storage was cleared (a null key).
     tabs.addEventListener('storage', (event) => {
       const { key } = event as StorageEvent;
-      if (key === null || key === kind.key) this.#value = kind.read(storage);
+      if (key === null || key === kind.key) this.#take(kind.read(storage));
     });
   }
 
@@ -34,7 +44,14 @@ export class DeviceSetting<T> {
 
   /** Sets the value on this device, and keeps it. */
   set(value: T) {
-    this.#value = value;
+    // Kept first, so a setting shown the value sees it already kept.
     this.#kind.store(this.#storage, value);
+    this.#take(value);
+  }
+
+  // Takes a new value, and shows it where the setting says how.
+  #take(value: T) {
+    this.#value = value;
+    this.#kind.shown?.(value);
   }
 }
