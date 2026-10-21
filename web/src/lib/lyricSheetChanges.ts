@@ -1,6 +1,6 @@
 // Changes to the Lyric Sheet, each named by its kind, as Lyric Sheet editing
 // (see lyricSheetEditing.svelte.ts) sends them through Saves.
-import type { Sheet, SheetCopy, Song } from './api';
+import type { Section, Sheet, SheetCopy, Song } from './api';
 
 /** A change to the Lyric Sheet, as the intent sent to the API. */
 export type LyricSheetChange =
@@ -105,21 +105,26 @@ export function isLyricSheetChange(change: { kind: string }): change is LyricShe
   return lyricSheetChangeKinds.has(change.kind);
 }
 
+/** A copy of a Section as a copy of the sheet holds it: only what's written, with every id. */
+function sectionCopy(section: Section): SheetCopy['sections'][number] {
+  return {
+    id: section.id,
+    label: section.label,
+    alternates: section.alternates.map((a) => ({
+      id: a.id,
+      name: a.name,
+      active: a.active,
+      lines: a.lines.map((l) => ({ id: l.id, text: l.text, cue: l.cue })),
+    })),
+  };
+}
+
 /** A copy of a Song's Lyric Sheet and Scrapbook, to put back. */
 export function sheetCopy(song: Sheet): SheetCopy {
   return {
     arrangement: [...song.arrangement],
     scrapbook: [...song.scrapbook],
-    sections: song.sections.map((s) => ({
-      id: s.id,
-      label: s.label,
-      alternates: s.alternates.map((a) => ({
-        id: a.id,
-        name: a.name,
-        active: a.active,
-        lines: a.lines.map((l) => ({ id: l.id, text: l.text, cue: l.cue })),
-      })),
-    })),
+    sections: song.sections.map(sectionCopy),
   };
 }
 
@@ -129,10 +134,27 @@ export function sheetCopy(song: Sheet): SheetCopy {
  * moved between the Lyric Sheet and the Scrapbook, else the one moved
  * within either, else, for one gone, the one now where it was, in the
  * Lyric Sheet or the Scrapbook as it was. Null when none is left there.
+ *
+ * The answer is only where the Song page looks afterwards: it ends Sync
+ * mode, opens the Scrapbook's fold if the Section is there, and scrolls the
+ * Section into view. The sheet itself is already back, whole, by then
+ * (ADR 0019), so nothing saved depends on this.
+ *
+ * Where a put-back leaves more than one answer, these are the rules:
+ *
+ * - **More than one Section changed: the first in Arrangement order, the
+ *   Scrapbook's only after.** Undoing `addToSection` changes two at once (the
+ *   Section comes back, and the one it was added to loses the Alternates),
+ *   and undoing `restoreSnapshot` can change most of the sheet. The topmost
+ *   thing that changed is what to scroll to.
+ * - **A Section gone: the Section now where it was** — the one after it, or
+ *   the one before it when it was the last.
+ * - **A Section gone from a list with nothing else left in it: none**, rather
+ *   than the other list's. A Section in the Scrapbook doesn't stand in for
+ *   one gone from the Lyric Sheet.
  */
 export function changedSection(from: Sheet, to: Sheet): number | null {
-  const written = (sheet: Sheet) =>
-    new Map(sheet.sections.map((s) => [s.id, JSON.stringify(sheetCopy({ ...sheet, sections: [s] }).sections[0])]));
+  const written = (sheet: Sheet) => new Map(sheet.sections.map((s) => [s.id, JSON.stringify(sectionCopy(s))]));
   const was = written(from);
   const shown = [...to.arrangement, ...to.scrapbook];
   const now = written(to);
@@ -148,6 +170,13 @@ export function changedSection(from: Sheet, to: Sheet): number | null {
     const after = to[list];
     if (before.join() === after.join()) continue;
     const without = (order: number[], id: number) => order.filter((other) => other !== id).join();
+    // The one Section that, taken out, leaves the two orders the same: the one
+    // moved. A reorder of more than one move, which a Snapshot restore can put
+    // back, leaves none, so then it's the first place the orders differ. The
+    // two lists hold the same Sections by here — one in either that the other
+    // lacks was brought back or crossed, which the strategies above answer — so
+    // some place differs whenever the orders aren't equal, which is checked
+    // above.
     return after.find((id) => without(before, id) === without(after, id)) ?? after.find((id, i) => before[i] !== id)!;
   }
 
