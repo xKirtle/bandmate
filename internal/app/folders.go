@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/xKirtle/bandmate/internal/lyricsheet"
+	"github.com/xKirtle/bandmate/internal/song"
 )
 
 func (a *App) listFolders(w http.ResponseWriter, r *http.Request) {
@@ -84,7 +84,7 @@ func (a *App) deleteFolder(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, `songs must be "keep" or "delete"`)
 		return
 	}
-	count := lyricsheet.AnyCount
+	count := song.AnyCount
 	if text := query.Get("count"); text != "" {
 		n, err := strconv.Atoi(text)
 		if err != nil || n < 0 {

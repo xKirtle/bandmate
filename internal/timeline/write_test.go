@@ -9,7 +9,7 @@ import (
 
 	"github.com/xKirtle/bandmate/internal/db"
 	"github.com/xKirtle/bandmate/internal/domain"
-	"github.com/xKirtle/bandmate/internal/lyricsheet"
+	"github.com/xKirtle/bandmate/internal/song"
 )
 
 // newSong makes a Song with its first Track in a fresh database, and a Beat
@@ -23,7 +23,7 @@ func newSong(t *testing.T) (*sql.DB, int64, int64, Beat) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { conn.Close() })
-	song, err := lyricsheet.NewStore(conn, nil, time.Now).CreateSong(ctx, "Night Drive", nil)
+	song, err := song.NewStore(conn, nil, time.Now).CreateSong(ctx, "Night Drive", nil)
 	if err != nil {
 		t.Fatal(err)
 	}

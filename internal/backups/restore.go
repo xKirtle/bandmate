@@ -20,7 +20,7 @@ import (
 
 	"github.com/xKirtle/bandmate/internal/db"
 	"github.com/xKirtle/bandmate/internal/domain"
-	"github.com/xKirtle/bandmate/internal/lyricsheet"
+	"github.com/xKirtle/bandmate/internal/song"
 	"github.com/xKirtle/bandmate/internal/songfiles"
 )
 
@@ -861,7 +861,7 @@ func remapSnapshots(ctx context.Context, tx *sql.Tx) error {
 		return last[table], nil
 	}
 	for _, h := range snapshots {
-		sheet, err := lyricsheet.RemapSnapshotSheet(h.sheet, newID)
+		sheet, err := song.RemapSnapshotSheet(h.sheet, newID)
 		if err != nil {
 			return fmt.Errorf("snapshot %d: %w", h.id, err)
 		}
