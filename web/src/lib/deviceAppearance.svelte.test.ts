@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { paletteKey, themeKey, type Palette, type Theme } from './appearance';
-import { Appearance } from './appearance.svelte';
+import { DeviceAppearance } from './deviceAppearance.svelte';
 import { storage } from './storageFake';
 
 /** What the appearance was shown as: the Palette, and light or dark. */
@@ -25,7 +25,7 @@ function appearanceOn({ values = {}, systemDark = false }: AppearanceCase = {}) 
   });
   const shown: Shown[] = [];
   const tabs = new EventTarget();
-  const appearance = new Appearance(storage(values), tabs, (palette, theme) => shown.push({ palette, theme }));
+  const appearance = new DeviceAppearance(storage(values), tabs, (palette, theme) => shown.push({ palette, theme }));
   /** Another tab kept a choice, or cleared storage with a null key, as the browser tells this one. */
   const otherTab = (key: string | null) => tabs.dispatchEvent(Object.assign(new Event('storage'), { key }));
   /** The system turned light or dark, as the browser tells the page. */

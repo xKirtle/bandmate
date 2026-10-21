@@ -2,8 +2,10 @@
 // Light or Dark, each a Device Setting of its own, so a choice made in one
 // of this device's tabs shows in all of them. The reading, keeping and
 // falling back are appearance.ts's; showing it on the page is the caller's,
-// handed in, so this module needs no DOM (sharedAppearance.svelte.ts shows
-// it for the app).
+// handed in, so this module touches no element of the page
+// (sharedAppearance.svelte.ts shows it for the app). The system's light or
+// dark is the one thing it asks the browser itself, as the app has always
+// asked it, since it is the browser's answer rather than anything kept here.
 
 import {
   paletteKey,
@@ -38,17 +40,17 @@ const themeSetting = {
  * picked here, picked in another of this device's tabs, left behind by a
  * cleared storage, or the system turning light or dark.
  */
-export class Appearance {
+export class DeviceAppearance {
   // The system's light or dark is not kept on this device, so it's no
   // Device Setting: it's the browser's answer, listened to here.
   #system = matchMedia('(prefers-color-scheme: dark)');
   #palette: DeviceSetting<Palette>;
   #theme: DeviceSetting<ThemeChoice>;
-  #showing: (palette: Palette, theme: Theme) => void;
+  #showIt: (palette: Palette, theme: Theme) => void;
   // Each setting shows its value as it's constructed, while the other is
   // still being made: those two calls are left out, and the appearance
   // shown once below instead, from both values.
-  #both = false;
+  #bothMade = false;
 
   /**
    * `tabs` tells of other tabs' changes to storage: the window, in the app.
@@ -56,13 +58,13 @@ export class Appearance {
    * the page.
    */
   constructor(storage: Storage | undefined, tabs: EventTarget, show: (palette: Palette, theme: Theme) => void) {
-    this.#showing = show;
-    const shown = () => this.#show();
+    this.#showIt = show;
+    const shown = () => this.#showBoth();
     this.#palette = new DeviceSetting({ ...paletteSetting, shown }, storage, tabs);
     this.#theme = new DeviceSetting({ ...themeSetting, shown }, storage, tabs);
     this.#system.addEventListener('change', shown);
-    this.#both = true;
-    this.#show();
+    this.#bothMade = true;
+    this.#showBoth();
   }
 
   /** The Palette shown on this device. */
@@ -86,8 +88,8 @@ export class Appearance {
   }
 
   // Shows both current values together, so neither is shown without the other.
-  #show() {
-    if (!this.#both) return;
-    this.#showing(this.#palette.value, shownTheme(this.#theme.value, this.#system.matches));
+  #showBoth() {
+    if (!this.#bothMade) return;
+    this.#showIt(this.#palette.value, shownTheme(this.#theme.value, this.#system.matches));
   }
 }

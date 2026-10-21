@@ -1,5 +1,5 @@
 import { applyAppearance, type Palette, type Theme } from './appearance';
-import { Appearance } from './appearance.svelte';
+import { DeviceAppearance } from './deviceAppearance.svelte';
 import { deviceStorage } from './deviceStorage';
 
 // How the app looks on this device, shown across the page from the moment
@@ -28,4 +28,4 @@ function themeColor(): HTMLMetaElement {
 }
 
 /** The appearance on this device, shown on the page as the app starts and at every change. */
-export const appearance = new Appearance(deviceStorage(), window, show);
+export const appearance = new DeviceAppearance(deviceStorage(), window, show);
