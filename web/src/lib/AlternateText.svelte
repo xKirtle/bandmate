@@ -1,41 +1,9 @@
 <script lang="ts" module>
-  import type { Line } from './api';
-
-  /** How a Section's Cues show on the text box of its active Alternate. */
-  export interface Cueing {
-    /** The Line playback is on, highlighted. */
-    current: number | null;
-    /** Keeps track of a Line's row, to follow playback to. */
-    track: (el: HTMLElement, line: number) => () => void;
-    /** Given, a gutter beside each Line shows its Cue, to change it with. */
-    gutter?: {
-      /** Ends each Line's name for screen readers, e.g. " of Chorus". */
-      labelSuffix: string;
-      save: (line: Line, cue: number | null) => void;
-      /** Whether a Line's still in the Song, e.g. not deleted with its Section. */
-      has: (line: number) => boolean;
-      /** Hands over a Line's field, or null once it's gone, so Enter elsewhere can go on to it. */
-      field: (line: number, field: GutterField | null | undefined) => void;
-      /** Opens the next Line's field; answers whether there was one. */
-      next: (line: number) => boolean;
-      /** Given, a ▶ beside each Cue plays from it. */
-      play?: (to: number) => void;
-      /** Why a Line's Cue is out of order, or null if it isn't. */
-      outOfOrder: (line: number) => string | null;
-    };
-    /**
-     * Given, as in Sync mode, the text is read-only, the Line up next has a
-     * Now button in its gutter slot, and clicking a Line makes it next.
-     */
-    sync?: {
-      /** The Line up next, wherever it is: only one of this Alternate's is marked. */
-      next: number | null;
-      /** Cues the Line up next at the playhead. */
-      now: () => void;
-      /** Makes a Line the next one. */
-      pick: (line: number) => void;
-    };
-  }
+  /**
+   * Keeps track of a Line's row, to follow playback to, until the function
+   * returned is called.
+   */
+  export type TrackRow = (el: HTMLElement, line: number) => () => void;
 </script>
 
 <script lang="ts">
@@ -44,7 +12,7 @@
   import type { Alternate } from './api';
   import CueField from './CueField.svelte';
   import { isBlank, linesByRow } from './cues';
-  import type { GutterField } from './cueGutter.svelte';
+  import type { CueGutter } from './cueGutter.svelte';
   import { rowAt } from './gutter';
   import { keyHints } from './keyHints';
   import type { LyricSheetEditing } from './lyricSheetEditing.svelte';
@@ -57,7 +25,9 @@
     sectionId,
     label,
     editing,
-    cueing,
+    gutter,
+    current = null,
+    track,
     onCaret,
     tour,
   }: {
@@ -68,8 +38,16 @@
     label: string;
     /** Saves the text typed, and holds it while it isn't saved. */
     editing: LyricSheetEditing;
-    /** Given, the Lines get a backdrop behind the text box to highlight and cue them. */
-    cueing?: Cueing;
+    /**
+     * Given, the Lines get a backdrop behind the text box to highlight them,
+     * and the Cue gutter is asked, Line by Line, what to show beside each:
+     * its Cue, whether it's picked in Sync mode, and the rest.
+     */
+    gutter?: CueGutter;
+    /** With the gutter, the Line playback is on, highlighted. */
+    current?: number | null;
+    /** With the gutter, keeps track of a Line's row, to follow playback to. */
+    track?: TrackRow;
     /** Given, hears where the caret is in the text box while it has focus, and null once it hasn't. */
     onCaret?: CaretListener;
     /** Given, names the text box for the Tour to spotlight, as its `data-tour`. */
@@ -115,8 +93,8 @@
   // The rows of the text box as typed, each with the saved Line it is. Until
   // typing is saved, a row may be matched to the wrong Line; the save
   // matches them for real.
-  const rows = $derived(cueing ? text.split('\n') : []);
-  const rowLines = $derived(cueing ? linesByRow(text, alternate.lines) : []);
+  const rows = $derived(gutter ? text.split('\n') : []);
+  const rowLines = $derived(gutter ? linesByRow(text, alternate.lines) : []);
 
   // The row under the pointer, so its Line's gutter shows its ✕. The text box
   // takes the pointer over the rows, so it's found by height.
@@ -146,51 +124,49 @@
 <div
   class="line-field"
   data-tour={tour}
-  class:cued={cueing}
-  class:with-gutter={cueing?.gutter}
-  class:syncing={cueing?.sync}
+  class:cued={gutter}
+  class:with-gutter={gutter?.offered}
+  class:syncing={gutter?.syncing}
   style:--rows={rows.length}
-  onpointermove={cueing?.gutter ? pointed : undefined}
+  onpointermove={gutter?.offered ? pointed : undefined}
   onpointerleave={() => (hoveredRow = null)}
 >
-  {#if cueing}
+  {#if gutter}
     <div class="backdrop"></div>
     {#each rows as row, i (i)}
       {@const line = rowLines[i]}
       {@const gridRow = i + 2}
+      <!-- Which Lines Sync mode picks is the gutter's: it skips a blank Line and a Chord Line. -->
+      {@const picks = !!line && gutter.syncing && gutter.pickable(line.id)}
       {#if line}
-        <!-- Sync mode skips Chord Lines, so only Lines with words are picked. -->
-        {@const sync = cueing.sync && !isBlank(line) && !line.chordLine ? cueing.sync : undefined}
         <!-- Picking a Line is also in its gutter slot, which takes the keyboard. -->
         <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
         <div
           bind:this={rowEls[i]}
           class="row"
-          class:current={line.id === cueing.current}
-          class:pickable={sync}
+          class:current={line.id === current}
+          class:pickable={picks}
           style:grid-row={gridRow}
           aria-hidden="true"
-          title={sync ? 'Cue this Line next' : undefined}
-          onclick={sync ? () => sync.pick(line.id) : undefined}
-          {@attach (el) => cueing.track(el, line.id)}
+          title={picks ? 'Cue this Line next' : undefined}
+          onclick={picks ? () => gutter.pick({ section: sectionId, line: line.id }) : undefined}
+          {@attach (el) => track?.(el, line.id)}
         >
           {row || ' '}
         </div>
       {:else}
         <div bind:this={rowEls[i]} class="row" style:grid-row={gridRow} aria-hidden="true">{row || ' '}</div>
       {/if}
-      {#if cueing.gutter && line && !isBlank(line)}
-        {@const gutter = cueing.gutter}
-        {@const sync = cueing.sync}
-        {@const lineLabel = `Line ${alternate.lines.indexOf(line) + 1}${gutter.labelSuffix}`}
+      {#if gutter.offered && line && !isBlank(line)}
+        {@const lineLabel = `Line ${alternate.lines.indexOf(line) + 1}${gutter.labelSuffix(sectionId)}`}
         <div class="gutter" style:grid-row={gridRow}>
-          {#if sync && line.id === sync.next}
+          {#if gutter.syncing && line.id === gutter.upNext}
             <!-- Clicked, it keeps focus where it was, so Space still plays and pauses. -->
             <button
               type="button"
               class="now"
               onpointerdown={(e) => e.preventDefault()}
-              onclick={sync.now}
+              onclick={() => gutter.now()}
               aria-label="Cue {lineLabel} now"
               aria-keyshortcuts={hints.aria(cueNextKeys)}
               title={hints.withKeys('Cue this Line at the playhead', cueNextKeys)}
@@ -198,19 +174,19 @@
             >
           {:else}
             <CueField
-              bind:this={() => undefined, (field) => gutter.field(line.id, field)}
+              bind:this={() => undefined, (field) => gutter.setField(line.id, field)}
               cue={line.cue}
               label={lineLabel}
-              save={(cue) => gutter.save(line, cue)}
+              save={(cue) => gutter.save({ section: sectionId, line: line.id }, cue)}
               exists={() => gutter.has(line.id)}
               typing={editing.typing}
               section={sectionId}
-              next={() => gutter.next(line.id)}
+              next={() => gutter.editAfter(line.id)}
               play={gutter.play}
-              current={line.id === cueing.current}
+              current={line.id === current}
               hovered={i === hoveredRow}
-              pick={sync && !line.chordLine ? () => sync.pick(line.id) : undefined}
-              syncing={!!sync}
+              pick={picks ? () => gutter.pick({ section: sectionId, line: line.id }) : undefined}
+              syncing={gutter.syncing}
               outOfOrder={gutter.outOfOrder(line.id)}
             />
           {/if}
@@ -222,7 +198,7 @@
     id="text-{alternate.id}"
     class="text"
     bind:value={() => text, box.type}
-    readonly={!!cueing?.sync}
+    readonly={!!gutter?.syncing}
     bind:this={textEl}
     onfocus={() => {
       box.focus();
