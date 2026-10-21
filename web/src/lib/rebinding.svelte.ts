@@ -38,7 +38,9 @@ import type { KeyPress, Modifier, Platform } from './shortcuts';
 /**
  * A press as rebinding hears it: a key press, with whether it's a held
  * key's repeat and whether an input method is taking it, as a
- * `KeyboardEvent` gives them.
+ * `KeyboardEvent` gives them. A handler on the Song page hears a press as a
+ * `KeyDown` instead (see shortcuts.ts): what it reads of one differs, as it
+ * acts on the keys rather than choosing them.
  */
 export type RebindPress = KeyPress & Partial<Pick<KeyboardEvent, 'repeat' | 'isComposing'>>;
 
@@ -48,11 +50,17 @@ export type RefusalShown = { text: string; by: ShortcutId | null };
 /** Where focus went when it left the editor: the button naming the Shortcut that has the key refused, or anywhere else. */
 export type FocusGone = 'holder' | 'elsewhere';
 
+/** The Shortcuts' keys as rebinding reads and sets them: the Device Setting that holds them, in the app. */
+export interface KeysSetting {
+  readonly value: ShortcutKeys;
+  set(value: ShortcutKeys): void;
+}
+
 export interface RebindingOptions {
   /** The Shortcut being rebound: one editor, and one of these, per Shortcut. */
   id: () => ShortcutId;
-  /** The Shortcuts' keys on this device, which rebinding reads and sets: the shared Device Setting, in the app. */
-  keys: { readonly value: ShortcutKeys; set(value: ShortcutKeys): void };
+  /** The Shortcuts' keys on this device, which rebinding reads and sets. */
+  keys: KeysSetting;
   /** The platform a refusal names its key for. */
   on: Platform;
 }

@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { Rebinding, type RebindPress } from './rebinding.svelte';
+import { Rebinding, type KeysSetting, type RebindPress } from './rebinding.svelte';
 import { defaultShortcutKeys, keysIn, type ShortcutId, type ShortcutKeys } from './shortcutKeys';
 
 /** The Shortcuts' keys as the Device Setting holds them, kept in the test alone. */
-class FakeKeys {
+class FakeKeys implements KeysSetting {
   value = $state<ShortcutKeys>(defaultShortcutKeys);
 
   set(value: ShortcutKeys) {
@@ -77,6 +77,23 @@ describe('Rebinding, choosing a key', () => {
     expect(rebinding.listening).toEqual({ id: 'record', list: 'keys', index: 0 });
   });
 
+  it('keeps waiting through a press that names no key, e.g. a modifier on its own', () => {
+    const { rebinding, keys } = rebindingFor('record');
+    rebinding.listen('keys', 0);
+    rebinding.press(pressOf('Shift', { shiftKey: true }));
+    expect(keysOf(keys, 'record')).toEqual([{ key: 'r' }]);
+    expect(rebinding.listening).toEqual({ id: 'record', list: 'keys', index: 0 });
+    expect(rebinding.message).toBe(null);
+  });
+
+  it("gives a two-way Shortcut's Forward keys a key of their own", () => {
+    const { rebinding, keys } = rebindingFor('seek');
+    rebinding.listen('forward', 0);
+    rebinding.press(pressOf('k'));
+    expect(keysIn(keys.value.keys, 'seek', 'forward')).toEqual([{ key: 'k' }, { key: 'ArrowUp' }]);
+    expect(keysIn(keys.value.keys, 'seek', 'back')).toEqual([{ key: 'ArrowLeft' }, { key: 'ArrowDown' }]);
+  });
+
   it('ignores a press an input method is taking', () => {
     const { rebinding, keys } = rebindingFor('record');
     rebinding.listen('keys', 0);
@@ -133,6 +150,13 @@ describe('Rebinding a mouse Shortcut and resetting', () => {
       by: null,
     });
     expect(keysOf(keys, 'toggleClip')).toEqual([{ key: 'click', mod: true }]);
+  });
+
+  it('turns a modifier a mouse Shortcut is held with on', () => {
+    const { rebinding, keys } = rebindingFor('toggleClip');
+    rebinding.toggle('shift');
+    expect(keysOf(keys, 'toggleClip')).toEqual([{ key: 'click', mod: true, shift: true }]);
+    expect(rebinding.message).toBe(null);
   });
 
   it("shows a refused Reset in Reset's wording", () => {
