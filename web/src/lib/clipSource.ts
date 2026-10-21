@@ -15,10 +15,10 @@
 // time, and never the window itself (ADR 0028), so it's layered on here:
 // where its audio file starts, and what of it is heard, both move with it,
 // while its start, offset, length and Fades don't. The audio may leave the
-// window on any kind of Clip, leaving the Clip playing silence where it
-// isn't, so what's heard is only ever the stretch of the window the audio
-// reaches, whether that's a Take within its span or a file a Nudge took
-// out from under the window's edge.
+// window on any kind of Clip (ADR 0023, as ADR 0028 generalised it),
+// leaving the Clip playing silence where it isn't, so what's heard is only
+// ever the stretch of the window the audio reaches, whether that's a Take
+// within its span or a file a Nudge took out from under the window's edge.
 import { api, type Clip, type NewClip, type OwnOfClip, type Take, type Timeline } from './api';
 import type { PlacedFades } from './clipFade';
 import { gainFactor } from './clipGain';
@@ -152,11 +152,11 @@ export function fileStart(clip: Clip): number {
 }
 
 /**
- * How long the audio file a Clip plays lasts, in seconds: a Take's own
- * length, or the whole of a Beat's or a Sound's file, which a Clip of one
- * plays from the start of unnudged.
+ * How long the audio file a Clip plays lasts, in seconds, from fileStart: a
+ * Take's own length, or the whole of a Beat's or a Sound's file, which a
+ * Clip of one plays from the start of unnudged.
  */
-function audioLength(clip: Clip, source: ClipSource): number {
+function fileLength(clip: Clip, source: ClipSource): number {
   return activeTake(clip)?.duration ?? source.duration;
 }
 
@@ -165,17 +165,17 @@ function audioLength(clip: Clip, source: ClipSource): number {
  * window its audio reaches, which is all of it unnudged for a Beat or a
  * Sound. Nudged later the audio comes in after the Clip starts, leaving
  * silence at its head, and nudged earlier it runs out before the Clip
- * ends, leaving silence at its tail, whatever the Clip plays (ADR 0028).
+ * ends, leaving silence at its tail, whatever the Clip plays (ADR 0023).
  * Null where none of its audio is in the window, which the Clip plays as
  * silence throughout.
  */
 export function heard(clip: Clip, source: ClipSource): Required<Placed> | null {
   const { tempo } = clip;
-  // Where its audio file starts and ends in its source, as its Nudge moved it.
+  // Where its audio file starts in its source, as its Nudge moved it.
   const at = fileStart(clip);
   // Where the audio starts and ends within the Clip, on the Timeline.
   const start = Math.max(clip.start, timelineAt(clip, at));
-  const end = Math.min(clip.start + clip.length, timelineAt(clip, at + audioLength(clip, source)));
+  const end = Math.min(clip.start + clip.length, timelineAt(clip, at + fileLength(clip, source)));
   if (end <= start) return null;
   return { start, offset: sourceAt(clip, start) - at, length: end - start, tempo };
 }
@@ -188,12 +188,13 @@ export function heard(clip: Clip, source: ClipSource): Required<Placed> | null {
 export function playing(timeline: Timeline, sources: ClipSources, silent: number | null = null): PlayableClip[] {
   return timeline.tracks.flatMap((t) =>
     t.clips.flatMap((c) => {
-      const h = c.id === silent ? null : heard(c, sources.of(c));
+      const source = sources.of(c);
+      const h = c.id === silent ? null : heard(c, source);
       if (!h) return [];
       return [
         {
           ...h,
-          source: sources.of(c).audio,
+          source: source.audio,
           trackId: t.id,
           pitch: c.pitch,
           gainFactor: gainFactor(c.gain),

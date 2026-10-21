@@ -187,7 +187,7 @@ describe('repeats', () => {
 });
 
 describe('schedule of a Take Clip', () => {
-  /** The span the Clip's Takes lie in, as long as they reach. */
+  /** The span the Clip's Takes lie in; its length goes unread, a Take's own bounding what's heard. */
   const span: ClipSource = { key: 'k', title: 't', audio: 'a', duration: 21, loadPeaks: async () => [] };
 
   // A Clip of Takes at 0:30 for 10s, 2s into its span, whose Take starts

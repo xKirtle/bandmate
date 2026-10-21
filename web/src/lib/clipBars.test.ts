@@ -104,7 +104,7 @@ describe('clipBars', () => {
     },
     {
       // Nudged clear of its window, the Clip draws silence throughout, as
-      // it plays it (ADR 0028).
+      // it plays it (ADR 0023).
       name: 'a Beat Clip nudged clear of its window',
       over: { nudge: 5 },
       stretch: [0, 4, 4],

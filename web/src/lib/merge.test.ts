@@ -240,7 +240,7 @@ describe('mergedClips', () => {
   it('merges as silence what a Nudge took out of a Clip, as playback plays it', () => {
     // The Beat Clip's audio comes in 3s late, leaving silence at its head;
     // the Sound Clip's is nudged clear of its window, so it merges as
-    // silence throughout and isn't played at all (ADR 0028).
+    // silence throughout and isn't played at all (ADR 0023).
     const late = clip(5, 0, { nudge: 3 });
     const gone = clip(7, 40, { beatId: null, soundId: 30, nudge: 12 });
     const tl = timeline([track(1, [late, gone])]);

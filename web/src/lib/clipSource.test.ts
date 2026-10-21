@@ -253,7 +253,7 @@ describe('trimLimit', () => {
 
   it("is a Beat's or a Sound's own length however its audio is nudged, which never lends it room", () => {
     // Trimming stays bounded by the file as it always was: only the audio
-    // slides out of the window (ADR 0028).
+    // slides out of the window (ADR 0023).
     expect(trimLimit({ ...clip(1, 7), nudge: 4 }, source(90))).toBe(90);
     expect(trimLimit({ ...clip(1, 7), nudge: -4 }, source(90))).toBe(90);
   });
@@ -273,8 +273,8 @@ describe('trimLimit', () => {
 describe('heard', () => {
   /**
    * What a Clip plays, from a source duration seconds long: a Beat's or a
-   * Sound's file, or the span a Clip of Takes lies in, which is as long as
-   * its Takes reach and so never cuts one short.
+   * Sound's file. A Clip of Takes is bounded by its active Take instead, so
+   * the length given goes unread for one.
    */
   const played = (c: Clip, duration = 90) => heard(c, source(duration));
 
