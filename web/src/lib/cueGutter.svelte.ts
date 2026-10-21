@@ -106,8 +106,8 @@ export class CueGutter {
     this.#options.cue({ kind: 'setLineCue', lineId: at.line, cue }, `the Cue of ${lineName(song, at)}`);
   }
 
-  /** Keeps a Line's Cue field, or forgets it with null, as it's drawn and as it goes. */
-  field(line: number, field: GutterField | null | undefined) {
+  /** Keeps a Line's Cue field, as it's drawn, or forgets it with null, as it goes. */
+  setField(line: number, field: GutterField | null | undefined) {
     if (field) this.#fields.set(line, field);
     else this.#fields.delete(line);
   }

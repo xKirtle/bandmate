@@ -7,7 +7,7 @@
   import GripVertical from '@lucide/svelte/icons/grip-vertical';
   import Plus from '@lucide/svelte/icons/plus';
   import X from '@lucide/svelte/icons/x';
-  import { tick, untrack } from 'svelte';
+  import { tick } from 'svelte';
   import { MediaQuery } from 'svelte/reactivity';
   import type { Cueing } from './AlternateText.svelte';
   import type { Section, Song } from './api';
@@ -153,8 +153,11 @@
     hasClips: () => hasClips,
     cue: (change, what) => changeCues(change, what),
     playFrom: () => playFrom,
-    // The page's one Sync mode, which never changes while the page is open.
-    sync: untrack(() => syncMode),
+    // Read as it's asked for, like the rest, so the gutter never holds a
+    // Sync mode the page has moved on from.
+    get sync() {
+      return syncMode;
+    },
   });
 
   // In Write mode, each Line is tracked, to follow playback to. Read mode
@@ -171,7 +174,7 @@
             labelSuffix: gutter.labelSuffix(section.id),
             save: (line, cue) => gutter.save({ section: section.id, line: line.id }, cue),
             has: (line) => gutter.has(line),
-            field: (line, field) => gutter.field(line, field),
+            field: (line, field) => gutter.setField(line, field),
             next: (line) => gutter.editAfter(line),
             play: gutter.play,
             outOfOrder: (line) => gutter.outOfOrder(line),

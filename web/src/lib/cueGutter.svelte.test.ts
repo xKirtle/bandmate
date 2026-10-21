@@ -95,7 +95,7 @@ function gutterFor(song: Song) {
   flushSync();
   /** Draws the Cue field of each Line given, as the gutter does. */
   const draw = (...lines: number[]) => {
-    for (const id of lines) gutter.field(id, { edit: () => opened.push(id) });
+    for (const id of lines) gutter.setField(id, { edit: () => opened.push(id) });
   };
   return { gutter, sync, port, page, cues, opened, draw };
 }
@@ -125,7 +125,7 @@ describe('going on to the next Cue field', () => {
   it('forgets a field once its Line is gone', () => {
     const { gutter, opened, draw } = gutterFor(sheetSong());
     draw(10, 11);
-    gutter.field(11, null);
+    gutter.setField(11, null);
     expect(gutter.editAfter(10)).toBe(false);
     expect(opened).toEqual([]);
   });
