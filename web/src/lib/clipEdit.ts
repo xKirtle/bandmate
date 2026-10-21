@@ -3,11 +3,10 @@
 // arithmetic, so the Timeline only has to follow it. The server enforces
 // the same rules and rejects anything else, but for how far a Clip of
 // Takes can be trimmed out, which is the Timeline's own bound: the server
-// lets such a Clip play past where its Takes end, so that nudging a Take
-// earlier never costs the Clip its window (ADR 0023).
+// lets such a Clip play past where its Takes end, so that nudging its
+// audio earlier never costs the Clip its window (ADR 0023).
 
 import type { Clip, ClipMove } from './api';
-import { activeTake } from './clipSource';
 import { sourceAt, sourceLength, timelineAt } from './clipTime';
 import type { Placed } from './schedule';
 
@@ -138,26 +137,19 @@ function gaps(clips: readonly OnTrack[]): Range[] {
 }
 
 /**
- * The nudge its active Take gets when a Clip of Takes is Alt+dragged by
- * seconds of the Timeline, from the nudge it has, in whole milliseconds of
- * the recording.
+ * The Nudge a Clip gets when it's Alt+dragged by seconds of the Timeline,
+ * from the Nudge it has, in whole milliseconds of its audio: a drag of the
+ * Timeline moves its audio by what that is of the audio's own time, so a
+ * Clip at another Tempo nudges by more or less than it was dragged.
  */
 export function draggedNudge(clip: Clip, seconds: number): number {
-  const take = activeTake(clip)!;
-  return Math.round((take.nudge + sourceLength(clip, seconds)) * 1000) / 1000;
+  return Math.round((clip.nudge + sourceLength(clip, seconds)) * 1000) / 1000;
 }
 
 /**
- * A Clip of Takes with its active Take nudged, as it's shown while
- * dragged: only the Take moves, never the Clip's window. Nudged before the
- * Clip's span, it's shown there, where the server takes the span back
- * instead: the Take is heard in the same place either way.
+ * A Clip with its audio nudged, as it's shown while dragged: only the audio
+ * moves, never the Clip's window, its edges or its Fades.
  */
 export function nudged(clip: Clip, nudge: number): Clip {
-  return {
-    ...clip,
-    takes: clip.takes.map((t) =>
-      t.id === clip.activeTakeId ? { ...t, position: t.position + nudge - t.nudge, nudge } : t,
-    ),
-  };
+  return { ...clip, nudge };
 }

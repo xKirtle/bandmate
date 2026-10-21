@@ -134,17 +134,3 @@ func (a *App) deleteTake(w http.ResponseWriter, r *http.Request) {
 func (a *App) clearInactiveTakes(w http.ResponseWriter, r *http.Request) {
 	a.changeClip(w, r, nil, a.timelines.ClearInactiveTakes)
 }
-
-// nudgeTake moves one of a Clip's Takes by hand, its Clip staying put.
-func (a *App) nudgeTake(w http.ResponseWriter, r *http.Request) {
-	takeID, ok := pathID(w, r, "takeID")
-	if !ok {
-		return
-	}
-	var req struct {
-		Nudge float64 `json:"nudge"`
-	}
-	a.changeClip(w, r, &req, func(ctx context.Context, id int64, based songversion.Version, clipID int64) (timeline.Timeline, error) {
-		return a.timelines.NudgeTake(ctx, id, based, clipID, takeID, req.Nudge)
-	})
-}

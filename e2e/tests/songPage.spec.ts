@@ -39,20 +39,17 @@ const cueSave = { method: 'PUT', url: '**/api/songs/*/lines/*/cue' };
 /** A save of an Alternate's Lines, typed in its text box. */
 const textSave = { method: 'PUT', url: '**/api/songs/*/alternates/*/text' };
 
-/** A Clip of Takes, with the Takes the shared Clip leaves to tests to read. */
-type TakesClip = Clip & { activeTakeId: number; takes: { id: number; nudge: number }[] };
-
-/** The Nudge of a Clip's active Take, in seconds. */
-const activeNudge = (c: TakesClip) => c.takes.find((t) => t.id === c.activeTakeId)!.nudge;
+/** A Clip of Takes, with its Nudge and the Takes the shared Clip leaves to tests to read. */
+type TakesClip = Clip & { activeTakeId: number; nudge: number; takes: { id: number }[] };
 
 /** The field a menu's Nudge entry shows, in milliseconds. */
 const nudgeField = (page: Page) => page.getByRole('spinbutton', { name: 'ms' });
 
-/** The Nudge of the Lead vox Clip's active Take, as the server has it. */
+/** The Nudge of the Lead vox Clip, as the server has it, in seconds. */
 const savedNudge = async (bandmate: Bandmate, songId: number) =>
-  activeNudge((await serverClips(bandmate, songId, 'Lead vox'))[0] as TakesClip);
+  ((await serverClips(bandmate, songId, 'Lead vox'))[0] as TakesClip).nudge;
 
-/** Alt+drags a Clip `by` pixels along the Timeline, which nudges its active Take. */
+/** Alt+drags a Clip `by` pixels along the Timeline, which nudges its audio. */
 async function altDragClip(page: Page, target: Locator, by: number) {
   await page.keyboard.down('Alt');
   await dragClip(page, target, by);
@@ -257,7 +254,7 @@ test("a Clip's fade dot dragged in sets its Fade, and an undo brings it back", a
   await expect(undo).toBeDisabled();
 });
 
-test('a Clip of Takes Alt+dragged nudges its active Take, the Clip staying put, and an undo brings it back', async ({
+test('a Clip of Takes Alt+dragged nudges its audio, the Clip staying put, and an undo brings it back', async ({
   page,
   bandmate,
 }) => {
@@ -267,7 +264,7 @@ test('a Clip of Takes Alt+dragged nudges its active Take, the Clip staying put, 
   const undo = undoButton(page);
   await expect(take).toHaveAccessibleName('Take 2, 0:04 to 0:25');
   const [before] = (await serverClips(bandmate, song.id, 'Lead vox')) as TakesClip[];
-  expect(activeNudge(before)).toBe(0);
+  expect(before.nudge).toBe(0);
 
   // Dragged a fifth of its width later: 4.2 s, as the Clip spans 21 s.
   const width = (await take.boundingBox())!.width;
@@ -278,7 +275,7 @@ test('a Clip of Takes Alt+dragged nudges its active Take, the Clip staying put, 
     .poll(() => savedNudge(bandmate, song.id))
     .not.toBe(0);
   const [nudged] = (await serverClips(bandmate, song.id, 'Lead vox')) as TakesClip[];
-  expect(activeNudge(nudged)).toBeCloseTo(4.2, 1);
+  expect(nudged.nudge).toBeCloseTo(4.2, 1);
   expect(nudged).toMatchObject({ start: 4, offset: before.offset, length: 21, activeTakeId: before.activeTakeId });
   // A Nudge leaves the Selection be.
   await expect(take).toHaveAccessibleName('Take 2, 0:04 to 0:25');
@@ -296,7 +293,7 @@ test('a Clip of Takes Alt+dragged nudges its active Take, the Clip staying put, 
   await expect(undo).toBeDisabled();
 });
 
-test('a Clip of Takes Alt+dragged left nudges its active Take earlier, past zero, and Undo and Redo follow', async ({
+test('a Clip of Takes Alt+dragged left nudges its audio earlier, past zero, and Undo and Redo follow', async ({
   page,
   bandmate,
 }) => {
@@ -306,7 +303,7 @@ test('a Clip of Takes Alt+dragged left nudges its active Take earlier, past zero
   const [undo, redo] = [undoButton(page), redoButton(page)];
   await expect(take).toHaveAccessibleName('Take 2, 0:04 to 0:25');
   const [before] = (await serverClips(bandmate, song.id, 'Lead vox')) as TakesClip[];
-  expect(activeNudge(before)).toBe(0);
+  expect(before.nudge).toBe(0);
 
   // Dragged a fifth of its width earlier: -4.2 s, as the Clip spans 21 s.
   const width = (await take.boundingBox())!.width;
@@ -315,8 +312,8 @@ test('a Clip of Takes Alt+dragged left nudges its active Take earlier, past zero
     .poll(() => savedNudge(bandmate, song.id))
     .not.toBe(0);
   const [nudged] = (await serverClips(bandmate, song.id, 'Lead vox')) as TakesClip[];
-  expect(activeNudge(nudged)).toBeCloseTo(-4.2, 1);
-  // Only the Take moved: the Clip's own window stays where it is.
+  expect(nudged.nudge).toBeCloseTo(-4.2, 1);
+  // Only the audio moved: the Clip's own window stays where it is.
   expect(nudged).toMatchObject({ start: 4, length: 21, activeTakeId: before.activeTakeId });
   await expect(take).toHaveAccessibleName('Take 2, 0:04 to 0:25');
 
@@ -340,7 +337,7 @@ test('a Clip of Takes Alt+dragged left nudges its active Take earlier, past zero
   await expect(nudgeField(page)).toHaveValue('-4200');
 });
 
-test("a negative Nudge typed in the Clip menu moves the Take as dragging left by as much does", async ({
+test('a negative Nudge typed in the Clip menu moves the audio as dragging left by as much does', async ({
   page,
   bandmate,
 }) => {
@@ -362,20 +359,21 @@ test("a negative Nudge typed in the Clip menu moves the Take as dragging left by
   expect((await serverClips(bandmate, song.id, 'Lead vox'))[0]).toMatchObject({ start: 4, length: 21 });
 });
 
-test('a Clip trimmed out to a Take nudged later has it dragged back, past where it was recorded', async ({
+test('a Clip trimmed out to its audio nudged later has it dragged back, past where it was recorded', async ({
   page,
   bandmate,
 }) => {
   const song = await heroSong(bandmate);
   const [was] = (await serverClips(bandmate, song.id, 'Lead vox')) as TakesClip[];
-  // The Take nudged 12 s later and the Clip trimmed out to 30 s to reach
+  // The audio nudged 12 s later and the Clip trimmed out to 30 s to reach
   // it: its Take now ends before the Clip does, which used to refuse any
   // nudge back.
   const other = was.takes.find((t) => t.id !== was.activeTakeId)!;
+  await bandmate.setClipNudge(song.id, was.id, 12);
   await bandmate.setClipTakes(song.id, was.id, {
     takes: [
-      { id: other.id, position: 0, nudge: 0 },
-      { id: was.activeTakeId, position: 12, nudge: 12 },
+      { id: other.id, position: 0 },
+      { id: was.activeTakeId, position: 0 },
     ],
     activeTakeId: was.activeTakeId,
     start: was.start,
@@ -386,14 +384,14 @@ test('a Clip trimmed out to a Take nudged later has it dragged back, past where 
   const take = clip(page, 'Take 2');
   await expect(take).toHaveAccessibleName('Take 2, 0:04 to 0:34');
 
-  // Dragged two thirds of its width earlier: 20 s, so the Take lands well
+  // Dragged two thirds of its width earlier: 20 s, so the audio lands well
   // before where it was recorded.
   const width = (await take.boundingBox())!.width;
   await altDragClip(page, take, (-width * 2) / 3);
   await expect
     .poll(() => savedNudge(bandmate, song.id))
     .toBeCloseTo(-8, 0);
-  // The Clip is where it was, as long as it was: only the Take moved.
+  // The Clip is where it was, as long as it was: only the audio moved.
   expect((await serverClips(bandmate, song.id, 'Lead vox'))[0]).toMatchObject({ start: 4, length: 30 });
   await expect(take).toHaveAccessibleName('Take 2, 0:04 to 0:34');
   // Nothing was refused.

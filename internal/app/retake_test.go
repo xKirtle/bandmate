@@ -51,14 +51,13 @@ type takesOf struct {
 type takeAt struct {
 	ID       int64   `json:"id"`
 	Position float64 `json:"position"`
-	Nudge    float64 `json:"nudge"`
 }
 
 // takesAsIn is how a Clip's Takes are set in c.
 func takesAsIn(c clip) takesOf {
 	s := takesOf{ActiveTakeID: *c.ActiveTakeID, Start: c.Start, Offset: c.Offset, Length: c.Length}
 	for _, tk := range c.Takes {
-		s.Takes = append(s.Takes, takeAt{tk.ID, tk.Position, tk.Nudge})
+		s.Takes = append(s.Takes, takeAt{tk.ID, tk.Position})
 	}
 	return s
 }

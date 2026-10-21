@@ -423,11 +423,16 @@ func contractCases() []contractCase {
 				http.MethodPost, "/timeline/clips/move", obj{"clips": moves})
 		}},
 
-		// A Clip's own name, Gain, Fades, Tempo and Pitch.
+		// A Clip's own name, Gain, Nudge, Fades, Tempo and Pitch.
 		{"set a Clip's Gain", func(ts *testServer) contractChange {
 			p := twoClipsOf(ts)
 			return sends(p.song.ID, "setClipGain", obj{"clipId": p.first, "gain": -4.5},
 				http.MethodPut, clipPath(p.first, "/gain"), obj{"gain": -4.5})
+		}},
+		{"set a Clip's Nudge", func(ts *testServer) contractChange {
+			p := twoClipsOf(ts)
+			return sends(p.song.ID, "setClipNudge", obj{"clipId": p.first, "nudge": -0.25},
+				http.MethodPut, clipPath(p.first, "/nudge"), obj{"nudge": -0.25})
 		}},
 		{"set a Clip's Fades", func(ts *testServer) contractChange {
 			p := twoClipsOf(ts)

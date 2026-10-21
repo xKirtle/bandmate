@@ -215,12 +215,11 @@ type ClipTakes struct {
 	FadeOut *float64 `json:"fadeOut"`
 }
 
-// TakeAt is a Take, where it starts in its Clip's source span, and how far
-// it's nudged, in seconds.
+// TakeAt is a Take and where it starts in its Clip's source span, in
+// seconds.
 type TakeAt struct {
 	ID       int64   `json:"id"`
 	Position float64 `json:"position"`
-	Nudge    float64 `json:"nudge"`
 }
 
 // SetTakes sets a Clip of Takes as it's to be, e.g. to undo or redo a
@@ -254,8 +253,8 @@ func (s *Store) SetTakes(ctx context.Context, songID int64, based songversion.Ve
 }
 
 // checkTakesAt checks the Takes a Clip of Takes is to have, each where it
-// starts in the Clip's source span and how far it's nudged, and the one it
-// plays among them, returning their ids.
+// starts in the Clip's source span, and the one it plays among them,
+// returning their ids.
 func checkTakesAt(takes []TakeAt, active *int64) ([]int64, error) {
 	ids := make([]int64, len(takes))
 	for i, t := range takes {
@@ -263,38 +262,11 @@ func checkTakesAt(takes []TakeAt, active *int64) ([]int64, error) {
 		if math.IsNaN(t.Position) || math.IsInf(t.Position, 0) || t.Position < -tolerance {
 			return nil, domain.Invalid("a Take can't start before its Clip's source")
 		}
-		if err := checkNudge(t.Nudge); err != nil {
-			return nil, err
-		}
 	}
 	if active == nil || !slices.Contains(ids, *active) {
 		return nil, domain.Invalid("a Clip of Takes plays one of them")
 	}
 	return ids, nil
-}
-
-// NudgeTake moves one of a Clip's Takes by hand, to be nudge seconds from
-// where it was recorded, later if positive. Only the Take moves: the Clip's
-// window stays where it is, and where the Take goes before the Clip's source
-// span, the span is taken back to where it starts, as for a Retake. Nudged
-// earlier out from under the Clip's end, it leaves the Clip playing silence
-// there rather than being refused (ADR 0023), so a Take goes as far earlier
-// as it goes later.
-func (s *Store) NudgeTake(ctx context.Context, songID int64, based songversion.Version, clipID, takeID int64, nudge float64) (Timeline, error) {
-	if err := checkNudge(nudge); err != nil {
-		return Timeline{}, err
-	}
-	return s.editTimeline(ctx, songID, based, func(tl Timeline, _ *ids) (Timeline, error) {
-		return tl.nudgingTake(clipID, takeID, nudge)
-	})
-}
-
-// checkNudge checks how far a Take is nudged.
-func checkNudge(nudge float64) error {
-	if math.IsNaN(nudge) || math.IsInf(nudge, 0) {
-		return domain.Invalid("a nudge must be a number")
-	}
-	return nil
 }
 
 // ChooseTake makes one of a Clip's Takes the one it plays, through the same
@@ -359,7 +331,7 @@ func (s *Store) SweepDetachedTakes(ctx context.Context, before time.Time) error 
 }
 
 // takeColumns are the takes columns scanTake reads, in its order.
-const takeColumns = `id, number, size, duration, sample_rate, latency_offset, position, nudge, recorded_at`
+const takeColumns = `id, number, size, duration, sample_rate, latency_offset, position, recorded_at`
 
 // scanTake reads one row of takeColumns. Columns selected after them are
 // read into extra.
@@ -367,7 +339,7 @@ func scanTake(row interface{ Scan(...any) error }, extra ...any) (Take, error) {
 	var t Take
 	var recorded string
 	err := row.Scan(append([]any{&t.ID, &t.Number, &t.Size, &t.Duration, &t.SampleRate, &t.LatencyOffset,
-		&t.Position, &t.Nudge, &recorded}, extra...)...)
+		&t.Position, &recorded}, extra...)...)
 	if err != nil {
 		return Take{}, err
 	}

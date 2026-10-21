@@ -671,7 +671,7 @@ func TestPastingAClipOfTakes(t *testing.T) {
 	// edit places them, in the order the Clipboard holds them.
 	copies := []Take{{ID: 9, Number: 2, Duration: 10}, {ID: 8, Number: 1, Duration: 20}}
 	pasted := ClipCopy{OnTrack: OnTrack{TrackID: 1}, ClipPlayback: asRecorded(),
-		Takes:        []TakeAt{{ID: 3, Position: 5, Nudge: 1}, {ID: 2, Position: -tolerance / 2}},
+		Takes:        []TakeAt{{ID: 3, Position: 5}, {ID: 2, Position: -tolerance / 2}},
 		ActiveTakeID: idOf(3), Start: 10, Length: 15}
 	after, err := edited(tl, func(tl Timeline, ids *ids) (Timeline, error) {
 		return tl.pasting(nil, []ClipCopy{pasted},
@@ -684,10 +684,10 @@ func TestPastingAClipOfTakes(t *testing.T) {
 	if !ok {
 		t.Fatal("the pasted Clip isn't on the Timeline")
 	}
-	// By number, each where it started in the Clip's source span, nudged as
+	// By number, each where it started in the Clip's source span, as
 	// it was, and a position a rounding hair before the span's start taken
 	// as its start.
-	want := []Take{{ID: 8, Number: 1, Duration: 20}, {ID: 9, Number: 2, Duration: 10, Position: 5, Nudge: 1}}
+	want := []Take{{ID: 8, Number: 1, Duration: 20}, {ID: 9, Number: 2, Duration: 10, Position: 5}}
 	if !reflect.DeepEqual(c.Takes, want) {
 		t.Errorf("the pasted Clip's Takes = %+v, want %+v", c.Takes, want)
 	}
@@ -1358,102 +1358,78 @@ func TestChoosingTake(t *testing.T) {
 	}
 }
 
-func TestNudgingTake(t *testing.T) {
+func TestSettingANudge(t *testing.T) {
+	slowed := func() Clip {
+		c := takesClip(1, 10, 0, 10, Take{ID: 7, Number: 1})
+		c.Tempo = 0.5
+		return c
+	}()
 	tests := []struct {
-		name    string
-		clip    Clip
-		takeID  int64
+		name string
+		clip Clip
+		// clipID is the Clip nudged, 1 for the one on the Timeline.
+		clipID  int64
 		nudge   float64
 		want    where
 		wantAt  []float64
 		refusal string
 	}{
 		{
-			name:   "a Take nudged later, the Clip staying where it is",
+			name:   "a Clip of Takes nudged later, which moves nothing but its audio",
 			clip:   takesClip(1, 10, 0, 10, Take{ID: 7, Number: 1}),
-			takeID: 7,
 			nudge:  2,
 			want:   where{clipID: 1, trackID: 1, start: 10, length: 10},
-			wantAt: []float64{2},
-		},
-		{
-			name:   "a Take nudged before the Clip's span, which starts earlier",
-			clip:   takesClip(1, 10, 0, 10, Take{ID: 7, Number: 1}),
-			takeID: 7,
-			nudge:  -3,
-			want:   where{clipID: 1, trackID: 1, start: 10, offset: 3, length: 10},
 			wantAt: []float64{0},
 		},
 		{
-			name:   "the other Takes staying where they are on the Timeline",
+			name: "nudged earlier, its window and its Takes staying put",
+			// Nothing is taken back for it: the audio leaves the window
+			// rather than the window moving (ADR 0028).
 			clip:   takesClip(1, 10, 0, 10, Take{ID: 7, Number: 1}, Take{ID: 8, Number: 2, Position: 10}),
-			takeID: 7,
 			nudge:  -5,
-			want:   where{clipID: 1, trackID: 1, start: 10, offset: 5, length: 10},
-			wantAt: []float64{0, 15},
+			want:   where{clipID: 1, trackID: 1, start: 10, length: 10},
+			wantAt: []float64{0, 10},
 		},
 		{
-			name: "a Clip trimmed out to a Take nudged later, nudged back",
-			// The Clip keeps the window it was trimmed out to, playing
-			// silence where its Take no longer reaches (ADR 0023).
-			clip:   takesClip(1, 10, 0, 15, Take{ID: 7, Number: 1, Position: 5, Nudge: 5}),
-			takeID: 7,
-			nudge:  0,
-			want:   where{clipID: 1, trackID: 1, start: 10, length: 15},
-			wantAt: []float64{0},
+			name:   "a Clip of a Beat nudged, which has a Nudge like any other",
+			clip:   beatClip(1, 10, 10),
+			nudge:  1,
+			want:   where{clipID: 1, trackID: 1, start: 10, length: 10},
+			wantAt: []float64{},
 		},
 		{
-			name: "that Take nudged on earlier still, past where it was recorded",
-			// Its span starts earlier for it, as for any Take nudged before
-			// the span, and the Clip's window stays where it is.
-			clip:   takesClip(1, 10, 0, 15, Take{ID: 7, Number: 1, Position: 5, Nudge: 5}),
-			takeID: 7,
+			name: "a slowed Clip, whose Nudge is in its audio's own time either way",
+			// The number is seconds of the recording, so the Clip's Tempo
+			// is nothing the stored Nudge knows about.
+			clip:   slowed,
 			nudge:  -2,
-			want:   where{clipID: 1, trackID: 1, start: 10, offset: 2, length: 15},
+			want:   where{clipID: 1, trackID: 1, start: 10, length: 10},
 			wantAt: []float64{0},
 		},
 		{
-			name: "a Take nudged in a slowed Clip, which nudges it in the recording's own time",
-			// At half speed the Clip plays 0:00 to 0:05 of its Takes' span
-			// over 0:10 to 0:20, and a 2-second nudge is 2 seconds of the
-			// recording, not of the Timeline.
-			clip: func() Clip {
-				c := takesClip(1, 10, 0, 10, Take{ID: 7, Number: 1})
-				c.Tempo = 0.5
-				return c
-			}(),
-			takeID: 7,
-			nudge:  -2,
-			want:   where{clipID: 1, trackID: 1, start: 10, offset: 2, length: 10},
-			wantAt: []float64{0},
-		},
-		{
-			name:    "a Take that isn't in the Clip",
+			name:    "a Clip that isn't on the Timeline",
 			clip:    takesClip(1, 10, 0, 10, Take{ID: 7, Number: 1}),
-			takeID:  9,
+			clipID:  9,
 			nudge:   1,
 			refusal: "not found",
-		},
-		{
-			name:    "a Clip of a Beat",
-			clip:    beatClip(1, 10, 10),
-			takeID:  7,
-			nudge:   1,
-			refusal: "only a Clip of Takes has Takes",
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			clipID := tt.clipID
+			if clipID == 0 {
+				clipID = 1
+			}
 			tl := timelineOf([]Clip{tt.clip})
 			after, err := edited(tl, func(tl Timeline, _ *ids) (Timeline, error) {
-				return tl.nudgingTake(1, tt.takeID, tt.nudge)
+				return tl.settingNudge(clipID, tt.nudge)
 			})
 			if tt.refusal != "" {
 				refused(t, err, tt.refusal)
 				return
 			}
 			if err != nil {
-				t.Fatalf("nudgingTake error = %v", err)
+				t.Fatalf("settingNudge error = %v", err)
 			}
 			if got := clipIn(t, after, tt.want.clipID); got != tt.want {
 				t.Errorf("the Clip = %+v, want %+v", got, tt.want)
@@ -1462,8 +1438,8 @@ func TestNudgingTake(t *testing.T) {
 			if got := takePositions(c); !reflect.DeepEqual(got, tt.wantAt) {
 				t.Errorf("its Takes start at %v in its span, want %v", got, tt.wantAt)
 			}
-			if got := c.Takes[0].Nudge; tt.takeID == 7 && got != tt.nudge {
-				t.Errorf("the Take is nudged by %g, want %g", got, tt.nudge)
+			if c.Nudge != tt.nudge {
+				t.Errorf("the Clip's Nudge = %g, want %g", c.Nudge, tt.nudge)
 			}
 		})
 	}

@@ -17,6 +17,11 @@ type ClipPlayback struct {
 	// changing its Tempo: a whole number from MinPitch to MaxPitch, 0 until
 	// it's set. It never changes its Length.
 	Pitch float64 `json:"pitch"`
+	// Nudge is how far its audio has been moved by hand inside it, in
+	// seconds of the audio's own time, later if positive: 0 until it's set.
+	// It moves whatever the Clip plays, and never its window, its Length or
+	// its Fades (ADR 0028).
+	Nudge float64 `json:"nudge"`
 	// FadeIn and FadeOut are how long it rises from silence at its start
 	// and falls to silence at its end, in seconds, each measured from that
 	// edge as trimmed: 0 for none. Together they never run longer than it.
@@ -41,9 +46,12 @@ func asRecorded() ClipPlayback {
 }
 
 // check checks the playback of a new Clip length seconds long: its Tempo,
-// Pitch, Gain and Fades.
+// Pitch, Gain, Nudge and Fades.
 func (pb ClipPlayback) check(length float64) error {
 	if err := checkTempo(pb.Tempo); err != nil {
+		return err
+	}
+	if err := checkNudge(pb.Nudge); err != nil {
 		return err
 	}
 	if err := checkPitch(pb.Pitch); err != nil {

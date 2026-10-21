@@ -10,6 +10,7 @@ const clip = (id: number, start: number, length = 10, more: Partial<Clip> = {}):
   gain: 0,
   tempo: 1,
   pitch: 0,
+  nudge: 0,
   fadeIn: 0,
   fadeOut: 0,
   takes: [],
@@ -29,7 +30,7 @@ const track = (id: number, clips: Clip[] = []): Track => ({
   clips,
 });
 
-const take = (id: number, position: number, nudge: number): Take => ({
+const take = (id: number, position: number): Take => ({
   id,
   number: id,
   size: 1000,
@@ -37,7 +38,6 @@ const take = (id: number, position: number, nudge: number): Take => ({
   sampleRate: 48000,
   latencyOffset: 0.01,
   position,
-  nudge,
   recordedAt: '',
 });
 
@@ -50,11 +50,12 @@ describe('copy', () => {
     expect(copy([track(1, [clip(5, 0)])], new Set())).toBeNull();
   });
 
-  it('holds the selected Clips as they are, with their trim, name and active Take, and Takes as they are in it', () => {
+  it('holds the selected Clips as they are, with their trim, name, Nudge and active Take, and Takes as they are in it', () => {
     const takes = clip(6, 20, 3, {
       beatId: null,
       name: 'Hook',
-      takes: [take(60, 0, 0), take(61, 0.5, -0.25)],
+      nudge: -0.25,
+      takes: [take(60, 0), take(61, 0.5)],
       activeTakeId: 61,
       offset: 0.5,
     });
@@ -66,9 +67,10 @@ describe('copy', () => {
         below: 1,
         clip: {
           name: 'Hook',
+          nudge: -0.25,
           takes: [
-            { id: 60, position: 0, nudge: 0 },
-            { id: 61, position: 0.5, nudge: -0.25 },
+            { id: 60, position: 0 },
+            { id: 61, position: 0.5 },
           ],
           activeTakeId: 61,
           start: 20,
@@ -90,7 +92,7 @@ describe('copy', () => {
     const tracks = [
       track(1, [
         clip(5, 0, 10, { gain: -6 }),
-        clip(7, 40, 10, { activeTakeId: 70, beatId: null, takes: [take(70, 0, 0)], gain: 3 }),
+        clip(7, 40, 10, { activeTakeId: 70, beatId: null, takes: [take(70, 0)], gain: 3 }),
       ]),
     ];
 
@@ -189,7 +191,8 @@ describe('paste', () => {
     const hook = clip(6, 20, 3, {
       beatId: null,
       name: 'Hook',
-      takes: [take(60, 0, 0), take(61, 0.5, -0.25)],
+      nudge: -0.25,
+      takes: [take(60, 0), take(61, 0.5)],
       activeTakeId: 61,
       offset: 0.5,
     });
@@ -202,9 +205,10 @@ describe('paste', () => {
           trackId: 1,
           clip: {
             name: 'Hook',
+            nudge: -0.25,
             takes: [
-              { id: 60, position: 0, nudge: 0 },
-              { id: 61, position: 0.5, nudge: -0.25 },
+              { id: 60, position: 0 },
+              { id: 61, position: 0.5 },
             ],
             activeTakeId: 61,
             start: 4,
@@ -278,11 +282,12 @@ describe('duplicate', () => {
     expect(landing(duplicate(tracks, new Set([5])))).toEqual(['1:15']);
   });
 
-  it('copies them as they are: trim, name and active Take, with their Takes', () => {
+  it('copies them as they are: trim, name, Nudge and active Take, with their Takes', () => {
     const takes = clip(6, 2, 3, {
       beatId: null,
       name: 'Hook',
-      takes: [take(60, 0, 0.1)],
+      nudge: 0.1,
+      takes: [take(60, 0)],
       activeTakeId: 60,
       offset: 0.5,
     });
@@ -292,7 +297,8 @@ describe('duplicate', () => {
         trackId: 1,
         clip: {
           name: 'Hook',
-          takes: [{ id: 60, position: 0, nudge: 0.1 }],
+          nudge: 0.1,
+          takes: [{ id: 60, position: 0 }],
           activeTakeId: 60,
           start: 5,
           offset: 0.5,

@@ -15,6 +15,7 @@ const beatClip = (id: number, start: number, end: number, over: Partial<Clip> = 
   gain: 0,
   tempo: 1,
   pitch: 0,
+  nudge: 0,
   fadeIn: 0,
   fadeOut: 0,
   takes: [],
@@ -405,12 +406,12 @@ describe('Clip commands, Takes', () => {
     )) as typeof server.apply;
     await commands.run({ kind: 'chooseTake', target: clip(1), takeId: 1 });
     await commands.run({ kind: 'deleteTake', target: clip(1), takeId: 2 });
-    await commands.run({ kind: 'nudgeTake', target: clip(1), takeId: 2, ms: 15 });
+    await commands.run({ kind: 'nudge', target: clip(1), ms: 15 });
     await commands.run({ kind: 'clearInactiveTakes', target: clip(1) });
     expect(sent).toEqual([
       { kind: 'chooseTake', clipId: 1, takeId: 1 },
       { kind: 'deleteTake', clipId: 1, takeId: 2 },
-      { kind: 'nudgeTake', clipId: 1, takeId: 2, nudge: 0.015 },
+      { kind: 'setClipNudge', clipId: 1, nudge: 0.015 },
       { kind: 'clearInactiveTakes', clipId: 1 },
     ]);
   });
@@ -428,9 +429,9 @@ describe('Clip commands, the freeze', () => {
     'tempo',
     'pitch',
     'gain',
+    'nudge',
     'chooseTake',
     'deleteTake',
-    'nudgeTake',
     'clearInactiveTakes',
   ];
 

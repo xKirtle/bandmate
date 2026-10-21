@@ -122,8 +122,10 @@ func storedRule(start, offset, length float64) placementRule {
 // playsPastSource tells whether c stops after the end of its source. Only
 // a Clip of a Beat or a Sound can: those play a file, which runs out. A
 // Clip of Takes plays the span its Takes are laid out in, and the span
-// holds whatever the Clip plays, so a Take nudged earlier leaves silence
-// at the Clip's end rather than costing the Clip its window (ADR 0023).
+// holds whatever the Clip plays, so a Clip whose audio starts late leaves
+// silence at its head rather than costing it its window (ADR 0023). A
+// Nudge moves neither c's offset nor its length, so it never changes this
+// (ADR 0028).
 func playsPastSource(tl Timeline, c Clip) bool {
 	if c.ActiveTakeID != nil {
 		return false
@@ -148,16 +150,17 @@ func sourceDuration(tl Timeline, c Clip) float64 {
 	return 0
 }
 
-// takesEnd is where in their Clip's source span the last of the Takes
-// ends. A Take nudged earlier still reaches where it ended before, so the
-// Clips that shrink to their Takes, as deleting one does, keep the window
-// a nudge left them.
-func takesEnd(takes []Take) float64 {
+// takesEnd is where in c's source span the last of its Takes ends, its
+// Nudge included. Nudged later, the audio reaches further into the span;
+// nudged earlier it still reaches where it did unnudged, so the Clips that
+// shrink to their Takes, as deleting one does, keep the window a Nudge
+// left them. The browser's clipSource works the span out the same way.
+func takesEnd(c Clip) float64 {
 	var end float64
-	for _, t := range takes {
-		end = max(end, t.Position+t.Duration+max(0, -t.Nudge))
+	for _, t := range c.Takes {
+		end = max(end, t.Position+t.Duration)
 	}
-	return end
+	return end + max(0, c.Nudge)
 }
 
 // placed is a Clip and the Track it's on.
@@ -168,7 +171,8 @@ type placed struct {
 
 // samePlacement tells whether a Clip is placed as it was: on the same Track,
 // at the same place, playing the same stretch of the same source at the
-// same Tempo, with the same Fades. Its name, Gain and Pitch don't count.
+// same Tempo, with the same Fades. Its name, Gain, Pitch and Nudge don't
+// count: a Nudge moves the audio inside the window, never the window.
 func (p placed) samePlacement(q placed) bool {
 	a, b := p.clip, q.clip
 	return p.trackID == q.trackID &&
@@ -176,7 +180,7 @@ func (p placed) samePlacement(q placed) bool {
 		a.FadeIn == b.FadeIn && a.FadeOut == b.FadeOut &&
 		sameID(a.BeatID, b.BeatID) && sameID(a.SoundID, b.SoundID) && sameID(a.ActiveTakeID, b.ActiveTakeID) &&
 		slices.EqualFunc(a.Takes, b.Takes, func(x, y Take) bool {
-			return x.ID == y.ID && x.Position == y.Position && x.Nudge == y.Nudge && x.Duration == y.Duration
+			return x.ID == y.ID && x.Position == y.Position && x.Duration == y.Duration
 		})
 }
 

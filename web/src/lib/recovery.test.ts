@@ -2,9 +2,10 @@ import { describe, expect, it } from 'vitest';
 import { recoveredPlacement, type Unsaved } from './recovery';
 
 // A Track with Clips at 0:00 to 0:10 and 0:20 to 0:30, the second of Takes,
-// its Take recorded to start at 0:18 and nudged 0.5 s later since.
+// its Take recorded to start at 0:18, which is where its position puts it:
+// a Nudge since moves its audio, never the Take (ADR 0028).
 const beat = { id: 1, start: 0, offset: 0, length: 10, activeTakeId: null, takes: [] };
-const take = { id: 7, position: 1.5, nudge: 0.5 };
+const take = { id: 7, position: 1 };
 const takes = { id: 2, start: 20, offset: 3, length: 10, activeTakeId: 7, takes: [take] };
 const tracks = [
   { id: 10, clips: [beat, takes] },
@@ -83,13 +84,13 @@ describe('recoveredPlacement', () => {
 
   it("keeps a Retake in step with its Clip's Takes once another took the span back earlier", () => {
     // A later Retake started 1 s before the span: its Takes moved within it, not on the Timeline.
-    const earlier = [{ id: 10, clips: [beat, { ...takes, offset: 4, takes: [{ ...take, position: 2.5 }] }] }];
+    const earlier = [{ id: 10, clips: [beat, { ...takes, offset: 4, takes: [{ ...take, position: 2 }] }] }];
     expect(recoveredPlacement(earlier, retaken, duration, null)).toEqual({ target: { clipId: 2 }, captureStart: 18 });
   });
 
   it('keeps a Retake in step with where its Clip starts once its Takes are gone', () => {
     const replaced = [
-      { id: 10, clips: [beat, { ...takes, start: 22, activeTakeId: 8, takes: [{ id: 8, position: 0, nudge: 0 }] }] },
+      { id: 10, clips: [beat, { ...takes, start: 22, activeTakeId: 8, takes: [{ id: 8, position: 0 }] }] },
     ];
     expect(recoveredPlacement(replaced, retaken, duration, null)).toEqual({ target: { clipId: 2 }, captureStart: 20 });
   });

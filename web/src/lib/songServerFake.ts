@@ -51,7 +51,6 @@ export const notModelledKinds: ReadonlySet<ChangeKind> = new Set<ChangeKind>([
   'trimClip',
   'setTakes',
   'chooseTake',
-  'nudgeTake',
   'deleteTake',
   'clearInactiveTakes',
   'duplicateSection',
@@ -335,6 +334,8 @@ export class FakeSongServer implements SongServer {
         return (tl) => edit.moves.reduce(moved, tl);
       case 'setClipGain':
         return (tl) => changedClip(tl, edit.clipId, { gain: edit.gain });
+      case 'setClipNudge':
+        return (tl) => changedClip(tl, edit.clipId, { nudge: edit.nudge });
       case 'setClipFades':
         return (tl) => changedClip(tl, edit.clipId, { fadeIn: edit.fadeIn, fadeOut: edit.fadeOut });
       case 'setClipTempos':
@@ -533,6 +534,7 @@ export class FakeSongServer implements SongServer {
       gain: placed.gain ?? 0,
       tempo: placed.tempo ?? 1,
       pitch: placed.pitch ?? 0,
+      nudge: placed.nudge ?? 0,
       fadeIn: placed.fadeIn ?? 0,
       fadeOut: placed.fadeOut ?? 0,
       takes: [],
@@ -639,7 +641,7 @@ export class FakeSongServer implements SongServer {
   #take({ latencyOffset, peaks }: Captured, position: number): Take {
     const id = this.#nextTakeId++;
     const duration = peaks.length / peaksPerSecond;
-    return { id, number: id, size: 0, duration, sampleRate: 0, latencyOffset, position, nudge: 0, recordedAt: '' };
+    return { id, number: id, size: 0, duration, sampleRate: 0, latencyOffset, position, recordedAt: '' };
   }
 
   setTags(tags: string[]): Promise<string[]> {

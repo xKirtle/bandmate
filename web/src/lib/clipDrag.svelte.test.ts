@@ -10,19 +10,20 @@ afterEach(() => {
   cleanups = [];
 });
 
-/** A Clip of a Beat 60 s long, or with a Take, of Takes, placed from start to end. */
-function clip(id: number, start: number, end: number, take?: { nudge: number }): Clip {
+/** A Clip of a Beat 60 s long, or, with `ofTakes`, of one Take, placed from start to end. */
+function clip(id: number, start: number, end: number, ofTakes = false): Clip {
   return {
     id,
-    beatId: take ? null : 1,
+    beatId: ofTakes ? null : 1,
     soundId: null,
     name: null,
     gain: 0,
     tempo: 1,
     pitch: 0,
+    nudge: 0,
     fadeIn: 0,
     fadeOut: 0,
-    takes: take
+    takes: ofTakes
       ? [
           {
             id: 100 + id,
@@ -32,12 +33,11 @@ function clip(id: number, start: number, end: number, take?: { nudge: number }):
             sampleRate: 48000,
             latencyOffset: 0,
             position: 0,
-            nudge: take.nudge,
             recordedAt: '2026-01-01T00:00:00Z',
           },
         ]
       : [],
-    activeTakeId: take ? 100 + id : null,
+    activeTakeId: ofTakes ? 100 + id : null,
     start,
     offset: 0,
     length: end - start,
@@ -50,7 +50,7 @@ function track(id: number, clips: Clip[]): Track {
 
 // Two Tracks: a Beat in two Clips, at 0:10-0:20 and 0:40-0:50, and a vocal
 // Take's Clip below, at 0:25-0:35.
-const song = () => [track(1, [clip(1, 10, 20), clip(2, 40, 50)]), track(2, [clip(3, 25, 35, { nudge: 0 })])];
+const song = () => [track(1, [clip(1, 10, 20), clip(2, 40, 50)]), track(2, [clip(3, 25, 35, true)])];
 
 // Drawn at 10 px a second, each Track's lane 100 px tall: the slop, 4 px,
 // is 0.4 s, and an edge snaps within 8 px, 0.8 s.
@@ -258,7 +258,7 @@ describe('ClipDrag', () => {
       expect(drag.clip).toBeNull();
     });
 
-    it('nudges the active Take instead with Alt held, for a Clip of Takes', () => {
+    it("nudges the Clip's audio instead with Alt held, for a Clip of Takes", () => {
       const { drag, press } = timelineDrag();
       press(3, 'move', 30, { nudges: true });
 
@@ -266,13 +266,14 @@ describe('ClipDrag', () => {
 
       expect(drag.mode).toBe('nudge');
       const [shown] = drag.shown;
+      // The Clip stays where it is, on its own Track: only its audio moves.
       expect(shown.at).toMatchObject({ start: 25, length: 10 });
       expect(shown.trackId).toBe(2);
-      expect(shown.clip.takes[0]).toMatchObject({ nudge: 0.5, position: 0.5 });
-      expect(drag.release()).toEqual({ edit: { kind: 'nudgeTake', clipId: 3, takeId: 103, nudge: 0.5 } });
+      expect(shown.clip).toMatchObject({ nudge: 0.5, takes: [{ position: 0 }] });
+      expect(drag.release()).toEqual({ edit: { kind: 'setClipNudge', clipId: 3, nudge: 0.5 } });
     });
 
-    it('nudges the active Take earlier, past zero, dragged left', () => {
+    it("nudges the Clip's audio earlier, past zero, dragged left", () => {
       const { drag, press } = timelineDrag();
       press(3, 'move', 30, { nudges: true });
 
@@ -281,8 +282,8 @@ describe('ClipDrag', () => {
       expect(drag.mode).toBe('nudge');
       const [shown] = drag.shown;
       expect(shown.at).toMatchObject({ start: 25, length: 10 });
-      expect(shown.clip.takes[0]).toMatchObject({ nudge: -0.5, position: -0.5 });
-      expect(drag.release()).toEqual({ edit: { kind: 'nudgeTake', clipId: 3, takeId: 103, nudge: -0.5 } });
+      expect(shown.clip).toMatchObject({ nudge: -0.5, takes: [{ position: 0 }] });
+      expect(drag.release()).toEqual({ edit: { kind: 'setClipNudge', clipId: 3, nudge: -0.5 } });
     });
 
     it('moves a Clip of a Beat with Alt held, as it has no Take to nudge', () => {
@@ -295,7 +296,7 @@ describe('ClipDrag', () => {
       expect(drag.release()?.edit.kind).toBe('moveClip');
     });
 
-    it('saves no Nudge when let go where the Take was', () => {
+    it('saves no Nudge when let go where the audio was', () => {
       const { drag, press } = timelineDrag();
       press(3, 'move', 30, { nudges: true });
 

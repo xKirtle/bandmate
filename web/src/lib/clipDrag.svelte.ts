@@ -20,7 +20,7 @@ import {
 
 // Dragging a Clip, from press to release: its body moves it, along its
 // Track or onto another; an edge trims it; Alt+dragging a Clip of Takes
-// nudges its active Take within it; its gain line sets its Gain, finely
+// nudges its audio within it; its gain line sets its Gain, finely
 // with Shift held; a dot at either end of the gain line sets its fade in or
 // fade out. It stops at its neighbours, the source's ends and 0:00 as it
 // goes, and is saved on release, if it changed. Moved, trimmed or nudged,
@@ -44,7 +44,7 @@ import {
  */
 export type ClipGrip = 'move' | 'start' | 'end' | 'gain' | FadeEnd;
 
-/** What a Clip drag does: move the Clip (or the Selection), trim either edge, nudge its active Take, or set its Gain or a Fade. */
+/** What a Clip drag does: move the Clip (or the Selection), trim either edge, nudge its audio, or set its Gain or a Fade. */
 export type ClipDragMode = ClipGrip | 'nudge';
 
 /** Where a Clip's fade dots are as it's pressed, in seconds. */
@@ -83,7 +83,7 @@ export interface PressKeys {
   free: boolean;
   /** Mod, so a click adds the Clip to the Selection or takes it out. */
   toggles: boolean;
-  /** Alt, so dragging a Clip of Takes nudges its active Take. */
+  /** Alt, so dragging a Clip of Takes nudges its audio inside it. */
   nudges: boolean;
 }
 
@@ -103,7 +103,10 @@ export interface DraggedClip {
 
 /** The edit a release saves. */
 export interface DragSave {
-  edit: Extract<Edit, { kind: 'moveClip' | 'moveClips' | 'trimClip' | 'nudgeTake' | 'setClipGain' | 'setClipFades' }>;
+  edit: Extract<
+    Edit,
+    { kind: 'moveClip' | 'moveClips' | 'trimClip' | 'setClipNudge' | 'setClipGain' | 'setClipFades' }
+  >;
 }
 
 /** The Timeline a Clip drag goes over. */
@@ -131,7 +134,7 @@ interface Drag {
   trackId: number;
   /** Where it's shown now. */
   placement: Placed;
-  /** Where its active Take is nudged to, for a nudge. */
+  /** The Nudge its audio is dragged to, for a nudge. */
   nudge: number;
   /** Its Gain as dragged, in dB, for the gain line. */
   gain: number;
@@ -263,7 +266,7 @@ export class ClipDrag {
       moved: false,
       trackId: this.#trackOf(clip),
       placement: clip,
-      nudge: take?.nudge ?? 0,
+      nudge: clip.nudge,
       gain: clip.gain,
       gainFrom: { gain: clip.gain, clientY: at.point.clientY, height: measured.waveHeight ?? 0 },
       fades: { fadeIn: clip.fadeIn, fadeOut: clip.fadeOut },
@@ -446,8 +449,8 @@ export class ClipDrag {
         if (unchanged()) return null;
         return { edit: { kind: 'trimClip', clipId: clip.id, offset: to.offset, length: to.length } };
       case 'nudge':
-        if (drag.nudge === activeTake(clip)!.nudge) return null;
-        return { edit: { kind: 'nudgeTake', clipId: clip.id, takeId: clip.activeTakeId!, nudge: drag.nudge } };
+        if (drag.nudge === clip.nudge) return null;
+        return { edit: { kind: 'setClipNudge', clipId: clip.id, nudge: drag.nudge } };
       case 'gain':
         if (drag.gain === clip.gain) return null;
         return { edit: { kind: 'setClipGain', clipId: clip.id, gain: drag.gain } };

@@ -82,14 +82,14 @@ func (c ClipCopy) pasted() NewClip {
 }
 
 // takesAt are the Takes of a Clip of Takes being placed, each where at says
-// it starts in the Clip's source span and how far it's nudged, in the order
+// it starts in the Clip's source span, in the order
 // the Timeline holds them, by number. takes and at name the same Takes in
 // the same order; a position a rounding hair before the span's start is
 // taken as its start, as settingTakes takes one.
 func takesAt(takes []Take, at []TakeAt) []Take {
 	placed := slices.Clone(takes)
 	for i := range placed {
-		placed[i].Position, placed[i].Nudge = max(at[i].Position, 0), at[i].Nudge
+		placed[i].Position = max(at[i].Position, 0)
 	}
 	sortTakes(placed)
 	return placed
@@ -278,8 +278,8 @@ func nextTakeNumber(c Clip) int {
 }
 
 // settingTakes is tl with one of its Clips of Takes holding the Takes
-// given, each where set puts it in the Clip's source span and however far
-// it's nudged, playing the one set names through the window it gives, with
+// given, each where set puts it in the Clip's source span, playing the one
+// set names through the window it gives, with
 // fades for its Fades if they're given: what SetTakes leaves. The Takes it
 // held that aren't given leave it, to be placed again.
 func (tl Timeline) settingTakes(clipID int64, set ClipTakes, takes []Take, fades *Fades) (Timeline, error) {
@@ -295,7 +295,7 @@ func (tl Timeline) settingTakes(clipID int64, set ClipTakes, takes []Take, fades
 	}
 	c.Takes = slices.Clone(takes)
 	for i, take := range c.Takes {
-		c.Takes[i].Position, c.Takes[i].Nudge = max(at[take.ID].Position, 0), at[take.ID].Nudge
+		c.Takes[i].Position = max(at[take.ID].Position, 0)
 	}
 	c.ActiveTakeID = copyID(set.ActiveTakeID)
 	c.Start, c.Offset, c.Length = set.Start, set.Offset, set.Length
@@ -331,7 +331,7 @@ func (tl Timeline) keepingTakes(clipID int64, keep []int64) (Timeline, error) {
 	// Where the Clip's window sits is worked out from where it was, so the
 	// window it had is kept while it's changed.
 	was := c
-	end := takesEnd(c.Takes)
+	end := takesEnd(c)
 	if end <= was.Offset+tolerance {
 		// Its audio stays where it is on the Timeline.
 		offset := max(0, end-was.sourceLength(was.Length))
@@ -385,28 +385,6 @@ func (tl Timeline) choosingTake(clipID, takeID int64) (Timeline, error) {
 		return Timeline{}, domain.Invalid("a Clip of Takes plays one of them")
 	}
 	c.ActiveTakeID = &takeID
-	return tl.replacing(t, t.ID, asPlaced(c)), nil
-}
-
-// nudgingTake is tl with one of a Clip of Takes' Takes nudge seconds from
-// where it was recorded, later if positive: what NudgeTake leaves. Only the
-// Take moves: the Clip's window stays where it is, and where the Take goes
-// before the Clip's source span, the span is taken back to where it starts,
-// as for a Retake.
-func (tl Timeline) nudgingTake(clipID, takeID int64, nudge float64) (Timeline, error) {
-	t, c, err := tl.findClipOfTakes(clipID)
-	if err != nil {
-		return Timeline{}, err
-	}
-	i := slices.IndexFunc(c.Takes, func(take Take) bool { return take.ID == takeID })
-	if i < 0 {
-		return Timeline{}, domain.ErrNotFound
-	}
-	position := c.Takes[i].Position + nudge - c.Takes[i].Nudge
-	earlier := max(0, -position)
-	c.Takes = takesStartingLater(c.Takes, earlier)
-	c.Offset += earlier
-	c.Takes[i].Position, c.Takes[i].Nudge = position+earlier, nudge
 	return tl.replacing(t, t.ID, asPlaced(c)), nil
 }
 
@@ -555,6 +533,16 @@ func (tl Timeline) changingClip(clipID int64, how func(Clip) (Clip, error)) (Tim
 func (tl Timeline) settingGain(clipID int64, gain float64) (Timeline, error) {
 	return tl.changingClip(clipID, func(c Clip) (Clip, error) {
 		c.Gain = gain
+		return c, nil
+	})
+}
+
+// settingNudge is tl with one of its Clips' audio nudge seconds from where
+// it plays unnudged, later if positive: what SetClipNudge leaves. Nothing
+// else about the Clip changes. The Nudge it gives is already checked.
+func (tl Timeline) settingNudge(clipID int64, nudge float64) (Timeline, error) {
+	return tl.changingClip(clipID, func(c Clip) (Clip, error) {
+		c.Nudge = nudge
 		return c, nil
 	})
 }

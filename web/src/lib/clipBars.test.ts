@@ -16,6 +16,7 @@ const clip = (over: Partial<Clip> = {}): Clip => ({
   gain: 0,
   tempo: 1,
   pitch: 0,
+  nudge: 0,
   fadeIn: 0,
   fadeOut: 0,
   takes: [],
@@ -38,7 +39,6 @@ const take: Take = {
   sampleRate: 48000,
   latencyOffset: 0,
   position: 1,
-  nudge: 0,
   recordedAt: '',
 };
 const takes = { beatId: null, takes: [take], activeTakeId: take.id };
@@ -72,6 +72,33 @@ describe('clipBars', () => {
       over: takes,
       peaks: takePeaks,
       stretch: [0, 4, 4],
+      count: 4,
+      want: [2, 10, 20, 30],
+    },
+    {
+      // Its Nudge moves its audio inside it, the Clip staying put, so the
+      // first second plays silence (ADR 0028).
+      name: 'a Beat Clip nudged a second later',
+      over: { nudge: 1 },
+      stretch: [0, 4, 4],
+      count: 4,
+      want: [2, 10, 20, 30],
+    },
+    {
+      // Nudged earlier, its audio runs out before its end.
+      name: 'a Beat Clip nudged a second earlier',
+      over: { nudge: -1 },
+      stretch: [0, 4, 4],
+      count: 4,
+      want: [20, 30, 40, 2],
+    },
+    {
+      // A Nudge is in the audio's own time: a second of audio is half a
+      // second of the Timeline at 200%, so one bar of four is silent, not
+      // two. Each bar covers a second of the source.
+      name: 'a Clip at 200% nudged a second of its audio later',
+      over: { nudge: 1, tempo: 2, length: 2 },
+      stretch: [0, 2, 2],
       count: 4,
       want: [2, 10, 20, 30],
     },

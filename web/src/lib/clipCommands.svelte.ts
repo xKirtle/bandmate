@@ -46,17 +46,17 @@ export type ClipCommand = { target: ClipTarget } & (
   | { kind: 'pitch'; semitones: number }
   /** Sets one Clip's Gain, in dB. */
   | { kind: 'gain'; gain: number }
+  /** Sets one Clip's Nudge, in milliseconds of its audio. */
+  | { kind: 'nudge'; ms: number }
   | { kind: 'chooseTake'; takeId: number }
   | { kind: 'deleteTake'; takeId: number }
-  /** Sets a Take's nudge, in milliseconds. */
-  | { kind: 'nudgeTake'; takeId: number; ms: number }
   | { kind: 'clearInactiveTakes' }
 );
 
 export type ClipCommandKind = ClipCommand['kind'];
 
 /** The commands that act on one Clip: on the Selection, only while it's one Clip. */
-const oneClipKinds = ['gain', 'chooseTake', 'deleteTake', 'nudgeTake', 'clearInactiveTakes'] as const;
+const oneClipKinds = ['gain', 'nudge', 'chooseTake', 'deleteTake', 'clearInactiveTakes'] as const;
 type OneClipCommand = Extract<ClipCommand, { kind: (typeof oneClipKinds)[number] }>;
 const onOneClip = (kind: ClipCommandKind): kind is OneClipCommand['kind'] =>
   (oneClipKinds as readonly ClipCommandKind[]).includes(kind);
@@ -198,12 +198,12 @@ export class ClipCommands {
       case 'gain':
         // To the tenth, as a drag sets it.
         return { kind: 'setClipGain', clipId, gain: clampGain(command.gain) };
+      case 'nudge':
+        return { kind: 'setClipNudge', clipId, nudge: command.ms / 1000 };
       case 'chooseTake':
         return { kind: 'chooseTake', clipId, takeId: command.takeId };
       case 'deleteTake':
         return { kind: 'deleteTake', clipId, takeId: command.takeId };
-      case 'nudgeTake':
-        return { kind: 'nudgeTake', clipId, takeId: command.takeId, nudge: command.ms / 1000 };
       case 'clearInactiveTakes':
         return { kind: 'clearInactiveTakes', clipId };
     }

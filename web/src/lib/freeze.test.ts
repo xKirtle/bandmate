@@ -28,7 +28,7 @@ describe('editsWhileRecording', () => {
       { kind: 'deleteClips', clipIds: [1] },
       { kind: 'replaceClips', clipIds: [1], clips: [] },
       { kind: 'chooseTake', clipId: 1, takeId: 2 },
-      { kind: 'nudgeTake', clipId: 1, takeId: 2, nudge: 0.01 },
+      { kind: 'setClipNudge', clipId: 1, nudge: 0.01 },
       { kind: 'deleteTake', clipId: 1, takeId: 2 },
       { kind: 'clearInactiveTakes', clipId: 1 },
       { kind: 'setLoop', loop: { start: 0, end: 4, on: true } },

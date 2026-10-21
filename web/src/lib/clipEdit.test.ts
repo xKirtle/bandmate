@@ -219,7 +219,6 @@ describe('nudging', () => {
     sampleRate: 48000,
     latencyOffset: 0,
     position: 0.5,
-    nudge: 0,
     recordedAt: '',
     ...more,
   });
@@ -231,27 +230,32 @@ describe('nudging', () => {
     gain: 0,
     tempo: 1,
     pitch: 0,
+    nudge: 0.02,
     fadeIn: 0,
     fadeOut: 0,
-    takes: [take(3), take(4, { nudge: 0.02 })],
+    takes: [take(3), take(4)],
     activeTakeId: 4,
     start: 10,
     offset: 2,
     length: 5,
   };
 
-  it('moves only the active Take, to be the nudge from where it was recorded', () => {
+  it('moves only the audio, leaving the Clip and its Takes where they are', () => {
     const got = nudged(clip, -0.03);
-    expect(got.takes[0]).toEqual(take(3));
-    expect(got.takes[1]).toEqual(take(4, { position: got.takes[1].position, nudge: -0.03 }));
-    expect(got.takes[1].position).toBeCloseTo(0.45);
+    expect(got.nudge).toBe(-0.03);
+    expect(got.takes).toEqual(clip.takes);
     expect({ start: got.start, offset: got.offset, length: got.length }).toEqual({ start: 10, offset: 2, length: 5 });
   });
 
   it('nudges by how far the Clip is dragged, in whole milliseconds', () => {
     expect(draggedNudge(clip, 0.1234)).toBe(0.143);
     expect(draggedNudge(clip, -0.02)).toBe(0);
-    // Dragged further left, the Take is nudged earlier than it was recorded.
+    // Dragged further left, the audio goes earlier than it was recorded.
     expect(draggedNudge(clip, -0.1234)).toBe(-0.103);
+  });
+
+  it("nudges in the audio's own time, so a slowed Clip nudges by less than it's dragged", () => {
+    expect(draggedNudge({ ...clip, nudge: 0, tempo: 0.5 }, 0.2)).toBe(0.1);
+    expect(draggedNudge({ ...clip, nudge: 0, tempo: 2 }, 0.2)).toBe(0.4);
   });
 });

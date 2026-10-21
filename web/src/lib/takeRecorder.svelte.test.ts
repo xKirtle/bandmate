@@ -26,6 +26,7 @@ const takeClip = (id: number, start: number, length: number, takeId = id * 10): 
   gain: 0,
   tempo: 1,
   pitch: 0,
+  nudge: 0,
   fadeIn: 0,
   fadeOut: 0,
   takes: [
@@ -37,7 +38,6 @@ const takeClip = (id: number, start: number, length: number, takeId = id * 10): 
       sampleRate: 100,
       latencyOffset: 0,
       position: 0,
-      nudge: 0,
       recordedAt: '',
     },
   ],

@@ -1,5 +1,5 @@
 // Where a Clip's audio meets the Timeline. A Clip's start and length are
-// Timeline time, while its offset, a Take's position and nudge, and its
+// Timeline time, while its offset, its nudge, a Take's position and its
 // source's duration are time in its audio. It plays its audio at a rate:
 // how many seconds of its source it plays for each second of the Timeline.
 // Everything that crosses between the two goes through here, so the rate

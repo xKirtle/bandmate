@@ -197,6 +197,7 @@ describe('schedule of a Take Clip', () => {
     gain: 0,
     tempo: 1,
     pitch: 0,
+    nudge: 0,
     fadeIn: 0,
     fadeOut: 0,
     takes: [
@@ -208,7 +209,6 @@ describe('schedule of a Take Clip', () => {
         sampleRate: 48000,
         latencyOffset: 0,
         position: 1,
-        nudge: 0,
         recordedAt: '',
       },
     ],
@@ -224,12 +224,14 @@ describe('schedule of a Take Clip', () => {
     expect(schedule([played], 34)).toEqual([{ clip: played, delay: 0, from: 5, duration: 6 }]);
   });
 
-  it('plays a slowed Take, nudged in its own time, from where the Clip is in it', () => {
-    // At 50%, the 10s Clip covers 5s of its span; the Take is nudged half a second later.
+  it("plays a slowed Clip's audio, nudged in its own time, from where the Clip is in it", () => {
+    // At 50%, the 10s Clip covers 5s of its span; its audio is nudged half
+    // a second later, which is a second of the Timeline.
     const slowed: Clip = {
       ...clip,
       tempo: 0.5,
-      takes: [{ ...clip.takes[0], position: 1.5, nudge: 0.5 }],
+      nudge: 0.5,
+      takes: [{ ...clip.takes[0], position: 1 }],
     };
     const played = heard(slowed)!;
     expect(played).toEqual({ start: 30, offset: 0.5, length: 10, tempo: 0.5 });

@@ -24,7 +24,7 @@ import X from '@lucide/svelte/icons/x';
 
 // A Clip's menu, opened by its ⋯, right-click, the Menu key, Shift+F10 or a
 // long press: its entries, in the order they're listed. Deleting a Clip,
-// setting its Gain, Tempo or Pitch, or choosing, nudging, deleting and clearing its Takes,
+// setting its Gain, Tempo, Pitch or Nudge, or choosing, deleting and clearing its Takes,
 // don't ask first: they can be undone, and a deleted Take is only detached.
 // Split at playhead is always listed, but off while the playhead crosses
 // no Clip it would split. Retake is off for a Clip whose Tempo isn't 100%
@@ -46,7 +46,7 @@ export type ClipMenuState = {
   canRecord: boolean;
   /** The name of the Sound a Clip of a Sound plays, or null for another Clip. */
   soundName: string | null;
-  /** The keys that nudge a Take, as shown, or null for none. */
+  /** The keys that nudge a Clip's audio, as shown, or null for none. */
   nudgeKeys: string | null;
   /** The keys that copy, as shown, or null for none. */
   copyKeys: string | null;
@@ -106,6 +106,14 @@ export function clipActions(
       },
     }),
     ...stretchActions(clip, commands, target, command),
+    command(
+      'nudge',
+      // The keys are named on a Clip of Takes, which is where the drag
+      // nudges: dragging another Clip with them held moves it instead.
+      nudgeAction(clip.nudge, clip.activeTakeId === null ? null : state.nudgeKeys, (ms) => {
+        void commands.run({ kind: 'nudge', target, ms });
+      }),
+    ),
     ...clipboardActions(command, state, run),
     command('duplicate', { icon: CopyPlus, label: 'Duplicate', run: run({ kind: 'duplicate' }) }),
     command('split', splitAction(state, run({ kind: 'split' })), 'Move the playhead into the Clip to split it'),
@@ -217,6 +225,27 @@ function pitchAction(pitch: number, changed: boolean, set: (semitones: number) =
   };
 }
 
+/**
+ * The Nudge entry, typed in whole milliseconds of the Clip's audio,
+ * starting at nudge, with a reset to 0 offered while it's nudged, and the
+ * keys that nudge by dragging named, if there are any to name.
+ */
+function nudgeAction(nudge: number, nudgeKeys: string | null, set: (ms: number) => void): MenuAction {
+  return {
+    icon: MoveHorizontal,
+    label: 'Nudge',
+    title: `Move the Clip's audio within it, in milliseconds, later if positive${nudgeKeys ? `; or ${nudgeKeys} the Clip` : ''}`,
+    field: {
+      value: Math.round(nudge * 1000),
+      unit: 'ms',
+      step: 1,
+      shiftStep: 10,
+      reset: { value: 0, label: 'Reset to 0 ms', offered: nudge !== 0 },
+      set,
+    },
+  };
+}
+
 /** Marks an entry that edits as off while frozen, saying why. */
 function editing(freeze: Freeze): (action: MenuAction) => MenuAction {
   return (action) => (freeze ? { ...action, disabled: true, title: editHint(freeze, action.title) } : action);
@@ -292,7 +321,6 @@ function takeActions(clip: Clip, state: ClipMenuState, commands: ClipMenuCommand
   if (clip.activeTakeId === null) return [];
   const { activeTakeId, takes } = clip;
   const active = activeTake(clip)!;
-  const { nudgeKeys } = state;
   const target: ClipTarget = { kind: 'clip', clipId: clip.id };
   const command = commandEntry(commands, target, state.frozen);
   const canRecord = state.canRecord && state.selected <= 1;
@@ -336,18 +364,6 @@ function takeActions(clip: Clip, state: ClipMenuState, commands: ClipMenuCommand
           }),
         ]
       : []),
-    command('nudgeTake', {
-      icon: MoveHorizontal,
-      label: 'Nudge',
-      title: `Move Take ${active.number} within the Clip, in milliseconds, later if positive${nudgeKeys ? `; or ${nudgeKeys} the Clip` : ''}`,
-      field: {
-        value: Math.round(active.nudge * 1000),
-        unit: 'ms',
-        step: 1,
-        shiftStep: 10,
-        set: (ms) => void commands.run({ kind: 'nudgeTake', target, takeId: activeTakeId, ms }),
-      },
-    }),
     ...(several
       ? [
           command('clearInactiveTakes', {

@@ -273,6 +273,19 @@ func (a *App) setClipGain(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// setClipNudge moves a Clip's audio by hand inside it, the Clip staying put.
+func (a *App) setClipNudge(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Nudge *float64 `json:"nudge"`
+	}
+	a.changeClip(w, r, &req, func(ctx context.Context, id int64, based songversion.Version, clipID int64) (timeline.Timeline, error) {
+		if req.Nudge == nil {
+			return timeline.Timeline{}, domain.Invalid("nudge is required")
+		}
+		return a.timelines.SetClipNudge(ctx, id, based, clipID, *req.Nudge)
+	})
+}
+
 func (a *App) setClipFades(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		FadeIn  *float64 `json:"fadeIn"`

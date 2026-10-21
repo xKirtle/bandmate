@@ -468,6 +468,13 @@ export interface Clip {
    */
   pitch: number;
   /**
+   * How far its audio has been moved by hand inside it, in seconds of the
+   * audio's own time, later if positive, whichever Take is active: 0 until
+   * it's set. It moves whatever the Clip plays, and never the Clip's
+   * window, its length or its Fades (ADR 0028).
+   */
+  nudge: number;
+  /**
    * How long it rises from silence at its start, and falls to silence at its
    * end, in seconds from that edge as trimmed: 0 for no Fade. Together they
    * never run longer than it (see clipFade).
@@ -501,21 +508,20 @@ export interface Take {
   sampleRate: number;
   /** The delay taken off where it was captured to place it, in seconds. */
   latencyOffset: number;
-  /** Where it starts in its Clip's source span, in seconds. */
+  /** Where it was recorded to start in its Clip's source span, in seconds; its Clip's Nudge moves its audio from there. */
   position: number;
-  /** How far it's been nudged by hand from where it was recorded, in seconds, later if positive. Position includes it. */
-  nudge: number;
   recordedAt: string;
   /** The waveform, 100 per second, from 0 to 1. Only when reading one Take, not in the Timeline. */
   peaks?: number[];
 }
 
-/** What a Clip has of its own, each left out while it has none: its name, its Gain, its Tempo, its Pitch and its Fades. */
+/** What a Clip has of its own, each left out while it has none: its name, its Gain, its Tempo, its Pitch, its Nudge and its Fades. */
 export type OwnOfClip = {
   name?: string;
   gain?: number;
   tempo?: number;
   pitch?: number;
+  nudge?: number;
   fadeIn?: number;
   fadeOut?: number;
 };
@@ -524,7 +530,8 @@ export type OwnOfClip = {
  * A stretch of a Beat or a Sound, or of detached Takes, to place on a Track,
  * e.g. a deleted Clip brought back, or a recording or import redone, with its
  * name if it has one, its Gain, 0 dB if not given, its Tempo, 100% if not
- * given, its Pitch, 0 if not given, and its Fades, none if not given.
+ * given, its Pitch, 0 if not given, its Nudge, unnudged if not given, and
+ * its Fades, none if not given.
  */
 export type NewClip = Pick<Clip, 'start' | 'offset' | 'length'> &
   OwnOfClip &
@@ -585,15 +592,11 @@ export type PlacedClip = OnTrack & { clip: NewClip };
 /**
  * A Clip as it was copied, to paste as a new Clip: a stretch of a Beat or a
  * Sound, or of Takes, given as they were then, each where it started in the
- * Clip's source span and how far it was nudged.
+ * Clip's source span.
  */
 export type ClipCopy = Pick<Clip, 'start' | 'offset' | 'length'> &
   OwnOfClip &
-  (
-    | { beatId: number }
-    | { soundId: number }
-    | { takes: Pick<Take, 'id' | 'position' | 'nudge'>[]; activeTakeId: number }
-  );
+  ({ beatId: number } | { soundId: number } | { takes: Pick<Take, 'id' | 'position'>[]; activeTakeId: number });
 
 /** A Clip to paste, and the Track it goes on. */
 export type PastedClip = OnTrack & { clip: ClipCopy };
@@ -635,11 +638,11 @@ export interface ClipMove {
 
 /**
  * How a Clip of Takes is to be, e.g. to undo or redo a Retake: its Takes,
- * each where it starts in its source span and how far it's nudged, the one
- * it plays, and its placement.
+ * each where it starts in its source span, the one it plays, and its
+ * placement.
  */
 export type ClipTakes = Pick<Clip, 'activeTakeId' | 'start' | 'offset' | 'length'> & {
-  takes: Pick<Take, 'id' | 'position' | 'nudge'>[];
+  takes: Pick<Take, 'id' | 'position'>[];
 } & Partial<ClipFades>;
 
 /**

@@ -232,8 +232,8 @@ function sendEdit(at: SongAt, edit: Edit): Promise<Timeline> {
       return send('PUT', `/clips/${edit.clipId}/takes`, edit.takes);
     case 'chooseTake':
       return send('PUT', `/clips/${edit.clipId}/active-take`, { takeId: edit.takeId });
-    case 'nudgeTake':
-      return send('PUT', `/clips/${edit.clipId}/takes/${edit.takeId}/nudge`, { nudge: edit.nudge });
+    case 'setClipNudge':
+      return send('PUT', `/clips/${edit.clipId}/nudge`, { nudge: edit.nudge });
     case 'deleteTake':
       return send('DELETE', `/clips/${edit.clipId}/takes/${edit.takeId}`);
     case 'clearInactiveTakes':
