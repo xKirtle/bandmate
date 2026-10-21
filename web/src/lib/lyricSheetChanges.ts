@@ -130,10 +130,13 @@ export function sheetCopy(song: Sheet): SheetCopy {
 
 /**
  * The Section a Lyric Sheet change, undone or redone, changed, as it left
- * the sheet, to show: one written differently or brought back, else one
- * moved between the Lyric Sheet and the Scrapbook, else the one moved
- * within either, else, for one gone, the one now where it was, in the
- * Lyric Sheet or the Scrapbook as it was. Null when none is left there.
+ * the sheet, to show. It takes the first answer of four, in this order:
+ *
+ * 1. one written differently, or brought back;
+ * 2. one crossed between the Lyric Sheet and the Scrapbook;
+ * 3. the one moved within either;
+ * 4. for one gone, the one now where it was, in the Lyric Sheet or the
+ *    Scrapbook as it was. Null when none is left there.
  *
  * The answer is only where the Song page looks afterwards: it ends Sync
  * mode, opens the Scrapbook's fold if the Section is there, and scrolls the
@@ -171,12 +174,11 @@ export function changedSection(from: Sheet, to: Sheet): number | null {
     if (before.join() === after.join()) continue;
     const without = (order: number[], id: number) => order.filter((other) => other !== id).join();
     // The one Section that, taken out, leaves the two orders the same: the one
-    // moved. A reorder of more than one move, which a Snapshot restore can put
-    // back, leaves none, so then it's the first place the orders differ. The
-    // two lists hold the same Sections by here — one in either that the other
-    // lacks was brought back or crossed, which the strategies above answer — so
-    // some place differs whenever the orders aren't equal, which is checked
-    // above.
+    // moved. A reorder of more than one move, which restoring a Snapshot can
+    // put back, leaves none, so then it's the first place the orders differ.
+    // Both orders hold the same Sections by here, for a valid sheet — one the
+    // other lacked was brought back or crossed, which 1 and 2 answer — and
+    // they aren't equal, so some place does differ.
     return after.find((id) => without(before, id) === without(after, id)) ?? after.find((id, i) => before[i] !== id)!;
   }
 
