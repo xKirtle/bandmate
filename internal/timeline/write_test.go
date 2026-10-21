@@ -23,7 +23,7 @@ func newSong(t *testing.T) (*sql.DB, int64, int64, Beat) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { conn.Close() })
-	song, err := song.NewStore(conn, nil, time.Now).CreateSong(ctx, "Night Drive", nil)
+	s, err := song.NewStore(conn, nil, time.Now).CreateSong(ctx, "Night Drive", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -39,10 +39,10 @@ func newSong(t *testing.T) (*sql.DB, int64, int64, Beat) {
 		t.Fatal(err)
 	}
 	var trackID int64
-	if err := conn.QueryRowContext(ctx, `SELECT id FROM tracks WHERE song_id = ?`, song.ID).Scan(&trackID); err != nil {
+	if err := conn.QueryRowContext(ctx, `SELECT id FROM tracks WHERE song_id = ?`, s.ID).Scan(&trackID); err != nil {
 		t.Fatal(err)
 	}
-	return conn, song.ID, trackID, beat
+	return conn, s.ID, trackID, beat
 }
 
 // detachedTake adds a Take of the Song, in no Clip, and returns it as the

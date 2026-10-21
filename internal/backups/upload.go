@@ -192,8 +192,8 @@ func (r *OpenedBackup) checkFiles(ctx context.Context, entries map[string]bool) 
 		}
 		return nil
 	}
-	for _, song := range songs {
-		if err := need(songfiles.Kinds, song); err != nil {
+	for _, songID := range songs {
+		if err := need(songfiles.Kinds, songID); err != nil {
 			return err
 		}
 	}

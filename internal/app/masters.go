@@ -27,13 +27,13 @@ func (a *App) addMaster(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	song, err := a.songs.AddMaster(r.Context(), id, based, details.MasterDetails,
+	s, err := a.songs.AddMaster(r.Context(), id, based, details.MasterDetails,
 		details.audio(file.name, file.contentType), file.Received)
 	if err != nil {
 		writeDomainError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, song)
+	writeJSON(w, http.StatusOK, s)
 }
 
 func (a *App) getMaster(w http.ResponseWriter, r *http.Request) {

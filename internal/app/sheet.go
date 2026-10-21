@@ -297,10 +297,10 @@ func (a *App) changeSheet(w http.ResponseWriter, r *http.Request, req any,
 	if !ok || (req != nil && !readJSON(w, r, req)) {
 		return
 	}
-	song, err := change(id, based)
+	s, err := change(id, based)
 	if err != nil {
 		writeDomainError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, song)
+	writeJSON(w, http.StatusOK, s)
 }
