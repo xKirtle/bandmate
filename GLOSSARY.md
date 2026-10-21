@@ -272,8 +272,12 @@ _Avoid_: Export, archive, Snapshot (a Snapshot is a copy of one Song's Lyric She
 A Backup of Everything that Bandmate makes on its own, daily, weekly or monthly, once the user turns the schedule on. None is made when nothing has changed since the last. Only the newest few are kept, as many as the user chooses, and older ones are deleted as new ones are made. Keeping one turns it into an ordinary Backup, which nothing deletes but the user.
 _Avoid_: Automatic backup, auto-backup
 
+**Identity**:
+What makes a Song or Beat that one wherever it is: it's kept with the Song or Beat, goes into a Backup with it, and survives moving to another install. A Restore knows a Song or Beat is already in Bandmate by its Identity alone, never by its title or, for a Beat, its audio, and a Song or Beat kept both is added with an Identity of its own, so it's another one from then on. A Folder or Tag has none: it's only a name, which already says which it is (ADR 0015).
+_Avoid_: UUID, GUID, Key (a Song's Key is musical), id (an id is the row's here, and a Restore hands out new ones)
+
 **Restore**:
-Bringing back Songs and Beats picked from a Backup. A Song brings the Beats its Clips use, so those Beats can't be left out while it's picked. Where a Song or Beat is already in Bandmate (the same one, even from another install, never just one with the same name or, for a Beat, the same audio), the user chooses to replace it or keep both, the restored one added alongside. A restored Song goes into the Folder of the same name, made if there's none, and carries the Tags of the same names, made if there are none, in place of any it had. A Restore only adds and replaces: it never deletes what the Backup doesn't hold.
+Bringing back Songs and Beats picked from a Backup. A Song brings the Beats its Clips use, so those Beats can't be left out while it's picked. Where a Song or Beat is already in Bandmate (the same one, by its **Identity**, even from another install, never just one with the same name or, for a Beat, the same audio), the user chooses to replace it or keep both, the restored one added alongside. A restored Song goes into the Folder of the same name, made if there's none, and carries the Tags of the same names, made if there are none, in place of any it had. A Restore only adds and replaces: it never deletes what the Backup doesn't hold.
 _Avoid_: Import (importing brings an audio file in as a Sound)
 
 **Upgrade copy**:
