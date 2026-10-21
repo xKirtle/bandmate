@@ -5,16 +5,20 @@
   import ChordDiagram from './ChordDiagram.svelte';
   import {
     firstVoicing,
-    keyName,
-    keys,
+    joinKey,
+    keyText,
     lookUp,
     nameIt,
     plucks,
     qualities,
     roots,
+    otherQuality,
+    splitKey,
     suggest,
+    tonics,
     type FinderContext,
     type Frets,
+    type KeyParts,
     type Suggestion,
     type Voicing,
   } from './chordFinder';
@@ -122,10 +126,23 @@
     tabButtons[tabs.findIndex((t) => t.id === 'look-up')]?.focus();
   }
 
-  // Suggest: the Key's Chords, and what usually follows the Chord picked
-  // after, if any. Picking another Key starts again with none picked.
+  // Suggest: the Key typed, or made by the pickers, which show the last Key
+  // that could be read, as Look up's do. The Key drives the suggestions as
+  // it's typed; the field re-spells itself once the Key is committed,
+  // because a Key's spelling follows its signature, not the typist.
+  // svelte-ignore state_referenced_locally
+  let typedKey = $state(suggestKey);
+  // svelte-ignore state_referenced_locally
+  let keyPicked = $state<KeyParts>(splitKey(suggestKey) ?? { tonic: 'C', minor: false });
+  const keyRead = $derived(splitKey(typedKey));
+  $effect.pre(() => {
+    if (keyRead) keyPicked = keyRead;
+  });
+
+  // The Key's Chords, and what usually follows the Chord picked after, if
+  // any. Picking another Key starts again with none picked.
   let after = $state<string | null>(null);
-  const suggested = $derived(suggest(suggestKey, after));
+  const suggested = $derived(suggest(typedKey, after));
   const chords = $derived(suggested.kind === 'key' ? suggested.chords : []);
   const numeralOf = $derived(new Map(chords.map((c) => [c.chord, c.numeral])));
   const groups = $derived(
@@ -138,9 +155,35 @@
       .filter((g) => g.chords.length),
   );
 
-  function pickKey(key: string) {
+  /**
+   * The Key the field now names, kept for this device once it reads. A text
+   * that names the Key already showing isn't a change: committing Dbm as
+   * C#m mustn't throw away the Chord picked after it.
+   */
+  function setKey(text: string) {
+    typedKey = text;
+    const key = keyText(text);
+    if (!key || key === keyText(suggestKey)) return;
     after = null;
     onpickkey(key);
+  }
+
+  /**
+   * Re-spells the field from the Key's signature, on leaving it or pressing
+   * Enter. Never while typing: the field would snap at the D of Dbm, and
+   * Dbm could not be typed at all.
+   */
+  function commitKey() {
+    typedKey = keyText(typedKey) ?? typedKey;
+  }
+
+  function pickTonic(tonic: string) {
+    setKey(joinKey({ tonic, minor: keyPicked.minor }));
+  }
+
+  function pickQuality(minor: boolean) {
+    if (minor === keyPicked.minor) return;
+    setKey(joinKey(otherQuality(keyPicked)));
   }
 </script>
 
@@ -347,16 +390,41 @@
           </div>
         </div>
       {:else}
-        <div class="pick suggest-pick">
+        <div class="pick">
           <div class="field">
-            <span id="finder-key-label">Key</span>
-            <Picker
+            <label for="finder-key">Key</label>
+            <input
               id="finder-key"
-              aria-labelledby="finder-key-label"
-              options={keys}
-              value={suggestKey}
-              text={(key) => keyName(key) ?? key}
-              onpick={pickKey}
+              type="text"
+              value={typedKey}
+              oninput={(e) => setKey(e.currentTarget.value)}
+              onblur={commitKey}
+              onkeydown={(e) => e.key === 'Enter' && commitKey()}
+              autocomplete="off"
+              autocapitalize="off"
+              spellcheck="false"
+              placeholder="e.g. Am"
+            />
+          </div>
+          <div class="field">
+            <span id="finder-tonic-label">Tonic</span>
+            <Picker
+              id="finder-tonic"
+              aria-labelledby="finder-tonic-label"
+              options={tonics(keyPicked.minor)}
+              value={keyPicked.tonic}
+              onpick={pickTonic}
+            />
+          </div>
+          <div class="field">
+            <span id="finder-key-quality-label">Quality</span>
+            <Picker
+              id="finder-key-quality"
+              aria-labelledby="finder-key-quality-label"
+              options={[false, true]}
+              value={keyPicked.minor}
+              text={(minor) => (minor ? 'minor' : 'major')}
+              onpick={pickQuality}
             />
           </div>
           <div class="field">
@@ -373,7 +441,11 @@
         </div>
 
         {#if suggested.kind === 'unreadable'}
-          <p class="unknown">No Key I know is called “{suggested.key}”.</p>
+          {#if typedKey.trim()}
+            <p class="unknown" role="status">No Key I know is called “{typedKey.trim()}”.</p>
+          {:else}
+            <p class="muted">Pick a Tonic and a quality, or type a Key.</p>
+          {/if}
         {:else}
           {#if after && suggested.follows}
             <section class="group" aria-live="polite">
@@ -587,12 +659,6 @@
     align-items: center;
     gap: var(--space-2);
     align-self: flex-end;
-  }
-  /* Suggest: the Key and the Chord picked after, side by side. */
-  @container finder (min-width: 40rem) {
-    .suggest-pick {
-      grid-template-columns: repeat(2, minmax(0, 12rem));
-    }
   }
   .group {
     display: flex;
