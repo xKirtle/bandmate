@@ -60,7 +60,7 @@ func (s *Store) check(ctx context.Context, path string) (Backup, error) {
 	if err != nil {
 		return Backup{}, err
 	}
-	defer r.close()
+	defer r.Close()
 	if err := r.checkDatabase(ctx); err != nil {
 		return Backup{}, err
 	}
@@ -152,7 +152,7 @@ func looksLikeZip(path string) bool {
 
 // checkDatabase checks the Backup's database is whole and keeps the
 // database's rules.
-func (r *openedBackup) checkDatabase(ctx context.Context) error {
+func (r *OpenedBackup) checkDatabase(ctx context.Context) error {
 	var result string
 	if err := r.db.QueryRowContext(ctx, `PRAGMA integrity_check(1)`).Scan(&result); err != nil {
 		return damagedBy(err)
@@ -173,7 +173,7 @@ func (r *openedBackup) checkDatabase(ctx context.Context) error {
 
 // checkFiles checks the Backup's file holds every file its rows use, of
 // every Song and Beat.
-func (r *openedBackup) checkFiles(ctx context.Context, entries map[string]bool) error {
+func (r *OpenedBackup) checkFiles(ctx context.Context, entries map[string]bool) error {
 	songs, err := queryIDs(ctx, r.db, `SELECT id FROM songs`)
 	if err != nil {
 		return damagedBy(err)

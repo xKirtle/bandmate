@@ -132,7 +132,13 @@ func (a *App) backupSongs(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	list, err := a.backups.Songs(r.Context(), id)
+	backup, err := a.backups.OpenBackup(r.Context(), id)
+	if err != nil {
+		writeDomainError(w, err)
+		return
+	}
+	defer backup.Close()
+	list, err := backup.Songs(r.Context())
 	if err != nil {
 		writeDomainError(w, err)
 		return
@@ -146,7 +152,13 @@ func (a *App) backupBeats(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	list, err := a.backups.Beats(r.Context(), id)
+	backup, err := a.backups.OpenBackup(r.Context(), id)
+	if err != nil {
+		writeDomainError(w, err)
+		return
+	}
+	defer backup.Close()
+	list, err := backup.Beats(r.Context())
 	if err != nil {
 		writeDomainError(w, err)
 		return
@@ -169,7 +181,13 @@ func (a *App) restoreBackup(w http.ResponseWriter, r *http.Request) {
 	if !readJSON(w, r, &req) {
 		return
 	}
-	restored, err := a.backups.Restore(r.Context(), id, req.Picks, req.Replace)
+	backup, err := a.backups.OpenBackup(r.Context(), id)
+	if err != nil {
+		writeDomainError(w, err)
+		return
+	}
+	defer backup.Close()
+	restored, err := backup.Restore(r.Context(), req.Picks, req.Replace)
 	if err != nil {
 		writeDomainError(w, err)
 		return
@@ -189,7 +207,13 @@ func (a *App) presentInBandmate(w http.ResponseWriter, r *http.Request) {
 	if !readJSON(w, r, &picks) {
 		return
 	}
-	present, err := a.backups.Present(r.Context(), id, picks)
+	backup, err := a.backups.OpenBackup(r.Context(), id)
+	if err != nil {
+		writeDomainError(w, err)
+		return
+	}
+	defer backup.Close()
+	present, err := backup.Present(r.Context(), picks)
 	if err != nil {
 		writeDomainError(w, err)
 		return

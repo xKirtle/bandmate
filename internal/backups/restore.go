@@ -37,14 +37,9 @@ type Song struct {
 // the same one already in Bandmate.
 const keptBothSuffix = " (restored)"
 
-// Songs lists the Songs a Backup holds, by title, each with the Folder it
+// Songs lists the Songs the Backup holds, by title, each with the Folder it
 // sat in.
-func (s *Store) Songs(ctx context.Context, id int64) ([]Song, error) {
-	r, err := s.openBackup(ctx, id)
-	if err != nil {
-		return nil, err
-	}
-	defer r.close()
+func (r *OpenedBackup) Songs(ctx context.Context) ([]Song, error) {
 	return querySongs(ctx, r.db, `SELECT s.id, s.title, f.name FROM songs s
 		LEFT JOIN folders f ON f.id = s.folder_id ORDER BY s.title COLLATE NOCASE, s.id`)
 }
@@ -82,14 +77,9 @@ type SongID struct {
 	ID int64 `json:"id"`
 }
 
-// Beats lists the Beats a Backup holds, by title, each with the Songs it
+// Beats lists the Beats the Backup holds, by title, each with the Songs it
 // holds that use it.
-func (s *Store) Beats(ctx context.Context, id int64) ([]Beat, error) {
-	r, err := s.openBackup(ctx, id)
-	if err != nil {
-		return nil, err
-	}
-	defer r.close()
+func (r *OpenedBackup) Beats(ctx context.Context) ([]Beat, error) {
 	rows, err := r.db.QueryContext(ctx, `SELECT b.id, b.title, b.producer, COALESCE(json_group_array(DISTINCT t.song_id)
 			FILTER (WHERE t.song_id IS NOT NULL), '[]')
 		FROM beats b LEFT JOIN clips c ON c.beat_id = b.id LEFT JOIN tracks t ON t.id = c.track_id
@@ -171,7 +161,7 @@ type Restored struct {
 	Beats int    `json:"beats"`
 }
 
-// Restore brings back what picks names from a Backup: Songs, each with the
+// Restore brings back what picks names from the Backup: Songs, each with the
 // Beats its Clips use, and Beats. It never deletes a Song or Beat the
 // Backup doesn't hold. What it picks is copied in with fresh ids, all of
 // it or, if anything fails, none. A Song or Beat already in Bandmate (the same one, by its identity) is kept, unless
@@ -186,19 +176,14 @@ type Restored struct {
 // case, made if there's none, or into none if it's in none there. It
 // carries exactly the Tags it carries in the Backup, each the Tag of the
 // same name, ignoring case, made if there's none.
-func (s *Store) Restore(ctx context.Context, id int64, picks Picks, replace Replace) (Restored, error) {
-	r, err := s.openBackup(ctx, id)
-	if err != nil {
-		return Restored{}, err
-	}
-	defer r.close()
-	return s.restore(ctx, r, picks, replace, false)
+func (r *OpenedBackup) Restore(ctx context.Context, picks Picks, replace Replace) (Restored, error) {
+	return r.restore(ctx, picks, replace, false)
 }
 
-// restore brings back what picks names from the opened Backup r, as Restore
+// restore brings back what picks names from the opened Backup, as Restore
 // does. If demo is set, what it brings back is the Demo, replacing the one
 // in Bandmate (see PutDemoBack).
-func (s *Store) restore(ctx context.Context, r *openedBackup, picks Picks, replace Replace, demo bool) (Restored, error) {
+func (r *OpenedBackup) restore(ctx context.Context, picks Picks, replace Replace, demo bool) (Restored, error) {
 	picked, err := r.pick(ctx, picks)
 	if err != nil {
 		return Restored{}, err
@@ -221,12 +206,12 @@ func (s *Store) restore(ctx context.Context, r *openedBackup, picks Picks, repla
 	if err := r.closeDB(); err != nil {
 		return Restored{}, err
 	}
-	return s.copyIn(ctx, r.staging, picked, replace, demo)
+	return r.store.copyIn(ctx, r.staging, picked, replace, demo)
 }
 
 // pick checks picks names Songs and Beats the Backup holds, at least one,
 // listing each once.
-func (r *openedBackup) pick(ctx context.Context, picks Picks) (Picks, error) {
+func (r *OpenedBackup) pick(ctx context.Context, picks Picks) (Picks, error) {
 	if len(picks.Songs) == 0 && len(picks.Beats) == 0 {
 		return Picks{}, domain.Invalid("pick at least one Song or Beat to restore")
 	}
@@ -243,7 +228,7 @@ func (r *openedBackup) pick(ctx context.Context, picks Picks) (Picks, error) {
 
 // held lists ids once each, refusing with missing if one isn't in the
 // Backup's table, which is a constant.
-func (r *openedBackup) held(ctx context.Context, table string, ids []int64, missing string) ([]int64, error) {
+func (r *OpenedBackup) held(ctx context.Context, table string, ids []int64, missing string) ([]int64, error) {
 	list := []int64{}
 	for _, id := range ids {
 		if slices.Contains(list, id) {
@@ -280,12 +265,7 @@ type Presence struct {
 
 // Present lists which of the Songs and Beats a Restore of picks would bring
 // back are already in Bandmate.
-func (s *Store) Present(ctx context.Context, id int64, picks Picks) (Presence, error) {
-	r, err := s.openBackup(ctx, id)
-	if err != nil {
-		return Presence{}, err
-	}
-	defer r.close()
+func (r *OpenedBackup) Present(ctx context.Context, picks Picks) (Presence, error) {
 	picked, err := r.pick(ctx, picks)
 	if err != nil {
 		return Presence{}, err
@@ -299,11 +279,11 @@ func (s *Store) Present(ctx context.Context, id int64, picks Picks) (Presence, e
 		return Presence{}, err
 	}
 	var p Presence
-	if p.Songs, err = s.present(ctx, r.db, "songs", `SELECT id, title, identity FROM songs
+	if p.Songs, err = r.present(ctx, "songs", `SELECT id, title, identity FROM songs
 		WHERE id IN (SELECT value FROM json_each(?))`, string(ids)); err != nil {
 		return Presence{}, err
 	}
-	if p.Beats, err = s.present(ctx, r.db, "beats", `SELECT id, title, identity FROM beats
+	if p.Beats, err = r.present(ctx, "beats", `SELECT id, title, identity FROM beats
 		WHERE id IN (SELECT value FROM json_each(?2)) OR id IN (SELECT c.beat_id FROM clips c
 			JOIN tracks t ON t.id = c.track_id WHERE t.song_id IN (SELECT value FROM json_each(?1)))`,
 		string(ids), string(beats)); err != nil {
@@ -315,8 +295,8 @@ func (s *Store) Present(ctx context.Context, id int64, picks Picks) (Presence, e
 // present lists, by title, the rows of table that query selects from the
 // Backup's database, by id, title and identity, that are already in
 // Bandmate.
-func (s *Store) present(ctx context.Context, backup *sql.DB, table, query string, args ...any) ([]Present, error) {
-	rows, err := backup.QueryContext(ctx, query, args...)
+func (r *OpenedBackup) present(ctx context.Context, table, query string, args ...any) ([]Present, error) {
+	rows, err := r.db.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -339,7 +319,7 @@ func (s *Store) present(ctx context.Context, backup *sql.DB, table, query string
 	}
 	list := []Present{}
 	for _, h := range all {
-		err := s.db.QueryRowContext(ctx, `SELECT id, title FROM `+table+` WHERE identity = ?`, h.identity).
+		err := r.store.db.QueryRowContext(ctx, `SELECT id, title FROM `+table+` WHERE identity = ?`, h.identity).
 			Scan(&h.InBandmate.ID, &h.InBandmate.Title)
 		if errors.Is(err, sql.ErrNoRows) {
 			continue
@@ -355,18 +335,23 @@ func (s *Store) present(ctx context.Context, backup *sql.DB, table, query string
 	return list, nil
 }
 
-// openedBackup is a Backup's database, brought up to this Bandmate's schema
-// in a staging directory, beside the files unpacked from it.
-type openedBackup struct {
+// OpenedBackup is a Backup's database, brought up to this Bandmate's schema
+// in a staging directory, beside the files unpacked from it. It's what the
+// Backup's Songs, its Beats, what of them is already in Bandmate, and a
+// Restore are all asked of, so they're asked of one unpacking, and it's
+// closed once they've been asked.
+type OpenedBackup struct {
+	store   *Store
 	backup  Backup
 	file    *zip.ReadCloser
 	staging string
 	db      *sql.DB
 }
 
-// openBackup unpacks a Backup's database into a staging directory and runs
-// the migrations on it, leaving the Backup's file as it is.
-func (s *Store) openBackup(ctx context.Context, id int64) (*openedBackup, error) {
+// OpenBackup opens the Backup with the given id: it unpacks its database
+// into a staging directory and runs the migrations on it, leaving the
+// Backup's file as it is. The caller closes it.
+func (s *Store) OpenBackup(ctx context.Context, id int64) (*OpenedBackup, error) {
 	b, err := s.get(ctx, id)
 	if err != nil {
 		return nil, err
@@ -407,22 +392,22 @@ func (d damagedOnRead) Read(p []byte) (int, error) {
 // staging directory and runs the migrations on it, leaving the file as it
 // is. It refuses a file that can't be read as a Backup as damaged, and one
 // a newer Bandmate made.
-func (s *Store) openFile(ctx context.Context, path string) (*openedBackup, error) {
+func (s *Store) openFile(ctx context.Context, path string) (*OpenedBackup, error) {
 	file, err := zip.OpenReader(path)
 	if err != nil {
 		return nil, damagedBy(err)
 	}
-	r := &openedBackup{file: file}
+	r := &OpenedBackup{store: s, file: file}
 	if r.staging, err = os.MkdirTemp(s.dir, makingPrefix+"*"); err != nil {
-		r.close()
+		r.Close()
 		return nil, fmt.Errorf("restoring backup: %w", err)
 	}
 	if err := r.unpack(db.FileName, filepath.Join(r.staging, db.FileName)); err != nil {
-		r.close()
+		r.Close()
 		return nil, fmt.Errorf("unpacking backup database: %w", err)
 	}
 	if r.db, err = db.OpenNoNewer(ctx, r.staging); err != nil {
-		r.close()
+		r.Close()
 		if errors.Is(err, db.ErrNewer) {
 			return nil, errNewer
 		}
@@ -432,7 +417,7 @@ func (s *Store) openFile(ctx context.Context, path string) (*openedBackup, error
 }
 
 // closeDB closes the Backup's database, leaving it in the staging directory.
-func (r *openedBackup) closeDB() error {
+func (r *OpenedBackup) closeDB() error {
 	if r.db == nil {
 		return nil
 	}
@@ -441,8 +426,8 @@ func (r *openedBackup) closeDB() error {
 	return err
 }
 
-// close closes the Backup and removes its staging directory.
-func (r *openedBackup) close() {
+// Close closes the Backup and removes its staging directory.
+func (r *OpenedBackup) Close() {
 	r.closeDB()
 	r.file.Close()
 	if r.staging != "" {
@@ -452,7 +437,7 @@ func (r *openedBackup) close() {
 
 // unpack writes the Backup's file entry name to to. An entry missing, or
 // not as it was written, means the Backup is damaged.
-func (r *openedBackup) unpack(name, to string) error {
+func (r *OpenedBackup) unpack(name, to string) error {
 	src, err := r.file.Open(name)
 	if err != nil {
 		return damagedBy(err)
@@ -479,7 +464,7 @@ func stagedFile(staging, dir string, id int64) string {
 }
 
 // unpackFiles unpacks the files listed by files, given args, each once.
-func (r *openedBackup) unpackFiles(ctx context.Context, files []songfiles.Kind, args ...any) error {
+func (r *OpenedBackup) unpackFiles(ctx context.Context, files []songfiles.Kind, args ...any) error {
 	for _, f := range files {
 		ids, err := queryIDs(ctx, r.db, f.IDs, args...)
 		if err != nil {
