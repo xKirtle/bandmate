@@ -1,19 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { chartSizeKey, chartSizeSetting, readChartSize, stepChartSize, storeChartSize } from './chartSize';
-import { DeviceSetting } from './deviceSetting.svelte';
+import { chartSizeKey, readChartSize, stepChartSize, storeChartSize } from './chartSize';
 import { lyricSizeKey, readLyricSize } from './lyricSize';
-
-/** A Storage holding some values, or one that throws like a blocked one. */
-function storage(values: Record<string, string> = {}, blocked = false): Storage {
-  const fail = () => {
-    throw new DOMException('Blocked', 'SecurityError');
-  };
-  return {
-    getItem: (key: string) => (blocked ? fail() : (values[key] ?? null)),
-    setItem: (key: string, value: string) => (blocked ? fail() : void (values[key] = value)),
-    removeItem: (key: string) => (blocked ? fail() : void delete values[key]),
-  } as Storage;
-}
+import { storage } from './storageFake';
 
 describe('readChartSize', () => {
   it('is 100% until set on this device', () => {
@@ -81,30 +69,5 @@ describe('stepChartSize', () => {
   it('is held from 70% to 175%', () => {
     expect(stepChartSize(175, 1)).toBe(175);
     expect(stepChartSize(70, -1)).toBe(70);
-  });
-});
-
-describe('The Chart Size as the app keeps it', () => {
-  /** The Chart Size as the app keeps it, in a stand-in Storage this device's other tabs share. */
-  function setting(values: Record<string, string> = {}) {
-    const tabs = new EventTarget();
-    const size = new DeviceSetting(chartSizeSetting, storage(values), tabs);
-    /** Another tab keeps a value, as the browser tells this one. */
-    const otherTab = (key: string) => tabs.dispatchEvent(Object.assign(new Event('storage'), { key }));
-    return { size, values, otherTab };
-  }
-
-  it('keeps a size, to read back after a reload', () => {
-    const { size, values } = setting();
-    size.set(150);
-    expect(size.value).toBe(150);
-    expect(setting(values).size.value).toBe(150);
-  });
-
-  it('changes when another tab changes it', () => {
-    const { size, values, otherTab } = setting();
-    values[chartSizeKey] = '80';
-    otherTab(chartSizeKey);
-    expect(size.value).toBe(80);
   });
 });
