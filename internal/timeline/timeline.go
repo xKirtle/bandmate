@@ -11,6 +11,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"math"
 	"slices"
 	"strings"
 	"time"
@@ -98,11 +99,9 @@ type Take struct {
 	// LatencyOffset is the delay, in seconds, taken off where it was
 	// captured to place it.
 	LatencyOffset float64 `json:"latencyOffset"`
-	// Position is where it starts in its Clip's source span, in seconds.
-	Position float64 `json:"position"`
-	// Nudge is how far it's been moved by hand from where it was recorded,
-	// in seconds, later if positive. Position includes it.
-	Nudge      float64   `json:"nudge"`
+	// Position is where it was recorded to start in its Clip's source span,
+	// in seconds. Its Clip's Nudge moves its audio from there (ADR 0028).
+	Position   float64   `json:"position"`
 	RecordedAt time.Time `json:"recordedAt"`
 	// Peaks is the waveform, as the browser computed it. The Timeline
 	// leaves them out; GetTake includes them.
@@ -213,15 +212,15 @@ func read(ctx context.Context, tx *sql.Tx, songID int64) (Timeline, error) {
 
 	type at struct{ track, clip int }
 	clipAt := map[int64]at{}
-	err = query(ctx, tx, `SELECT c.id, c.track_id, c.beat_id, c.sound_id, c.name, c.gain, c.tempo, c.pitch, c.fade_in, c.fade_out,
-			c.active_take_id, c.start, c.source_offset, c.length
+	err = query(ctx, tx, `SELECT c.id, c.track_id, c.beat_id, c.sound_id, c.name, c.gain, c.tempo, c.pitch,
+			c.nudge, c.fade_in, c.fade_out, c.active_take_id, c.start, c.source_offset, c.length
 		FROM clips c JOIN tracks t ON t.id = c.track_id
 		WHERE t.song_id = ? ORDER BY c.start, c.id`, []any{songID},
 		func(rows *sql.Rows) error {
 			c := Clip{Takes: []Take{}}
 			var trackID int64
-			if err := rows.Scan(&c.ID, &trackID, &c.BeatID, &c.SoundID, &c.Name, &c.Gain, &c.Tempo, &c.Pitch, &c.FadeIn, &c.FadeOut,
-				&c.ActiveTakeID, &c.Start, &c.Offset, &c.Length); err != nil {
+			if err := rows.Scan(&c.ID, &trackID, &c.BeatID, &c.SoundID, &c.Name, &c.Gain, &c.Tempo, &c.Pitch,
+				&c.Nudge, &c.FadeIn, &c.FadeOut, &c.ActiveTakeID, &c.Start, &c.Offset, &c.Length); err != nil {
 				return err
 			}
 			t := &tl.Tracks[trackAt[trackID]]
@@ -825,6 +824,31 @@ func (s *Store) SetClipGain(ctx context.Context, songID int64, based songversion
 func checkGain(gain float64) error {
 	if gain < MinGain || gain > MaxGain {
 		return domain.Invalid(fmt.Sprintf("a Clip's Gain goes from %g dB to +%g dB", MinGain, MaxGain))
+	}
+	return nil
+}
+
+// SetClipNudge moves a Clip's audio by hand inside it, to be nudge seconds
+// from where it plays unnudged, later if positive. Only the audio moves:
+// the Clip keeps its window, its edges and its Fades, so a Clip wedged
+// between its neighbours can still be nudged (ADR 0028). The Nudge is in
+// the audio's own time, so a Clip at another Tempo moves its audio by what
+// the number says of its audio, not of the Timeline.
+func (s *Store) SetClipNudge(ctx context.Context, songID int64, based songversion.Version, clipID int64, nudge float64) (Timeline, error) {
+	if err := checkNudge(nudge); err != nil {
+		return Timeline{}, err
+	}
+	return s.editTimeline(ctx, songID, based, func(tl Timeline, _ *ids) (Timeline, error) {
+		return tl.settingNudge(clipID, nudge)
+	})
+}
+
+// checkNudge checks that a Clip's Nudge is a number. It has no range of its
+// own: the audio goes as far earlier as it goes later, and may leave the
+// Clip's window altogether (ADR 0023).
+func checkNudge(nudge float64) error {
+	if math.IsNaN(nudge) || math.IsInf(nudge, 0) {
+		return domain.Invalid("a Nudge must be a number")
 	}
 	return nil
 }

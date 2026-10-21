@@ -95,7 +95,7 @@ func TestASplitClipOfTakesGivesEachHalfTakesOfItsOwn(t *testing.T) {
 	}
 	for i, tk := range right.Takes {
 		was := left.Takes[i]
-		if tk.ID == was.ID || tk.Position != was.Position || tk.Nudge != was.Nudge || tk.Size != was.Size {
+		if tk.ID == was.ID || tk.Position != was.Position || tk.Size != was.Size {
 			t.Errorf("right half's take = %+v, want a copy of %+v", tk, was)
 		}
 	}

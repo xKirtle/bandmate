@@ -22,26 +22,26 @@ func (ts *testServer) pasteClips(songID int64, clips ...map[string]any) response
 func TestAPastedClipOfTakesGetsCopiesOfTheTakesAsTheyWereCopied(t *testing.T) {
 	ts := newTestServer(t)
 	r := recordATake(t, ts)
-	// The Clip as copied, before its Take is nudged since.
-	copied := map[string]any{"trackId": r.vox.ID, "name": "Hook",
-		"takes":        []map[string]any{{"id": r.take.ID, "position": r.take.Position, "nudge": 0.25}},
+	// The Clip as copied, nudged as it was then, before it's nudged since.
+	copied := map[string]any{"trackId": r.vox.ID, "name": "Hook", "nudge": 0.25,
+		"takes":        []map[string]any{{"id": r.take.ID, "position": r.take.Position}},
 		"activeTakeId": r.take.ID, "start": 10, "offset": 0.5, "length": 3}
-	timelineChange(t, ts.nudgeTake(r.song.ID, r.clip.ID, r.take.ID, -0.1))
+	timelineChange(t, ts.setClipNudge(r.song.ID, r.clip.ID, -0.1))
 	before := ts.getTimeline(r.song.ID)
 
 	got := timelineChange(t, ts.pasteClips(r.song.ID, copied))
 
 	clips := got.Tracks[1].Clips
 	if len(clips) != 2 || clips[1].Start != 10 || clips[1].Offset != 0.5 || clips[1].Length != 3 ||
-		nameOf(clips[1]) != "Hook" {
-		t.Fatalf("clips = %+v, want a new Clip named Hook at 0:10", clips)
+		nameOf(clips[1]) != "Hook" || clips[1].Nudge != 0.25 {
+		t.Fatalf("clips = %+v, want a new Clip named Hook at 0:10, nudged as copied", clips)
 	}
 	takes := clips[1].Takes
 	if len(takes) != 1 || takes[0].ID == r.take.ID || *clips[1].ActiveTakeID != takes[0].ID {
 		t.Fatalf("takes = %+v, want a copy of the Take, active", takes)
 	}
 	if want := (take{ID: takes[0].ID, Number: 1, Size: r.take.Size, Duration: 4, SampleRate: wavRate,
-		Position: r.take.Position, Nudge: 0.25, RecordedAt: r.take.RecordedAt}); !reflect.DeepEqual(takes[0], want) {
+		Position: r.take.Position, RecordedAt: r.take.RecordedAt}); !reflect.DeepEqual(takes[0], want) {
 		t.Errorf("copy = %+v, want %+v", takes[0], want)
 	}
 	if !reflect.DeepEqual(got.Tracks[1].Clips[0], before.Tracks[1].Clips[0]) {
@@ -62,7 +62,7 @@ func TestAClipOfTakesStillPastesOnceItsClipIsDeleted(t *testing.T) {
 	timelineChange(t, ts.deleteClip(r.song.ID, r.clip.ID))
 
 	got := timelineChange(t, ts.pasteClips(r.song.ID, map[string]any{"trackId": r.vox.ID,
-		"takes":        []map[string]any{{"id": r.take.ID, "position": r.take.Position, "nudge": 0}},
+		"takes":        []map[string]any{{"id": r.take.ID, "position": r.take.Position}},
 		"activeTakeId": r.take.ID, "start": 2, "offset": 0.5, "length": 3}))
 
 	clips := got.Tracks[1].Clips
@@ -81,8 +81,8 @@ func TestAClipOfTakesStillPastesOnceItsClipIsDeleted(t *testing.T) {
 func TestACutClipOfTakesPastesAgainAndAgainWithItsAudio(t *testing.T) {
 	ts := newTestServer(t)
 	r := recordATake(t, ts)
-	cut := map[string]any{"trackId": r.vox.ID, "name": "Hook",
-		"takes":        []map[string]any{{"id": r.take.ID, "position": r.take.Position, "nudge": 0.25}},
+	cut := map[string]any{"trackId": r.vox.ID, "name": "Hook", "nudge": 0.25,
+		"takes":        []map[string]any{{"id": r.take.ID, "position": r.take.Position}},
 		"activeTakeId": r.take.ID, "start": 2, "offset": 0.5, "length": 3}
 	timelineChange(t, ts.Do(http.MethodPost, timelinePath(r.song.ID)+"/clips/delete",
 		map[string]any{"clipIds": []int64{r.clip.ID}}))
@@ -96,7 +96,7 @@ func TestACutClipOfTakesPastesAgainAndAgainWithItsAudio(t *testing.T) {
 		t.Fatalf("clips = %+v, want two pasted Clips, at 0:02 and 0:05", clips)
 	}
 	for _, c := range clips {
-		if len(c.Takes) != 1 || c.Takes[0].ID == r.take.ID || c.Takes[0].Nudge != 0.25 || nameOf(c) != "Hook" {
+		if len(c.Takes) != 1 || c.Takes[0].ID == r.take.ID || c.Nudge != 0.25 || nameOf(c) != "Hook" {
 			t.Fatalf("clip = %+v, want Hook with its own copy of the Take, nudged as cut", c)
 		}
 		served := ts.Do(http.MethodGet, takePath(r.song.ID, c.Takes[0].ID)+"/audio", nil)
@@ -123,7 +123,7 @@ func TestAPasteIsRefusedWhole(t *testing.T) {
 	other := recordATake(t, ts)
 	before := ts.getTimeline(r.song.ID)
 	takes := func(id int64, start float64) map[string]any {
-		return map[string]any{"trackId": r.vox.ID, "takes": []map[string]any{{"id": id, "position": 0, "nudge": 0}},
+		return map[string]any{"trackId": r.vox.ID, "takes": []map[string]any{{"id": id, "position": 0}},
 			"activeTakeId": id, "start": start, "offset": 0.5, "length": 3}
 	}
 
@@ -139,7 +139,7 @@ func TestAPasteIsRefusedWhole(t *testing.T) {
 		"a Take of another Song": {[]map[string]any{takes(other.take.ID, 20)},
 			http.StatusBadRequest, "there's no such Take in this Song"},
 		"playing none of its Takes": {[]map[string]any{{"trackId": r.vox.ID,
-			"takes": []map[string]any{{"id": r.take.ID, "position": 0, "nudge": 0}}, "activeTakeId": 999,
+			"takes": []map[string]any{{"id": r.take.ID, "position": 0}}, "activeTakeId": 999,
 			"start": 20, "offset": 0, "length": 1}}, http.StatusBadRequest, "a Clip of Takes plays one of them"},
 		"without a Track": {[]map[string]any{{"beatId": r.tl.Beats[0].ID, "start": 20, "offset": 0, "length": 1}},
 			http.StatusBadRequest, "trackId or newTrack, start, offset and length are required"},

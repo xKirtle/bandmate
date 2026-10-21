@@ -39,7 +39,6 @@ type storedClip struct {
 type storedTake struct {
 	clipID   sql.NullInt64
 	position float64
-	nudge    float64
 }
 
 // writeTimeline makes a Song's stored Tracks, Clips and Takes the Timeline
@@ -83,16 +82,16 @@ func writeTimeline(ctx context.Context, tx *sql.Tx, songID int64, tl Timeline) e
 			switch {
 			case !there:
 				_, err = tx.ExecContext(ctx, `INSERT INTO clips (id, track_id, beat_id, sound_id, name,
-						gain, tempo, pitch, fade_in, fade_out, active_take_id, start, source_offset, length)
-					VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+						gain, tempo, pitch, nudge, fade_in, fade_out, active_take_id, start, source_offset, length)
+					VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 					c.ID, want.trackID, want.beatID, want.soundID, want.name, want.Gain, want.Tempo, want.Pitch,
-					want.FadeIn, want.FadeOut, want.activeTakeID, want.start, want.offset, want.length)
+					want.Nudge, want.FadeIn, want.FadeOut, want.activeTakeID, want.start, want.offset, want.length)
 			case want != was:
 				_, err = tx.ExecContext(ctx, `UPDATE clips SET track_id = ?, beat_id = ?, sound_id = ?, name = ?,
-						gain = ?, tempo = ?, pitch = ?, fade_in = ?, fade_out = ?, active_take_id = ?,
+						gain = ?, tempo = ?, pitch = ?, nudge = ?, fade_in = ?, fade_out = ?, active_take_id = ?,
 						start = ?, source_offset = ?, length = ? WHERE id = ?`,
 					want.trackID, want.beatID, want.soundID, want.name, want.Gain, want.Tempo, want.Pitch,
-					want.FadeIn, want.FadeOut, want.activeTakeID, want.start, want.offset, want.length, c.ID)
+					want.Nudge, want.FadeIn, want.FadeOut, want.activeTakeID, want.start, want.offset, want.length, c.ID)
 			}
 			if err != nil {
 				return fmt.Errorf("writing clip: %w", err)
@@ -103,8 +102,7 @@ func writeTimeline(ctx context.Context, tx *sql.Tx, songID int64, tl Timeline) e
 	for _, t := range tl.Tracks {
 		for _, c := range t.Clips {
 			for _, take := range c.Takes {
-				want := storedTake{clipID: sql.NullInt64{Int64: c.ID, Valid: true},
-					position: take.Position, nudge: take.Nudge}
+				want := storedTake{clipID: sql.NullInt64{Int64: c.ID, Valid: true}, position: take.Position}
 				was, there := takes[take.ID]
 				delete(takes, take.ID)
 				if !there {
@@ -115,8 +113,8 @@ func writeTimeline(ctx context.Context, tx *sql.Tx, songID int64, tl Timeline) e
 				if want == was {
 					continue
 				}
-				if _, err := tx.ExecContext(ctx, `UPDATE takes SET clip_id = ?, position = ?, nudge = ?,
-						detached_at = NULL WHERE id = ?`, want.clipID, want.position, want.nudge, take.ID); err != nil {
+				if _, err := tx.ExecContext(ctx, `UPDATE takes SET clip_id = ?, position = ?,
+						detached_at = NULL WHERE id = ?`, want.clipID, want.position, take.ID); err != nil {
 					return fmt.Errorf("writing take: %w", err)
 				}
 			}
@@ -184,13 +182,13 @@ func readStoredRows(ctx context.Context, tx *sql.Tx, songID int64) (map[int64]st
 	}
 	clips := map[int64]storedClip{}
 	err = query(ctx, tx, `SELECT c.id, c.track_id, c.beat_id, c.sound_id, c.name, c.gain, c.tempo, c.pitch,
-			c.fade_in, c.fade_out, c.active_take_id, c.start, c.source_offset, c.length
+			c.nudge, c.fade_in, c.fade_out, c.active_take_id, c.start, c.source_offset, c.length
 		FROM clips c JOIN tracks t ON t.id = c.track_id WHERE t.song_id = ?`,
 		[]any{songID}, func(rows *sql.Rows) error {
 			var id int64
 			var c storedClip
 			err := rows.Scan(&id, &c.trackID, &c.beatID, &c.soundID, &c.name, &c.Gain, &c.Tempo, &c.Pitch,
-				&c.FadeIn, &c.FadeOut, &c.activeTakeID, &c.start, &c.offset, &c.length)
+				&c.Nudge, &c.FadeIn, &c.FadeOut, &c.activeTakeID, &c.start, &c.offset, &c.length)
 			clips[id] = c
 			return err
 		})
@@ -198,11 +196,11 @@ func readStoredRows(ctx context.Context, tx *sql.Tx, songID int64) (map[int64]st
 		return nil, nil, nil, fmt.Errorf("reading clips: %w", err)
 	}
 	takes := map[int64]storedTake{}
-	err = query(ctx, tx, `SELECT id, clip_id, position, nudge FROM takes WHERE song_id = ?`,
+	err = query(ctx, tx, `SELECT id, clip_id, position FROM takes WHERE song_id = ?`,
 		[]any{songID}, func(rows *sql.Rows) error {
 			var id int64
 			var t storedTake
-			err := rows.Scan(&id, &t.clipID, &t.position, &t.nudge)
+			err := rows.Scan(&id, &t.clipID, &t.position)
 			takes[id] = t
 			return err
 		})

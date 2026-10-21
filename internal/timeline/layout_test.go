@@ -112,7 +112,7 @@ func named(c Clip, name string) Clip {
 }
 
 // takesClip is a Clip of Takes, playing the first, each 10 seconds long,
-// where it starts in the span and nudged as given.
+// where it starts in the span as given.
 func takesClip(id int64, start, offset, length float64, takes ...Take) Clip {
 	for i := range takes {
 		takes[i].Duration = 10
@@ -161,8 +161,8 @@ func TestCheckLayoutClips(t *testing.T) {
 		// span holds whatever the Clip plays: past them it plays silence.
 		{"a Clip playing past where its last Take ends",
 			takesClip(1, 0, 0, 13, Take{ID: 1}, Take{ID: 2, Position: 2}), 0},
-		{"a Clip playing past where its nudged Take reaches",
-			takesClip(1, 0, 0, 13, Take{ID: 1}, Take{ID: 2, Position: 0, Nudge: -2}), 0},
+		{"a Clip whose audio a Nudge takes out from under its end",
+			nudged(takesClip(1, 0, 0, 13, Take{ID: 1}, Take{ID: 2, Position: 2}), -2), 0},
 		{"a Clip of Takes starting before its span", offset(takesClip(1, 0, 0, 12, Take{ID: 1}), -1), ruleBeforeSource},
 		// Only a Clip of Takes is let past its source, so one playing
 		// nothing at all is still refused, as it always was.
@@ -202,12 +202,19 @@ func TestCheckLayoutLeavesUntouchedClips(t *testing.T) {
 	}
 }
 
-func TestCheckLayoutNudgedTake(t *testing.T) {
-	// The Clip is trimmed out to its Take nudged later, which is nudged
-	// back: only the Take moves, and the Clip keeps the window it had,
-	// playing silence where the Take no longer reaches (ADR 0023).
-	before := timelineOf([]Clip{takesClip(1, 0, 0, 12, Take{ID: 1}, Take{ID: 2, Position: 2, Nudge: 1})})
-	after := timelineOf([]Clip{takesClip(1, 0, 0, 12, Take{ID: 1}, Take{ID: 2, Position: 1})})
+// nudged is c with its audio nudge seconds from where it plays unnudged.
+func nudged(c Clip, nudge float64) Clip {
+	c.Nudge = nudge
+	return c
+}
+
+func TestCheckLayoutNudgedClip(t *testing.T) {
+	// The Clip is trimmed out to its audio nudged later, which is nudged
+	// back: only the audio moves, and the Clip keeps the window it had,
+	// playing silence where its Take no longer reaches (ADR 0023).
+	clip := takesClip(1, 0, 0, 12, Take{ID: 1}, Take{ID: 2, Position: 2})
+	before := timelineOf([]Clip{nudged(clip, 1)})
+	after := timelineOf([]Clip{nudged(clip, 0)})
 	if got := checkLayout(before, after); got != nil {
 		t.Errorf("checkLayout = %+v, want none", got)
 	}

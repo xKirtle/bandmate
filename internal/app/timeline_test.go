@@ -50,6 +50,8 @@ type clip struct {
 	Tempo float64 `json:"tempo"`
 	// Pitch is in semitones, 0 until it's set.
 	Pitch float64 `json:"pitch"`
+	// Nudge is how far its audio is moved inside it, in seconds, 0 until it's set.
+	Nudge float64 `json:"nudge"`
 	// FadeIn and FadeOut are in seconds, 0 until they're set.
 	FadeIn       float64 `json:"fadeIn"`
 	FadeOut      float64 `json:"fadeOut"`
@@ -69,7 +71,6 @@ type take struct {
 	SampleRate    int       `json:"sampleRate"`
 	LatencyOffset float64   `json:"latencyOffset"`
 	Position      float64   `json:"position"`
-	Nudge         float64   `json:"nudge"`
 	RecordedAt    string    `json:"recordedAt"`
 	Peaks         []float64 `json:"peaks"`
 }

@@ -117,11 +117,11 @@ func TestWriteTimelineRoundTrip(t *testing.T) {
 	}
 
 	// The Beat's Clip is trimmed and moved onto the other Track, the Clip of
-	// Takes keeps one of its Takes, nudged, and the first Track goes.
+	// Takes keeps one of its Takes, moved in its span, and the first Track goes.
 	moved := riff
 	moved.Start, moved.Offset, moved.Length = 20, 5, 15
 	kept := takes[1]
-	kept.Position, kept.Nudge = 2, -1
+	kept.Position = 2
 	takeClip.Takes = []Take{kept}
 	second := Timeline{Tracks: []Track{
 		{ID: 2, Name: "Harmony", Volume: -3, Muted: true, Clips: []Clip{moved, takeClip}},
