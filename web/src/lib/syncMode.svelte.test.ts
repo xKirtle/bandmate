@@ -5,6 +5,7 @@ import { LyricSheetEditing } from './lyricSheetEditing.svelte';
 import { Saves } from './saves.svelte';
 import { emptySong, FakeSongServer } from './songServerFake';
 import type { Mode } from './songMode';
+import { storage } from './storageFake';
 import { SyncMode, type SyncPort } from './syncMode.svelte';
 
 /** A Line of words, with its Cue, if any. */
@@ -49,14 +50,6 @@ class FakePort implements SyncPort {
   playheadAt() {
     return this.playhead;
   }
-}
-
-/** A Device's storage, holding some values. */
-function storage(values: Record<string, string> = {}): Storage {
-  return {
-    getItem: (key: string) => values[key] ?? null,
-    setItem: (key: string, value: string) => void (values[key] = value),
-  } as Storage;
 }
 
 /**

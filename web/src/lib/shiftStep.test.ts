@@ -1,17 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { defaultShiftStep, readShiftStep, shiftStepKey, shiftSteps, storeShiftStep } from './shiftStep';
-
-/** A Storage holding some values, or one that throws like a blocked one. */
-function storage(values: Record<string, string> = {}, blocked = false): Storage {
-  const fail = () => {
-    throw new DOMException('Blocked', 'SecurityError');
-  };
-  return {
-    getItem: (key: string) => (blocked ? fail() : (values[key] ?? null)),
-    setItem: (key: string, value: string) => (blocked ? fail() : void (values[key] = value)),
-    removeItem: (key: string) => (blocked ? fail() : void delete values[key]),
-  } as Storage;
-}
+import { storage } from './storageFake';
 
 describe('shiftSteps', () => {
   it('offers 1 s, 0.5 s and 0.1 s, defaulting to the smallest', () => {

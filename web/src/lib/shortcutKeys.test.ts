@@ -20,6 +20,7 @@ import {
   type ShortcutKeys,
   type Slot,
 } from './shortcutKeys';
+import { storage } from './storageFake';
 
 const press = (key: string, mods: Partial<Omit<KeyPress, 'key'>> = {}): KeyPress => ({
   key,
@@ -288,20 +289,6 @@ group('changing and resetting', () => {
 });
 
 group('keeping the keys on this device', () => {
-  function storage(): Storage {
-    const items = new Map<string, string>();
-    return {
-      getItem: (k: string) => items.get(k) ?? null,
-      setItem: (k: string, v: string) => void items.set(k, v),
-      removeItem: (k: string) => void items.delete(k),
-      clear: () => items.clear(),
-      key: () => null,
-      get length() {
-        return items.size;
-      },
-    };
-  }
-
   it('reads the defaults where none are kept, or what is kept is unreadable', () => {
     const kept = storage();
     expect(readShortcutKeys(kept)).toEqual(defaultShortcutKeys);
