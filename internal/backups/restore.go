@@ -54,11 +54,11 @@ func querySongs(ctx context.Context, q domain.Queryer, query string) ([]Song, er
 	defer rows.Close()
 	list := []Song{}
 	for rows.Next() {
-		var song Song
-		if err := rows.Scan(&song.ID, &song.Title, &song.Folder); err != nil {
+		var s Song
+		if err := rows.Scan(&s.ID, &s.Title, &s.Folder); err != nil {
 			return nil, err
 		}
-		list = append(list, song)
+		list = append(list, s)
 	}
 	return list, rows.Err()
 }
@@ -100,8 +100,8 @@ func (r *OpenedBackup) Beats(ctx context.Context) ([]Beat, error) {
 			return nil, err
 		}
 		b.Songs = []SongID{}
-		for _, song := range ids {
-			b.Songs = append(b.Songs, SongID{song})
+		for _, id := range ids {
+			b.Songs = append(b.Songs, SongID{id})
 		}
 		list = append(list, b)
 	}
@@ -136,8 +136,8 @@ type rowsPicked struct {
 // Song picked and, for the Beats, those picked.
 func (p Picks) rows(t songTable) ([]rowsPicked, error) {
 	var list []rowsPicked
-	for _, song := range p.Songs {
-		list = append(list, rowsPicked{t.where, song})
+	for _, id := range p.Songs {
+		list = append(list, rowsPicked{t.where, id})
 	}
 	if len(p.Beats) == 0 {
 		return list, nil
@@ -190,9 +190,9 @@ func (r *OpenedBackup) restore(ctx context.Context, picks Picks, replace Replace
 	if err != nil {
 		return Restored{}, err
 	}
-	for _, song := range picked.Songs {
-		if err := r.unpackFiles(ctx, songfiles.Kinds, song); err != nil {
-			return Restored{}, fmt.Errorf("restoring song %d: %w", song, err)
+	for _, id := range picked.Songs {
+		if err := r.unpackFiles(ctx, songfiles.Kinds, id); err != nil {
+			return Restored{}, fmt.Errorf("restoring song %d: %w", id, err)
 		}
 	}
 	if len(picked.Beats) > 0 {
@@ -897,8 +897,8 @@ func copyTableIn(ctx context.Context, tx *sql.Tx, t songTable, columns []string,
 			t.name, strings.Join(sets, ", "), strings.Join(same, " AND ")), now)
 		return err
 	}
-	for _, song := range songs {
-		if _, err := tx.ExecContext(ctx, insert+` WHERE `+t.where, song); err != nil {
+	for _, id := range songs {
+		if _, err := tx.ExecContext(ctx, insert+` WHERE `+t.where, id); err != nil {
 			return err
 		}
 	}

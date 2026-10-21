@@ -101,8 +101,8 @@ func checkLanguages(languages []Language) error {
 	return nil
 }
 
-// SongSummary is a Song as shown in the Song list.
-type SongSummary struct {
+// Summary is a Song as shown in the Song list.
+type Summary struct {
 	ID     int64  `json:"id"`
 	Title  string `json:"title"`
 	Status Status `json:"status"`
@@ -266,8 +266,8 @@ func (s *Store) GetSong(ctx context.Context, id int64) (Song, error) {
 	return song, nil
 }
 
-// SongFilter narrows the Song list. Zero fields don't filter.
-type SongFilter struct {
+// Filter narrows the Song list. Zero fields don't filter.
+type Filter struct {
 	// Statuses keeps the Songs with any of them; blank ones are ignored.
 	Statuses []Status
 	// Title keeps Songs whose title contains it, ignoring case and
@@ -284,11 +284,11 @@ type SongFilter struct {
 	Tags []string
 }
 
-// NoFolder is the Folder id a SongFilter keeps the Songs in no Folder by.
+// NoFolder is the Folder id a Filter keeps the Songs in no Folder by.
 const NoFolder int64 = 0
 
 // ListSongs returns the Songs matching filter, most recently edited first.
-func (s *Store) ListSongs(ctx context.Context, filter SongFilter) ([]SongSummary, error) {
+func (s *Store) ListSongs(ctx context.Context, filter Filter) ([]Summary, error) {
 	conditions, args := []string{"NOT demo"}, []any{}
 	var placeholders []string
 	for _, status := range filter.Statuses {
@@ -337,9 +337,9 @@ func (s *Store) ListSongs(ctx context.Context, filter SongFilter) ([]SongSummary
 	// Titles are matched here rather than with SQL LIKE, whose case folding
 	// only covers ASCII ("canção" wouldn't find "CANÇÃO").
 	needle := strings.ToLower(strings.TrimSpace(filter.Title))
-	list := []SongSummary{}
+	list := []Summary{}
 	for rows.Next() {
-		var sum SongSummary
+		var sum Summary
 		var bpm, cover, folder sql.NullInt64
 		var tags, updated string
 		if err := rows.Scan(&sum.ID, &sum.Title, &sum.Status, &sum.Key, &bpm, &sum.HasMaster, &cover, &folder,
@@ -367,8 +367,8 @@ func (s *Store) ListSongs(ctx context.Context, filter SongFilter) ([]SongSummary
 	return list, rows.Err()
 }
 
-// SongChanges is a partial update to a Song. Fields not Set are unchanged.
-type SongChanges struct {
+// Changes is a partial update to a Song. Fields not Set are unchanged.
+type Changes struct {
 	Title  domain.Change[string] `json:"title"`
 	Status domain.Change[Status] `json:"status"`
 	Key    domain.Change[string] `json:"key"`
@@ -382,7 +382,7 @@ type SongChanges struct {
 
 // UpdateSong applies changes to a Song. Every change is validated before
 // anything is written, so a rejected update leaves the Song as it was.
-func (s *Store) UpdateSong(ctx context.Context, id int64, based songversion.Version, changes SongChanges) (Song, error) {
+func (s *Store) UpdateSong(ctx context.Context, id int64, based songversion.Version, changes Changes) (Song, error) {
 	var sets []string
 	var args []any
 	set := func(column string, value any) {

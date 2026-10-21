@@ -14,7 +14,7 @@ func (a *App) listSongs(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query()
 	// Several Statuses keep the Songs with any of them.
 	// Several Tags keep the Songs carrying all of them.
-	filter := song.SongFilter{Title: query.Get("q"), Tags: query["tag"]}
+	filter := song.Filter{Title: query.Get("q"), Tags: query["tag"]}
 	for _, status := range query["status"] {
 		filter.Statuses = append(filter.Statuses, song.Status(status))
 	}
@@ -62,12 +62,12 @@ func (a *App) createSong(w http.ResponseWriter, r *http.Request) {
 	if !readJSON(w, r, &req) {
 		return
 	}
-	song, err := a.songs.CreateSong(r.Context(), req.Title, req.FolderID)
+	s, err := a.songs.CreateSong(r.Context(), req.Title, req.FolderID)
 	if err != nil {
 		writeDomainError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusCreated, song)
+	writeJSON(w, http.StatusCreated, s)
 }
 
 func (a *App) getSong(w http.ResponseWriter, r *http.Request) {
@@ -75,12 +75,12 @@ func (a *App) getSong(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	song, err := a.songs.GetSong(r.Context(), id)
+	s, err := a.songs.GetSong(r.Context(), id)
 	if err != nil {
 		writeDomainError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, song)
+	writeJSON(w, http.StatusOK, s)
 }
 
 func (a *App) updateSong(w http.ResponseWriter, r *http.Request) {
@@ -92,16 +92,16 @@ func (a *App) updateSong(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	var changes song.SongChanges
+	var changes song.Changes
 	if !readJSON(w, r, &changes) {
 		return
 	}
-	song, err := a.songs.UpdateSong(r.Context(), id, based, changes)
+	s, err := a.songs.UpdateSong(r.Context(), id, based, changes)
 	if err != nil {
 		writeDomainError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, song)
+	writeJSON(w, http.StatusOK, s)
 }
 
 func (a *App) deleteSong(w http.ResponseWriter, r *http.Request) {

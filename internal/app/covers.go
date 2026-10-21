@@ -78,12 +78,12 @@ func (a *App) readCover(w http.ResponseWriter, r *http.Request, pictures []song.
 		f := files[string(p)]
 		uploaded[p] = song.UploadedPicture{File: f.Received, ContentType: f.contentType}
 	}
-	song, err := change(id, based, uploaded)
+	s, err := change(id, based, uploaded)
 	if err != nil {
 		writeDomainError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, song)
+	writeJSON(w, http.StatusOK, s)
 }
 
 // coverPicture serves one of a Song's Cover's pictures.
