@@ -16,6 +16,7 @@ It never looks like a corporate dashboard, a cluttered DAW, or anything neon.
 4. **Both themes are first-class.** They follow the system setting unless the user picks Light or Dark in Settings, and every colour has a light and a dark value in every Palette.
 5. **Motion only explains a change**: something opening, moving or appearing. Nothing bounces, and reduced motion is respected.
 6. **Every style value comes from a token**, enforced by Stylelint. A value the scale lacks is a new token, added here and in `app.css`, never a one-off.
+7. **A modifier that gives a gesture another meaning never falls back to the gesture without it.** Where the other meaning doesn't apply, the gesture does nothing: a modifier that redefines a drag here and is ignored there asks for one thing and does another. Where a gesture would apply to only some of what it's used on, that's a sign the thing it acts on is modelled at the wrong level (ADR 0028).
 
 ## Foundations
 
