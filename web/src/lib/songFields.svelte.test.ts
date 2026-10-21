@@ -166,7 +166,7 @@ async function secondMaster() {
     server.update(at, { masters: server.song.masters.map((m) => (m.id === id ? { ...m, ...changes } : m)) });
   const refused: string[] = [];
   const fields = masterFields(2, {
-    master: () => saves.saved.masters.find((m) => m.id === 2),
+    master: () => saves.savedSong.masters.find((m) => m.id === 2),
     submit: saves.submit,
     typing: saves.typing,
     update,

@@ -583,7 +583,7 @@
       },
       // As saved, as the Lyric Sheet's Cue gutter reads them.
       get hasClips() {
-        return saves.timeline.tracks.some((t) => t.clips.length > 0);
+        return saves.savedTimeline.tracks.some((t) => t.clips.length > 0);
       },
       playheadAt,
     }),

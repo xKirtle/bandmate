@@ -22,6 +22,9 @@
 //   undone, committing drops what's typed, sending nothing: losing it is
 //   expected, and a save the server would refuse isn't.
 //
+// It's one of the five As shown layers, each collapsing its own way: see
+// saves.svelte.ts.
+//
 // Typed in, it goes on Saves' list of edits being typed, until destroyed.
 // While what it shows differs from what's saved, the Song has unsaved
 // edits: closing the tab asks first, and a refresh doesn't replace what's

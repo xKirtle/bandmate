@@ -94,7 +94,7 @@ async function editingFor(server: FakeSongServer) {
   let selection!: Selection;
   const dispose = $effect.root(() => {
     selection = new Selection(
-      () => saves.timeline.tracks,
+      () => saves.savedTimeline.tracks,
       () => editing.freeze,
     );
     editing = new TimelineEditing({
@@ -190,11 +190,11 @@ describe('Timeline editing, the Timeline as shown', () => {
     const release = server.holdNextAnswer();
     const editing1 = editing.edit({ kind: 'updateTrack', trackId: 1, changes: { volume: -6, muted: true } });
     expect(shownTrack(editing, 1)).toMatchObject({ volume: -6, muted: true, soloed: false });
-    expect(saves.timeline.tracks[0]).toMatchObject({ volume: 0, muted: false });
+    expect(saves.savedTimeline.tracks[0]).toMatchObject({ volume: 0, muted: false });
     release();
     await editing1;
     expect(shownTrack(editing, 1)).toMatchObject({ volume: -6, muted: true });
-    expect(editing.timeline).toBe(saves.timeline);
+    expect(editing.timeline).toBe(saves.savedTimeline);
   });
 
   it('shows a Track’s new name until it’s saved', async () => {
@@ -203,11 +203,11 @@ describe('Timeline editing, the Timeline as shown', () => {
     const release = server.holdNextAnswer();
     const renaming = editing.edit({ kind: 'updateTrack', trackId: 2, changes: { name: ' Vocals ' } });
     expect(shownTrack(editing, 2).name).toBe('Vocals');
-    expect(saves.timeline.tracks[1].name).toBe('Track 2');
+    expect(saves.savedTimeline.tracks[1].name).toBe('Track 2');
     release();
     await renaming;
     expect(shownTrack(editing, 2).name).toBe('Vocals');
-    expect(editing.timeline).toBe(saves.timeline);
+    expect(editing.timeline).toBe(saves.savedTimeline);
   });
 
   it('shows a Clip’s new name, or its name cleared, until it’s saved', async () => {
@@ -226,7 +226,7 @@ describe('Timeline editing, the Timeline as shown', () => {
     expect(clipName(2)).toBe('Outro');
     await renaming;
     expect(server.timeline.tracks[0].clips.map((c) => c.name)).toEqual([null, 'Outro']);
-    expect(editing.timeline).toBe(saves.timeline);
+    expect(editing.timeline).toBe(saves.savedTimeline);
   });
 
   it('keeps showing a second rename sent before the first is saved, once the first is', async () => {
@@ -238,11 +238,11 @@ describe('Timeline editing, the Timeline as shown', () => {
     expect(shownTrack(editing, 1).name).toBe('Bass');
     release();
     await first;
-    expect(saves.timeline.tracks[0].name).toBe('Guitar');
+    expect(saves.savedTimeline.tracks[0].name).toBe('Guitar');
     expect(shownTrack(editing, 1).name).toBe('Bass');
     await second;
     expect(shownTrack(editing, 1).name).toBe('Bass');
-    expect(editing.timeline).toBe(saves.timeline);
+    expect(editing.timeline).toBe(saves.savedTimeline);
   });
 
   it('stops showing a value whose save fails, going back to the Timeline as saved', async () => {
@@ -253,7 +253,7 @@ describe('Timeline editing, the Timeline as shown', () => {
     expect(shownTrack(editing, 1).clips[0].name).toBe('Intro');
     expect(await renaming).toBeNull();
     expect(shownTrack(editing, 1).clips[0].name).toBeNull();
-    expect(editing.timeline).toBe(saves.timeline);
+    expect(editing.timeline).toBe(saves.savedTimeline);
   });
 
   it('leaves a newer value for the same field showing when an earlier save fails', async () => {
@@ -291,7 +291,7 @@ describe('Timeline editing, the Timeline as shown', () => {
     editing.adjust({ kind: 'updateTrack', trackId: 1, changes: { volume: -9 } });
     release();
     await saving;
-    expect(saves.timeline.tracks[0].volume).toBe(-6);
+    expect(saves.savedTimeline.tracks[0].volume).toBe(-6);
     expect(shownTrack(editing, 1).volume).toBe(-9);
   });
 
@@ -314,7 +314,7 @@ describe('Timeline editing, the Timeline as shown', () => {
     server.changeElsewhere({ title: 'From another tab' });
     await saves.refresh();
     expect(saves.song.title).toBe('From another tab');
-    expect(editing.timeline).toBe(saves.timeline);
+    expect(editing.timeline).toBe(saves.savedTimeline);
   });
 
   it('leaves what’s shown alone through an undo and a redo', async () => {
@@ -351,7 +351,7 @@ describe('Timeline editing, a Track’s fader', () => {
     editing.moveFader(1, 0);
     expect(await editing.letGoFader(1, 0)).toBeNull();
     expect(server.landed).toBe(0);
-    expect(editing.timeline).toBe(saves.timeline);
+    expect(editing.timeline).toBe(saves.savedTimeline);
   });
 
   it('shows an undo of a Track’s volume at once after its fader was let go where it started', async () => {
@@ -378,7 +378,7 @@ describe('Timeline editing, a Track’s fader', () => {
     release();
     await saving;
     expect(server.landed).toBe(1);
-    expect(editing.timeline).toBe(saves.timeline);
+    expect(editing.timeline).toBe(saves.savedTimeline);
   });
 
   it('shows the Track’s volume as saved for a fader let go where it started, once the save it started from resolved', async () => {
@@ -391,7 +391,7 @@ describe('Timeline editing, a Track’s fader', () => {
     await saving;
     editing.moveFader(1, -6);
     await editing.letGoFader(1, -6);
-    expect(editing.timeline).toBe(saves.timeline);
+    expect(editing.timeline).toBe(saves.savedTimeline);
     expect(shownTrack(editing, 1).volume).toBe(-6);
   });
 
@@ -566,7 +566,7 @@ describe('Timeline editing, the Loop as shown', () => {
     const release = server.holdNextAnswer();
     const setting = editing.edit({ kind: 'setLoop', loop: { start: 4, end: 8, on: true } });
     expect(editing.timeline.loop).toEqual({ start: 4, end: 8, on: true });
-    expect(saves.timeline.loop).toEqual({ start: 0, end: 10, on: true });
+    expect(saves.savedTimeline.loop).toEqual({ start: 0, end: 10, on: true });
     const switching = editing.edit({ kind: 'switchLoop', on: false });
     expect(editing.timeline.loop).toEqual({ start: 4, end: 8, on: false });
     release();
@@ -574,16 +574,16 @@ describe('Timeline editing, the Loop as shown', () => {
     expect(editing.timeline.loop).toEqual({ start: 4, end: 8, on: false });
     await switching;
     expect(server.timeline.loop).toEqual({ start: 4, end: 8, on: false });
-    expect(editing.timeline).toBe(saves.timeline);
+    expect(editing.timeline).toBe(saves.savedTimeline);
 
     const clearRelease = server.holdNextAnswer();
     const clearing = editing.edit({ kind: 'clearLoop' });
     expect(editing.timeline.loop).toBeNull();
-    expect(saves.timeline.loop).not.toBeNull();
+    expect(saves.savedTimeline.loop).not.toBeNull();
     clearRelease();
     await clearing;
     expect(server.timeline.loop).toBeNull();
-    expect(editing.timeline).toBe(saves.timeline);
+    expect(editing.timeline).toBe(saves.savedTimeline);
   });
 
   it('goes back to the Loop as saved when its save fails', async () => {
@@ -593,7 +593,7 @@ describe('Timeline editing, the Loop as shown', () => {
     expect(editing.timeline.loop).toEqual({ start: 4, end: 8, on: true });
     expect(await setting).toBeNull();
     expect(editing.timeline.loop).toEqual({ start: 0, end: 10, on: true });
-    expect(editing.timeline).toBe(saves.timeline);
+    expect(editing.timeline).toBe(saves.savedTimeline);
   });
 
   it('keeps showing a second Loop set before the first is saved, once the first is', async () => {
@@ -604,11 +604,11 @@ describe('Timeline editing, the Loop as shown', () => {
     expect(editing.timeline.loop).toEqual({ start: 12, end: 16, on: true });
     release();
     await first;
-    expect(saves.timeline.loop).toEqual({ start: 2, end: 6, on: true });
+    expect(saves.savedTimeline.loop).toEqual({ start: 2, end: 6, on: true });
     expect(editing.timeline.loop).toEqual({ start: 12, end: 16, on: true });
     await second;
     expect(server.timeline.loop).toEqual({ start: 12, end: 16, on: true });
-    expect(editing.timeline).toBe(saves.timeline);
+    expect(editing.timeline).toBe(saves.savedTimeline);
   });
 
   it('plays without the Loop at once as it’s switched off, and with it again if that fails', async () => {
@@ -632,7 +632,7 @@ describe('Timeline editing, the Loop as shown', () => {
     release();
     await switching;
     expect(server.timeline.loop).toEqual({ start: 0, end: 10, on: false });
-    expect(editing.timeline).toBe(saves.timeline);
+    expect(editing.timeline).toBe(saves.savedTimeline);
   });
 
   it('refuses setting, switching and clearing the Loop while frozen', async () => {
@@ -679,7 +679,7 @@ describe('Timeline editing, a Clip’s Gain and Fades as shown', () => {
     expect(drag.clip).toBeNull();
     expect(drag.shown).toEqual([]);
     expect(shownClip(editing, 1)).toMatchObject({ gain: 10, fadeIn: 0 });
-    expect(saves.timeline.tracks[0].clips[0].gain).toBe(0);
+    expect(saves.savedTimeline.tracks[0].clips[0].gain).toBe(0);
 
     // Its fade in's dot, dragged from where it rests to 0:04: a 4 s fade in.
     drag.press(shownClip(editing, 1), 'fadeIn', at(0.5), keys, {
@@ -695,7 +695,7 @@ describe('Timeline editing, a Clip’s Gain and Fades as shown', () => {
     expect(shownClip(editing, 1)).toMatchObject({ gain: 10, fadeIn: 4 });
     expect(await fading).toBe(true);
     expect(server.timeline.tracks[0].clips[0]).toMatchObject({ gain: 10, fadeIn: 4, fadeOut: 0 });
-    expect(editing.timeline).toBe(saves.timeline);
+    expect(editing.timeline).toBe(saves.savedTimeline);
   });
 
   it('goes back to a Clip’s Gain as saved when its save fails, leaving its Fades showing', async () => {
@@ -711,7 +711,7 @@ describe('Timeline editing, a Clip’s Gain and Fades as shown', () => {
     release();
     await fading;
     expect(server.timeline.tracks[0].clips[0]).toMatchObject({ gain: 0, fadeIn: 2, fadeOut: 3 });
-    expect(editing.timeline).toBe(saves.timeline);
+    expect(editing.timeline).toBe(saves.savedTimeline);
   });
 
   it('goes back to a Clip’s Fades as saved when their save fails', async () => {
@@ -722,7 +722,7 @@ describe('Timeline editing, a Clip’s Gain and Fades as shown', () => {
     expect(shownClip(editing, 1).fadeIn).toBe(2);
     expect(await fading).toBe(false);
     expect(shownClip(editing, 1).fadeIn).toBe(0);
-    expect(editing.timeline).toBe(saves.timeline);
+    expect(editing.timeline).toBe(saves.savedTimeline);
   });
 
   it('shows a Clip’s Gain reset at once', async () => {
@@ -731,11 +731,11 @@ describe('Timeline editing, a Clip’s Gain and Fades as shown', () => {
     const release = server.holdNextAnswer();
     const resetting = editing.edit({ kind: 'setClipGain', clipId: 1, gain: 0 });
     expect(shownClip(editing, 1).gain).toBe(0);
-    expect(saves.timeline.tracks[0].clips[0].gain).toBe(6);
+    expect(saves.savedTimeline.tracks[0].clips[0].gain).toBe(6);
     release();
     await resetting;
     expect(server.timeline.tracks[0].clips[0].gain).toBe(0);
-    expect(editing.timeline).toBe(saves.timeline);
+    expect(editing.timeline).toBe(saves.savedTimeline);
   });
 });
 

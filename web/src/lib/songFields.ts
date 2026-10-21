@@ -41,7 +41,7 @@ export function detailFields(saves: Saves, update: UpdateSong): DetailFields {
 
   const text = (detail: TextDetail) =>
     textField({
-      saved: () => saves.saved[detail],
+      saved: () => saves.savedSong[detail],
       parse: (typed) => ({ value: detail === 'notes' ? typed : typed.trim() }),
       commit: (value) => save({ [detail]: value }),
       typing: saves.typing,
@@ -49,7 +49,7 @@ export function detailFields(saves: Saves, update: UpdateSong): DetailFields {
 
   const number = (detail: NumberDetail, label: string) =>
     new TypedField<number | null>({
-      saved: () => saves.saved[detail],
+      saved: () => saves.savedSong[detail],
       format: (value) => value?.toString() ?? '',
       parse: (typed): Parsed<number | null> => {
         const trimmed = typed.trim();

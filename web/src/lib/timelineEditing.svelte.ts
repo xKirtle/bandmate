@@ -20,7 +20,8 @@
 //   was, even if the set that stretch came from then fails, until the
 //   switch resolves. A refresh replacing the Song drops them all; undo and
 //   redo leave them be. What's worked out to send (Merge rendering, undo)
-//   goes by the Timeline as saved.
+//   goes by the Timeline as saved. It's one of the five As shown layers,
+//   each collapsing its own way: see saves.svelte.ts.
 // - What follows an edit: Clips it adds are selected, and a Track it adds
 //   chosen.
 // - Merge and Sound import, the rarer edits whose audio the browser makes
@@ -126,7 +127,7 @@ export class TimelineEditing {
    * The Timeline as shown: as saved, with the values of edits on their
    * way, and values being adjusted, on top.
    */
-  #timeline = $derived.by(() => [...this.#values.values()].reduce((tl, v) => v.show(tl), this.#saves.timeline));
+  #timeline = $derived.by(() => [...this.#values.values()].reduce((tl, v) => v.show(tl), this.#saves.savedTimeline));
 
   constructor(options: TimelineEditingOptions) {
     this.#saves = options.saves;
@@ -310,7 +311,7 @@ export class TimelineEditing {
 
   /** Whether the Clips selected can be merged now: two or more, all on the Timeline, while it isn't frozen. */
   get mergeable(): boolean {
-    return !this.frozen && mergeTarget(this.#saves.timeline.tracks, this.#selection.ids) !== null;
+    return !this.frozen && mergeTarget(this.#saves.savedTimeline.tracks, this.#selection.ids) !== null;
   }
 
   /**

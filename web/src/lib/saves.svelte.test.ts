@@ -90,7 +90,7 @@ describe('Saves', () => {
     const seen: string[] = [];
     const caller = (async () => {
       await saves.change(update(server, { title: 'One' }));
-      seen.push(`caller saw version ${saves.saved.version}`);
+      seen.push(`caller saw version ${saves.savedSong.version}`);
     })();
     const next = saves.change((at) => {
       seen.push(`next turn built against version ${at.version}`);
@@ -104,10 +104,10 @@ describe('Saves', () => {
     const server = new FakeSongServer();
     const saves = await savesFor(server);
     expect(await saves.setTags(['Live', 'Live', 'Demo'])).toEqual(['Live', 'Demo']);
-    expect(saves.saved).toMatchObject({ tags: ['Live', 'Demo'], version: 1 });
+    expect(saves.savedSong).toMatchObject({ tags: ['Live', 'Demo'], version: 1 });
     server.failNext(1);
     expect(await saves.setTags(['Live'])).toBeNull();
-    expect(saves.saved.tags).toEqual(['Live', 'Demo']);
+    expect(saves.savedSong.tags).toEqual(['Live', 'Demo']);
   });
 });
 
@@ -125,7 +125,7 @@ describe('Saves, refreshing', () => {
     release();
     await Promise.all([saving, refreshing]);
     expect(saves.song).toMatchObject({ title: 'From another tab', key: 'Am', version: 3 });
-    expect(saves.timeline.version).toBe(3);
+    expect(saves.savedTimeline.version).toBe(3);
     expect(replaced.map((s) => s.title)).toEqual(['From another tab']);
     expect(saves.stale).toBe(false);
   });
@@ -165,11 +165,11 @@ describe('Saves, Cue changes', () => {
     const release = server.holdNextAnswer();
     const saving = saves.cue(setCue(10, 1.5), 'the Cue of Line 1');
     expect(cueOf(saves.song, 10)).toBe(1.5);
-    expect(cueOf(saves.saved, 10)).toBeNull();
+    expect(cueOf(saves.savedSong, 10)).toBeNull();
     expect(saves.unsaved).toBe(true);
     release();
     expect(await saving).toBe(true);
-    expect(cueOf(saves.saved, 10)).toBe(1.5);
+    expect(cueOf(saves.savedSong, 10)).toBe(1.5);
     expect(saves.unsaved).toBe(false);
   });
 
@@ -180,7 +180,7 @@ describe('Saves, Cue changes', () => {
     expect(await saves.cue(setCue(10, 1.5), 'the Cue of Line 1')).toBe(true);
     expect(server.landed).toBe(1);
     expect(cueOf(saves.song, 10)).toBe(1.5);
-    expect(saves.saved.version).toBe(2);
+    expect(saves.savedSong.version).toBe(2);
     expect(saves.saveError).toBeNull();
     expect(saves.stale).toBe(false);
   });
@@ -252,11 +252,11 @@ describe('Saves, undo', () => {
     expect(await editing).not.toBeNull();
     expect(await undoing).not.toBeNull();
     expect(server.timeline.loop).toBeNull();
-    expect(saves.timeline.loop).toBeNull();
+    expect(saves.savedTimeline.loop).toBeNull();
     expect(saves.canUndo).toBe(false);
     expect(saves.canRedo).toBe(true);
     await saves.redo();
-    expect(saves.timeline.loop).toMatchObject({ start: 2, end: 8 });
+    expect(saves.savedTimeline.loop).toMatchObject({ start: 2, end: 8 });
     expect(saves.canRedo).toBe(false);
   });
 
@@ -267,14 +267,14 @@ describe('Saves, undo', () => {
     await saves.cue(setCue(10, 1.5), 'the Cue of Line 1');
     await saves.edit(loop(2, 8));
     await saves.undo();
-    expect(saves.timeline.loop).toMatchObject({ start: 0, end: 4 });
+    expect(saves.savedTimeline.loop).toMatchObject({ start: 0, end: 4 });
     expect(cueOf(saves.song, 10)).toBe(1.5);
     await saves.undo();
     expect(cueOf(saves.song, 10)).toBeNull();
     expect(cueOf(server.song, 10)).toBeNull();
-    expect(saves.timeline.loop).toMatchObject({ start: 0, end: 4 });
+    expect(saves.savedTimeline.loop).toMatchObject({ start: 0, end: 4 });
     await saves.undo();
-    expect(saves.timeline.loop).toBeNull();
+    expect(saves.savedTimeline.loop).toBeNull();
     expect(saves.canUndo).toBe(false);
   });
 
@@ -322,15 +322,15 @@ describe('Saves, undo', () => {
     await saves.edit(loop(0, 4));
     await saves.cue(setCue(10, 1.5), 'the Cue of Line 1');
     const withoutLines = {
-      ...saves.saved.sections[0],
-      alternates: [{ ...saves.saved.sections[0].alternates[0], lines: [] }],
+      ...saves.savedSong.sections[0],
+      alternates: [{ ...saves.savedSong.sections[0].alternates[0], lines: [] }],
     };
     await saves.change(update(server, { sections: [withoutLines] }));
     const landed = server.landed;
     expect(await saves.undo()).not.toBeNull();
     expect(server.landed).toBe(landed);
     await saves.undo();
-    expect(saves.timeline.loop).toBeNull();
+    expect(saves.savedTimeline.loop).toBeNull();
     expect(saves.stale).toBe(false);
     expect(saves.saveError).toBeNull();
   });
@@ -377,9 +377,9 @@ describe('Saves, undo on the Lyric Sheet', () => {
     expect(cueOf(saves.song, 10)).toBeNull();
     expect(await saves.undo()).toMatchObject({ section: 1 });
     expect(labels(server.song)).toEqual({ arrangement: ['Verse', 'Chorus', 'Bridge'], scrapbook: ['Idea'] });
-    expect(saves.timeline.loop).toMatchObject({ start: 0, end: 4 });
+    expect(saves.savedTimeline.loop).toMatchObject({ start: 0, end: 4 });
     expect((await saves.undo())?.section).toBeUndefined();
-    expect(saves.timeline.loop).toBeNull();
+    expect(saves.savedTimeline.loop).toBeNull();
     expect(saves.canUndo).toBe(false);
 
     await saves.redo();
@@ -492,15 +492,15 @@ describe('Saves, undo on Clips', () => {
     const server = new FakeSongServer(emptySong(), [track(0, 4, 8)]);
     const saves = await savesFor(server);
     await saves.edit({ kind: 'deleteClips', clipIds: [1, 3] });
-    expect(startsOf(saves.timeline)).toEqual([4]);
+    expect(startsOf(saves.savedTimeline)).toEqual([4]);
     const undone = await saves.undo();
-    expect(startsOf(saves.timeline)).toEqual([0, 4, 8]);
-    const back = saves.timeline.tracks[0].clips.filter((c) => c.start !== 4).map((c) => c.id);
+    expect(startsOf(saves.savedTimeline)).toEqual([0, 4, 8]);
+    const back = saves.savedTimeline.tracks[0].clips.filter((c) => c.start !== 4).map((c) => c.id);
     expect(back).not.toContain(1);
     expect(undone).toMatchObject({ reselect: back, playhead: null });
     // Redoing deletes them by their new ids.
     await saves.redo();
-    expect(startsOf(saves.timeline)).toEqual([4]);
+    expect(startsOf(saves.savedTimeline)).toEqual([4]);
   });
 
   it('takes a new Take away on undo, returning the playhead to where it started', async () => {
@@ -509,9 +509,9 @@ describe('Saves, undo on Clips', () => {
     const take = { kind: 'placeClip', trackId: 1, clip: { beatId: 1, start: 6, offset: 0, length: 3 } } as const;
     // As the Timeline records one, uploading it in its turn.
     await saves.make(async (at) => ({ timeline: await server.apply(at, take), kept: 'take' }));
-    expect(startsOf(saves.timeline)).toEqual([0, 6]);
+    expect(startsOf(saves.savedTimeline)).toEqual([0, 6]);
     expect(await saves.undo()).toMatchObject({ playhead: 6, reselect: null });
-    expect(startsOf(saves.timeline)).toEqual([0]);
+    expect(startsOf(saves.savedTimeline)).toEqual([0]);
   });
 
   it('makes a Merge in its turn, against the Timeline as saved once the edits before it are', async () => {
