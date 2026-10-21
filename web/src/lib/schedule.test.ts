@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Clip, Timeline } from './api';
-import { clipSources, heard, playing } from './clipSource';
+import { clipSources, heard, playing, type ClipSource } from './clipSource';
 import { positionAt, repeats, schedule, timelineEnd } from './schedule';
 
 // A 10-second Clip at 0:05 playing a Beat from 2s in, and a 4-second one
@@ -187,6 +187,9 @@ describe('repeats', () => {
 });
 
 describe('schedule of a Take Clip', () => {
+  /** The span the Clip's Takes lie in; its length goes unread, a Take's own bounding what's heard. */
+  const span: ClipSource = { key: 'k', title: 't', audio: 'a', duration: 21, loadPeaks: async () => [] };
+
   // A Clip of Takes at 0:30 for 10s, 2s into its span, whose Take starts
   // 1s into the span (so 1s into its file at the Clip's start).
   const clip: Clip = {
@@ -219,7 +222,7 @@ describe('schedule of a Take Clip', () => {
   };
 
   it('plays its active Take from where the Clip is in it', () => {
-    const played = heard(clip)!;
+    const played = heard(clip, span)!;
     expect(schedule([played], 25)).toEqual([{ clip: played, delay: 5, from: 1, duration: 10 }]);
     expect(schedule([played], 34)).toEqual([{ clip: played, delay: 0, from: 5, duration: 6 }]);
   });
@@ -233,7 +236,7 @@ describe('schedule of a Take Clip', () => {
       nudge: 0.5,
       takes: [{ ...clip.takes[0], position: 1 }],
     };
-    const played = heard(slowed)!;
+    const played = heard(slowed, span)!;
     expect(played).toEqual({ start: 30, offset: 0.5, length: 10, tempo: 0.5 });
     expect(schedule([played], 34)).toEqual([{ clip: played, delay: 0, from: 2.5, duration: 6 }]);
   });
@@ -241,7 +244,7 @@ describe('schedule of a Take Clip', () => {
   it('starts a slowed Take that comes in partway through the Clip where it comes in on the Timeline', () => {
     const slowed: Clip = { ...clip, tempo: 0.5, takes: [{ ...clip.takes[0], position: 4 }] };
     // The span reaches the Take's start 2s in, 4s along the Timeline.
-    expect(heard(slowed)).toEqual({ start: 34, offset: 0, length: 6, tempo: 0.5 });
+    expect(heard(slowed, span)).toEqual({ start: 34, offset: 0, length: 6, tempo: 0.5 });
   });
 
   it('leaves the Clip being retaken out, and schedules the rest as usual', () => {
