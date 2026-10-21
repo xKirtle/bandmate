@@ -72,9 +72,9 @@
   let details = $state.raw<DetailFields | null>(null);
   // The Song as last saved. What's shown has the Cue changes not saved yet
   // made on top of it.
-  const song = $derived(saves?.saved ?? null);
+  const savedSong = $derived(saves?.savedSong ?? null);
   const shown = $derived(saves?.song ?? null);
-  const timeline = $derived(saves?.timeline ?? null);
+  const savedTimeline = $derived(saves?.savedTimeline ?? null);
   // Where the Timeline is playing, in seconds; null while it isn't.
   let playhead = $state<number | null>(null);
   let timelinePanel = $state<Timeline>();
@@ -88,12 +88,14 @@
   // that can't be made there now. They're off entirely while a recording or
   // a Merge keeps the Song as it is, as the Timeline says.
   let freeze = $state<Freeze>(null);
-  // A Status picked, shown until its save ends.
+  // A Status picked, shown until its save ends. With the Languages below,
+  // it's one of the five As shown layers, each falling back to what's saved
+  // its own way (see lib/saves.svelte.ts).
   let statusSent = $state<Status | null>(null);
-  const status = $derived(statusSent ?? song?.status ?? 'idea');
+  const status = $derived(statusSent ?? savedSong?.status ?? 'idea');
   // The Languages picked, shown until their save ends.
   let languagesSent = $state<string[] | null>(null);
-  const languages = $derived(languagesSent ?? song?.languages ?? []);
+  const languages = $derived(languagesSent ?? savedSong?.languages ?? []);
   const title = $derived(details?.title.shown ?? '');
   let loadError = $state<string | null>(null);
   let deleting = $state(false);
@@ -115,7 +117,7 @@
   // amount while they show, and not at all while they're hidden or Read mode
   // shows none, e.g. when only the Scrapbook has Chords.
   const transpose = $derived(
-    song && chordsInRead(song) === 'shown' && songChordsShown.of(id) ? songTranspose.of(id) : 0,
+    savedSong && chordsInRead(savedSong) === 'shown' && songChordsShown.of(id) ? songTranspose.of(id) : 0,
   );
   // Rhyme mode, which the Lyric Sheet draws the toggle of: see
   // rhymeMode.svelte.ts. Like the side column, it's only on a desktop-wide
@@ -233,7 +235,7 @@
   // cancels it.
   const drag = new SectionDragging(
     () => desktop.current && writing,
-    () => (song ? `${song.arrangement}|${song.scrapbook}` : ''),
+    () => (savedSong ? `${savedSong.arrangement}|${savedSong.scrapbook}` : ''),
   );
   // What the Lyric Sheet says about a Section just moved: the Lyric Sheet
   // shows it, and a Section moved out of the Scrapbook says it there too.
@@ -249,7 +251,7 @@
   const shortcuts = $derived(rebound());
 
   function keydown(event: KeyboardEvent) {
-    if (!song) return;
+    if (!savedSong) return;
     if (opensShortcuts(event)) {
       event.preventDefault();
       showingShortcuts = true;
@@ -278,8 +280,8 @@
     if (undone.section === undefined) return;
     syncMode.end();
     const sectionId = undone.section;
-    if (sectionId === null || !song) return;
-    if (song.scrapbook.includes(sectionId) && sideTabs) sideTab = 'scrapbook';
+    if (sectionId === null || !savedSong) return;
+    if (savedSong.scrapbook.includes(sectionId) && sideTabs) sideTab = 'scrapbook';
     await tick();
     document
       .querySelector(`[data-section="${sectionId}"]`)
@@ -322,7 +324,7 @@
       // changed again meanwhile.
       if (change === tagChanges) tags = saved;
       knownTags = [...new Set([...knownTags, ...saved])];
-    } else if (change === tagChanges && song) tags = song.tags;
+    } else if (change === tagChanges && savedSong) tags = savedSong.tags;
   }
 
   // Coming back to the tab shows what changed meanwhile, e.g. on another
@@ -424,8 +426,10 @@
   }
 
   async function remove() {
-    if (!saves || !song || recording) return;
-    const ok = confirm(`Delete “${song.title}”?\n\nThis removes the Song and everything in it. It can't be undone.`);
+    if (!saves || !savedSong || recording) return;
+    const ok = confirm(
+      `Delete “${savedSong.title}”?\n\nThis removes the Song and everything in it. It can't be undone.`,
+    );
     if (!ok) return;
     deleting = true;
     if (await saves.close((at) => api.deleteSong(at))) navigate('/', { replace: true });
@@ -452,7 +456,7 @@
 <main class="page" style:--timeline-height="{timelineHeight}px">
   {#if loadError}
     <p class="error" role="alert">{loadError}</p>
-  {:else if !saves || !song || !editing || !details}
+  {:else if !saves || !savedSong || !editing || !details}
     <p class="muted">Loading…</p>
   {:else}
     <div class="song">
@@ -460,15 +464,15 @@
         <div class="head">
           {#if writing}
             <EditCover
-              songId={song.id}
-              cover={song.cover}
+              songId={savedSong.id}
+              cover={savedSong.cover}
               {title}
               {status}
               change={saves.change}
               onError={saves.report}
             />
           {:else}
-            <SongCover songId={song.id} coverId={song.cover?.id ?? null} {title} {status} size="header" />
+            <SongCover songId={savedSong.id} coverId={savedSong.cover?.id ?? null} {title} {status} size="header" />
           {/if}
           <div class="head-main">
             <div class="title-block">
@@ -498,7 +502,7 @@
                   {#if saves.pending > 0}
                     Saving…
                   {:else}
-                    Edited <time datetime={song.updatedAt}>{timeAgo(song.updatedAt)}</time>
+                    Edited <time datetime={savedSong.updatedAt}>{timeAgo(savedSong.updatedAt)}</time>
                   {/if}
                 </p>
               </div>
@@ -571,7 +575,7 @@
                   bind:value={details.key.shown}
                   {@attach committedAsItGoes(details.key)}
                   options={commonKeys}
-                  saved={song.key}
+                  saved={savedSong.key}
                   onpick={() => details?.key.commit()}
                   onchange={() => details?.key.commit()}
                   onrevert={() => details?.key.cancel()}
@@ -687,7 +691,7 @@
           {rhymeMode}
           {onCaret}
           {notice}
-          hasClips={timeline?.tracks.some((t) => t.clips.length > 0) ?? false}
+          hasClips={savedTimeline?.tracks.some((t) => t.clips.length > 0) ?? false}
         />
       </div>
 
@@ -704,8 +708,8 @@
             ontoggle={(e) => toggled(part, startsOpen, e.currentTarget.open)}
           >
             {#if part === 'masters'}
-              <summary><FoldChevron />{song.masters.length > 1 ? 'Masters' : 'Master'}</summary>
-              <Masters {song} {mode} submit={saves.submit} typing={saves.typing} {setStatus} {recording} />
+              <summary><FoldChevron />{savedSong.masters.length > 1 ? 'Masters' : 'Master'}</summary>
+              <Masters song={savedSong} {mode} submit={saves.submit} typing={saves.typing} {setStatus} {recording} />
             {:else if part === 'rhymes'}
               <summary><FoldChevron />Rhymes</summary>
               <RhymesCard
@@ -716,7 +720,7 @@
               />
             {:else}
               <summary><FoldChevron />Scrapbook</summary>
-              <Scrapbook {song} {drag} {editing} {onCaret} {notice} />
+              <Scrapbook song={savedSong} {drag} {editing} {onCaret} {notice} />
             {/if}
           </details>
         {/each}
@@ -739,7 +743,7 @@
                   onclick={() => (sideTab = tab)}
                   onkeydown={(e) => sideTabKey(e, i)}
                 >
-                  {tab === 'scrapbook' ? 'Scrapbook' : song.masters.length > 1 ? 'Masters' : 'Master'}
+                  {tab === 'scrapbook' ? 'Scrapbook' : savedSong.masters.length > 1 ? 'Masters' : 'Master'}
                 </button>
               {/each}
             </div>
@@ -749,7 +753,7 @@
               aria-labelledby="side-tab-scrapbook"
               hidden={sideTab !== 'scrapbook'}
             >
-              <Scrapbook {song} {drag} {editing} {onCaret} {notice} />
+              <Scrapbook song={savedSong} {drag} {editing} {onCaret} {notice} />
             </div>
             <div
               id="side-panel-masters"
@@ -757,7 +761,7 @@
               aria-labelledby="side-tab-masters"
               hidden={sideTab !== 'masters'}
             >
-              <Masters {song} {mode} submit={saves.submit} typing={saves.typing} {setStatus} {recording} />
+              <Masters song={savedSong} {mode} submit={saves.submit} typing={saves.typing} {setStatus} {recording} />
             </div>
           </div>
         {/if}
@@ -780,7 +784,7 @@
   {/if}
 </main>
 
-{#if saves && songUndo && shown && timeline}
+{#if saves && songUndo && shown && savedTimeline}
   <Timeline
     bind:this={timelinePanel}
     bind:height={timelineHeight}
@@ -799,11 +803,11 @@
   <ShortcutsDialog onClose={() => (showingShortcuts = false)} />
 {/if}
 
-{#if showingSnapshots && editing && song}
+{#if showingSnapshots && editing && savedSong}
   {@const restoring = editing}
   <SnapshotsDialog
     songId={id}
-    current={song}
+    current={savedSong}
     restore={(snapshotId) => restoring.change({ kind: 'restoreSnapshot', snapshotId })}
     onClose={() => (showingSnapshots = false)}
   />

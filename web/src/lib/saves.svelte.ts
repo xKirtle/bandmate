@@ -28,6 +28,30 @@
 // change to it has to be kept, or the history forgotten (ADR 0019); the
 // changes one visit to a text field saves, one after another, are kept as
 // one.
+//
+// The five As shown layers. The Song as shown is one term in the glossary,
+// and the browser holds it in five places, each collapsing back to what's
+// saved its own way, which is why they stay apart rather than becoming one
+// layer that takes the policy as a parameter (ADR 0027):
+//
+// - The Cue changes, here: an ordered list of the changes not saved yet,
+//   replayed in order over the Song as saved. One leaves the list as its
+//   save lands, or is taken back whole if it fails.
+// - Timeline editing (see timelineEditing.svelte.ts): a map keyed by field,
+//   where the newest value for a field wins, dropped altogether once a
+//   refresh has replaced the Song, with each fader's own bookkeeping of
+//   what it started from and what showed under it.
+// - A field typed in place (see typedField.svelte.ts): one string, what's
+//   typed or what's saved formatted, which goes back to what's saved as its
+//   save resolves, unless something was typed since.
+// - A Clip dragged (see clipDrag.svelte.ts): the Clips held as they were
+//   dropped until one particular save resolves, so it's scoped to that
+//   save rather than to a field.
+// - The Song page's Status and Languages (see routes/SongPage.svelte):
+//   what was sent, or else what's saved, in two lines each.
+//
+// Names here say which layer they hold: song is the Song as shown, while
+// savedSong and savedTimeline are the pair as saved.
 import { ApiError, type Song, type Timeline } from './api';
 import { sameCues, withCueChange, type CueChange } from './cueChanges';
 import { History, restorable, type Edit, type HistoryEdit } from './history';
@@ -107,17 +131,17 @@ export class Saves {
   #wait: Wait;
   #onReplace: (song: Song) => void;
 
-  #saved: Song = $state.raw()!;
+  #savedSong: Song = $state.raw()!;
   /** Cue changes not saved yet, in the order they were made. */
   #unsavedCues: { change: CueChange }[] = $state.raw([]);
-  #shown = $derived(this.#unsavedCues.reduce((s, u) => withCueChange(s, u.change), this.#saved));
+  #shown = $derived(this.#unsavedCues.reduce((s, u) => withCueChange(s, u.change), this.#savedSong));
   /** The edits being typed, e.g. fields typed in place, unsaved while they differ from what's saved. */
   #typing: Typing[] = $state.raw([]);
   /** How many edits were typed into each Section by edits since gone from the list. */
   #typedGone = $state.raw(new Map<number, number>());
 
   /** The Timeline as saved. */
-  timeline: Timeline = $state.raw()!;
+  savedTimeline: Timeline = $state.raw()!;
   /** Whether a save was refused, or a refresh couldn't be shown, because the Song changed elsewhere since it loaded. */
   stale = $state(false);
   /** Why the latest save failed, until a later one lands. */
@@ -157,8 +181,8 @@ export class Saves {
     this.#server = options.server;
     this.#wait = options.wait ?? waitFor;
     this.#onReplace = options.onReplace ?? (() => {});
-    this.#saved = options.song;
-    this.timeline = options.timeline;
+    this.#savedSong = options.song;
+    this.savedTimeline = options.timeline;
   }
 
   /** The Song as shown: as saved, with the Cue changes not saved yet made on top. */
@@ -167,8 +191,8 @@ export class Saves {
   }
 
   /** The Song as saved. */
-  get saved(): Song {
-    return this.#saved;
+  get savedSong(): Song {
+    return this.#savedSong;
   }
 
   /** Whether anything isn't saved yet: saves on their way, Cue changes, or edits being typed. */
@@ -234,7 +258,7 @@ export class Saves {
     return this.#turn(
       async (saved) => ({ before: saved, after: await this.#server.apply(saved, change) }),
       ({ before, after }) => {
-        this.#saved = after;
+        this.#savedSong = after;
         this.#history.recordSheet(before, after, visit);
         this.#showHistory();
       },
@@ -249,7 +273,7 @@ export class Saves {
   submit = (op: (saved: Song) => Promise<Song>): Promise<Submitted> =>
     this.#turn(
       op,
-      (s) => (this.#saved = s),
+      (s) => (this.#savedSong = s),
       (ended) => ended,
     );
 
@@ -279,9 +303,9 @@ export class Saves {
     let edited: Edited | null = null;
     this.#undoablesQueued++;
     return this.#turn(
-      (at) => work(at, this.timeline, this.#server),
+      (at) => work(at, this.savedTimeline, this.#server),
       ({ timeline, kept }) => {
-        const before = this.timeline;
+        const before = this.savedTimeline;
         if (kept === 'take') this.#history.recordTake(before, timeline);
         else this.#history.record(kept, before, timeline, selectedThen);
         this.#showHistory();
@@ -349,7 +373,7 @@ export class Saves {
       async (at) => {
         const step = next();
         if (!step) return null;
-        const before = this.timeline;
+        const before = this.savedTimeline;
         return { step, before, after: await this.#send(at, step.edit) };
       },
       (sent) => {
@@ -360,8 +384,8 @@ export class Saves {
         if ('tracks' in after) this.#showTimeline((timeline = after));
         // A Cue edit or a Lyric Sheet change leaves the Timeline as it was.
         else {
-          if (step.edit.kind === 'putSheetBack') section = changedSection(this.#saved, after);
-          this.#saved = after;
+          if (step.edit.kind === 'putSheetBack') section = changedSection(this.#savedSong, after);
+          this.#savedSong = after;
         }
         undone = step.done({ before, after: timeline });
         if (section !== undefined) undone = { ...undone, section };
@@ -387,8 +411,8 @@ export class Saves {
 
   /** Shows the Timeline an edit left, which moved the Song on too. */
   #showTimeline(timeline: Timeline) {
-    this.timeline = timeline;
-    this.#saved = { ...this.#saved, version: timeline.version, updatedAt: timeline.updatedAt };
+    this.savedTimeline = timeline;
+    this.#savedSong = { ...this.#savedSong, version: timeline.version, updatedAt: timeline.updatedAt };
   }
 
   #showHistory() {
@@ -413,7 +437,7 @@ export class Saves {
       () => this.#server.setTags(tags),
       (s) => {
         saved = s;
-        this.#saved = { ...this.#saved, tags: s };
+        this.#savedSong = { ...this.#savedSong, tags: s };
       },
       () => saved,
     );
@@ -440,7 +464,7 @@ export class Saves {
         );
         // Shown as saved in the same step it stops being made on top, so
         // it's never made twice over.
-        this.#saved = after;
+        this.#savedSong = after;
         settle();
         // Kept to undo as what it changed in the Song as saved, whatever
         // Cue changes not saved yet the Song shown has.
@@ -498,15 +522,15 @@ export class Saves {
     const done = this.#queue.then(async () => {
       try {
         const latest = await this.#server.getSong();
-        if (latest.version === this.#saved.version) return;
+        if (latest.version === this.#savedSong.version) return;
         if (this.unsaved) {
           this.stale = true;
           return;
         }
         const timeline = await this.#server.getTimeline();
         this.#onReplace(latest);
-        this.#saved = latest;
-        this.timeline = timeline;
+        this.#savedSong = latest;
+        this.savedTimeline = timeline;
         this.stale = false;
         this.#forget();
         this.replaced++;
@@ -545,7 +569,7 @@ export class Saves {
     this.#closed = true;
     try {
       await this.#queue;
-      await deleteSend(this.#saved);
+      await deleteSend(this.#savedSong);
       return true;
     } catch (e) {
       this.#fail(e);
@@ -565,7 +589,7 @@ export class Saves {
     const turn = ++this.#turns;
     const done = this.#queue.then(async (): Promise<R> => {
       try {
-        show(await op(this.#saved));
+        show(await op(this.#savedSong));
         if (turn > this.#errorKeptUntil) this.saveError = null;
         return result('saved');
       } catch (e) {

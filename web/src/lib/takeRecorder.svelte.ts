@@ -281,7 +281,7 @@ export class TakeRecorder {
       }
       if (input.gone) this.inputNote = `${input.gone} isn't connected, so recording from the default input.`;
       // Placed once the Input's open, in case the Timeline changed meanwhile.
-      const { tracks } = this.#saves.timeline;
+      const { tracks } = this.#saves.savedTimeline;
       const target = retake !== undefined && tracks.find((t) => t.clips.some((c) => c.id === retake));
       if (retake !== undefined && !target) throw new CaptureError('The Clip to retake is gone.');
       const track = target || (tracks.find((t) => t.id === chosen) ?? tracks.at(-1)!);
@@ -300,7 +300,7 @@ export class TakeRecorder {
       const first = frameAt(startedAt, input.sampleRate);
       const kept = this.#keeping.keep({
         ...unsaved,
-        songId: this.#saves.saved.id,
+        songId: this.#saves.savedSong.id,
         sampleRate: input.sampleRate,
         first,
         recordedAt: new Date().toISOString(),
@@ -398,7 +398,7 @@ export class TakeRecorder {
 
   /** Offers back the unsaved Takes kept for the Song, along with any that failed to upload meanwhile. */
   async loadUnsaved(): Promise<void> {
-    const kept = await this.#keeping.list(this.#saves.saved.id);
+    const kept = await this.#keeping.list(this.#saves.savedSong.id);
     if (kept.length === 0) return;
     const offered = kept.map((t) => ({
       id: t.id,
@@ -434,7 +434,7 @@ export class TakeRecorder {
     const duration = samples.length / offer.sampleRate;
     let added: number | null = null;
     const place = (timeline: Timeline) => recoveredPlacement(timeline.tracks, offer.unsaved, duration, added);
-    const placement = place(this.#saves.timeline);
+    const placement = place(this.#saves.savedTimeline);
     // Stopped during the lead-in: there's nothing to keep.
     if (placement === null) {
       await this.#drop(offer);
@@ -456,7 +456,7 @@ export class TakeRecorder {
 
   /** Adds a Track at the bottom for an unsaved Take; resolves to its id, or null if it wasn't added. */
   async #addTrack(): Promise<number | null> {
-    const name = `Track ${this.#saves.timeline.tracks.length + 1}`;
+    const name = `Track ${this.#saves.savedTimeline.tracks.length + 1}`;
     const edited = await this.#saves.edit({ kind: 'addTrack', track: { name } });
     const added = edited && addedTrack(edited.before.tracks, edited.after.tracks);
     if (added) this.#onTrackAdded(added);

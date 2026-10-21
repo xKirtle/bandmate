@@ -27,7 +27,7 @@ async function keyField() {
   const saves = await savesFor(server);
   const committed: string[] = [];
   const field = new TypedField<string>({
-    saved: () => saves.saved.key,
+    saved: () => saves.savedSong.key,
     format: (key) => key,
     parse: parseKey,
     commit: (key) => {
@@ -146,7 +146,7 @@ describe('TypedField', () => {
     const there = { now: true };
     const committed: string[] = [];
     const field = new TypedField<string>({
-      saved: () => saves.saved.key,
+      saved: () => saves.savedSong.key,
       format: (key) => key,
       parse: parseKey,
       commit: (key) => void committed.push(key),
@@ -178,7 +178,7 @@ describe('TypedField', () => {
     const server = new FakeSongServer(emptySong({ key: 'C' }));
     const saves = await savesFor(server);
     const field = new TypedField<string>({
-      saved: () => saves.saved.key,
+      saved: () => saves.savedSong.key,
       format: (key) => key,
       parse: parseKey,
       commit: (key) => saves.submit((at) => server.update(at, { key })),

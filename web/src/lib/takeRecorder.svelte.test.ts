@@ -321,13 +321,13 @@ describe('TakeRecorder', () => {
     server.changeElsewhere({ title: 'From another tab' });
     await saves.refresh();
     await started;
-    expect(saves.saved.title).toBe('Untitled');
+    expect(saves.savedSong.title).toBe('Untitled');
 
     sing(1);
     await recorder.stop();
     await settled();
 
-    expect(saves.saved.title).toBe('From another tab');
+    expect(saves.savedSong.title).toBe('From another tab');
   });
 
   it("doesn't record when playback is stopped before it starts", async () => {
@@ -357,7 +357,7 @@ describe('TakeRecorder', () => {
     // Refreshes aren't held by a recording that never started.
     server.changeElsewhere({ title: 'From another tab' });
     await saves.refresh();
-    expect(saves.saved.title).toBe('From another tab');
+    expect(saves.savedSong.title).toBe('From another tab');
   });
 
   it('keeps what was captured so far to offer back when closed while recording', async () => {
