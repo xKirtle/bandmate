@@ -277,7 +277,7 @@ What makes a Song or Beat that one wherever it is: it's kept with the Song or Be
 _Avoid_: UUID, GUID, Key (a Song's Key is musical), id (an id is the row's here, and a Restore hands out new ones)
 
 **Restore**:
-Bringing back Songs and Beats picked from a Backup. A Song brings the Beats its Clips use, so those Beats can't be left out while it's picked. Where a Song or Beat is already in Bandmate (the same one, by its **Identity**, even from another install, never just one with the same name or, for a Beat, the same audio), the user chooses to replace it or keep both, the restored one added alongside. A restored Song goes into the Folder of the same name, made if there's none, and carries the Tags of the same names, made if there are none, in place of any it had. A Restore only adds and replaces: it never deletes what the Backup doesn't hold.
+Bringing back Songs and Beats picked from a Backup. A Song brings the Beats its Clips use, so those Beats can't be left out while it's picked. Where a Song or Beat is already in Bandmate (the same one, by its Identity, even from another install, never just one with the same name or, for a Beat, the same audio), the user chooses to replace it or keep both, the restored one added alongside. A restored Song goes into the Folder of the same name, made if there's none, and carries the Tags of the same names, made if there are none, in place of any it had. A Restore only adds and replaces: it never deletes what the Backup doesn't hold.
 _Avoid_: Import (importing brings an audio file in as a Sound)
 
 **Upgrade copy**:

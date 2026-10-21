@@ -5,21 +5,19 @@ import (
 	"slices"
 )
 
-// The identity decisions a Restore makes, as a value: which id each row of
-// the four tables carrying identity rules gets, and what that id means.
-// Folders and Tags are matched to those already in Bandmate by their folded
-// names (ADR 0015), Songs and Beats by their identities, replaced where the
-// user said so and kept both where not. The rows of the other 13 tables a
-// Song's rows live in carry no such decision, and their ids stay worked out
+// Which id each row a Restore brings back gets, as a value, for the four
+// tables where that is a decision rather than counting up: a Folder or Tag
+// takes the id of the one of the same folded name already in Bandmate (ADR
+// 0015), a Song or Beat that of the one of the same Identity, replaced where
+// the user said so and kept both where not. The rows of the other 13 tables
+// a Song's rows live in decide nothing, and their fresh ids stay worked out
 // in SQL (see giveFreshIDs and ADR 0026).
 
-// backupRow is a row of a table carrying identity rules as the Backup holds
-// it: its id there, the folded name or identity it's matched by, and the
-// version it holds, for a Song.
+// backupRow is a row of a table whose ids a Restore decides, as the Backup
+// holds it: its id there, and the folded name or Identity it's matched by.
 type backupRow struct {
-	id      int64
-	key     string
-	version int64
+	id  int64
+	key string
 }
 
 // bandmateRow is a row already in Bandmate that one from the Backup can
@@ -31,9 +29,8 @@ type bandmateRow struct {
 	version int64
 }
 
-// identityPlan is what the identity decisions for one table are worked out
-// from.
-type identityPlan struct {
+// identityInput is what the id decisions for one table are worked out from.
+type identityInput struct {
 	// picked is the rows the Backup holds that each pick of the Restore
 	// names, in the order they're picked; within a pick they're decided by
 	// their ids in the Backup, whatever order they come in. A shared table's
@@ -41,10 +38,10 @@ type identityPlan struct {
 	// and is decided once, where it's first named.
 	picked [][]backupRow
 	// inBandmate is the rows already in Bandmate, by the folded name or the
-	// identity they're matched by. A key no row here holds matches nothing.
+	// Identity they're matched by. A key no row here holds matches nothing.
 	inBandmate map[string]bandmateRow
 	// matchedByName tells whether the table's rows are matched by a folded
-	// name, i.e. Folders' and Tags', rather than by identity, i.e. Songs'
+	// name, i.e. Folders' and Tags', rather than by Identity, i.e. Songs'
 	// and Beats'.
 	matchedByName bool
 	// replacing lists the rows the Restore replaces rather than keeping
@@ -59,13 +56,23 @@ type identityPlan struct {
 	lastUsedID int64
 }
 
+// matchedBy is the column of t holding what its rows are matched by: the
+// folded name for a Folder or Tag, the Identity for a Song or Beat.
+func (in identityInput) matchedBy(t songTable) string {
+	if in.matchedByName {
+		return t.matchedBy
+	}
+	return "identity"
+}
+
 // idDecision is the id one row restored gets, and what that id means: what
 // the Restore's temporary table holds for the row.
 type idDecision struct {
 	// old is the row's id in the Backup, new the id it gets in Bandmate.
 	old, new int64
 	// keptBoth is set for a Song or Beat added alongside the same one
-	// already in Bandmate, which gets an identity and a title of its own.
+	// already in Bandmate, which gets an Identity of its own and a title
+	// saying it's restored.
 	keptBoth bool
 	// replaced is set for a Song or Beat taking the id of the one it
 	// replaces.
@@ -83,15 +90,15 @@ type idDecision struct {
 	priorVersion *int64
 }
 
-// decide is the id each row the Restore brings back gets, in the order the
-// rows are picked: the id of the row it replaces, or of the Folder or Tag it
-// matches by name, and otherwise a fresh one, past every id the table has
-// used, handed out in the order of their ids in the Backup.
-func decide(p identityPlan) []idDecision {
+// decideIDs is the id each row the Restore brings back gets, in the order
+// the rows are picked: the id of the row it replaces, or of the Folder or
+// Tag it matches by name, and otherwise a fresh one, past every id the table
+// has used, handed out in the order of their ids in the Backup.
+func decideIDs(in identityInput) []idDecision {
 	decisions := []idDecision{}
 	decided := map[int64]bool{}
-	next := p.lastUsedID
-	for _, pick := range p.picked {
+	next := in.lastUsedID
+	for _, pick := range in.picked {
 		byID := slices.SortedFunc(slices.Values(pick), func(a, b backupRow) int {
 			return cmp.Compare(a.id, b.id)
 		})
@@ -100,14 +107,14 @@ func decide(p identityPlan) []idDecision {
 				continue
 			}
 			decided[r.id] = true
-			match, inBandmate := p.inBandmate[r.key]
+			match, inBandmate := in.inBandmate[r.key]
 			switch {
-			case p.matchedByName && inBandmate:
+			case in.matchedByName && inBandmate:
 				name := match.name
 				decisions = append(decisions, idDecision{old: r.id, new: match.id, matched: true, matchedName: &name})
-			case !p.matchedByName && inBandmate && slices.Contains(p.replacing, r.id):
+			case !in.matchedByName && inBandmate && slices.Contains(in.replacing, r.id):
 				d := idDecision{old: r.id, new: match.id, replaced: true}
-				if p.versioned {
+				if in.versioned {
 					version := match.version
 					d.priorVersion = &version
 				}
@@ -115,7 +122,7 @@ func decide(p identityPlan) []idDecision {
 			default:
 				next++
 				decisions = append(decisions, idDecision{old: r.id, new: next,
-					keptBoth: !p.matchedByName && inBandmate})
+					keptBoth: !in.matchedByName && inBandmate})
 			}
 		}
 	}

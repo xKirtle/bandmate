@@ -611,11 +611,11 @@ func (s *Store) copyIn(ctx context.Context, staging string, picks Picks, replace
 }
 
 // giveIDs picks, for each row of what picks names, the id it gets in the
-// live database. The four tables carrying identity rules — Folders and Tags
+// live database. The four tables that decide anything — Folders and Tags
 // matched by their folded names, Songs and Beats replaced or kept both —
 // have theirs decided as a value, from what the Backup holds and what's
-// already in Bandmate (see identity.go). The rows of the rest hold no such
-// decision, so theirs are picked in SQL, where the rows are: those are the
+// already in Bandmate (see identity.go). The rows of the rest decide
+// nothing, so theirs are picked in SQL, where the rows are: those are the
 // tables holding the most rows, and reading them into Go to write them
 // straight back would buy nothing (ADR 0026).
 func giveIDs(ctx context.Context, tx *sql.Tx, columns map[string][]string, picks Picks, replace Replace) error {
@@ -640,46 +640,38 @@ func giveIDs(ctx context.Context, tx *sql.Tx, columns map[string][]string, picks
 	return nil
 }
 
-// giveDecidedIDs works out the identity decisions for the rows of t that
-// picked names, from what the Backup holds, what's already in Bandmate and
-// those replaced, and writes them.
+// giveDecidedIDs works out the id decisions for the rows of t that picked
+// names, from what the Backup holds, what's already in Bandmate and those
+// replaced, and writes them.
 func giveDecidedIDs(ctx context.Context, tx *sql.Tx, t songTable, columns []string,
 	picked []rowsPicked, replacing []int64) error {
-	plan := identityPlan{matchedByName: t.matchedBy != "", replacing: replacing,
+	in := identityInput{matchedByName: t.matchedBy != "", replacing: replacing,
 		versioned: slices.Contains(columns, "version")}
-	key := "identity"
-	if plan.matchedByName {
-		key = t.matchedBy
-	}
 	var err error
-	if plan.lastUsedID, err = lastUsedID(ctx, tx, t.name); err != nil {
+	if in.lastUsedID, err = lastUsedID(ctx, tx, t.name); err != nil {
 		return err
 	}
 	for _, rows := range picked {
-		held, err := pickedRows(ctx, tx, t, key, plan.versioned, rows)
+		found, err := pickedRows(ctx, tx, t, in, rows)
 		if err != nil {
 			return fmt.Errorf("reading the %s picked: %w", t.name, err)
 		}
-		plan.picked = append(plan.picked, held)
+		in.picked = append(in.picked, found)
 	}
-	if plan.inBandmate, err = rowsInBandmate(ctx, tx, t.name, key, plan); err != nil {
+	if in.inBandmate, err = rowsInBandmate(ctx, tx, t, in); err != nil {
 		return fmt.Errorf("matching %s: %w", t.name, err)
 	}
-	return writeDecisions(ctx, tx, t.name, decide(plan))
+	return writeDecisions(ctx, tx, t.name, decideIDs(in))
 }
 
 // pickedRows is the rows of t that the pick rows names, as the Backup holds
-// them: their ids there, the folded name or identity in key they're matched
-// by, and their versions, where the table holds one. A row with none in key,
-// which no Folder, Tag, Song or Beat is stored without, matches nothing.
-func pickedRows(ctx context.Context, tx *sql.Tx, t songTable, key string, versioned bool,
+// them: their ids there and what they're matched by. A row holding nothing
+// there, which no Folder, Tag, Song or Beat is stored without, matches
+// nothing.
+func pickedRows(ctx context.Context, tx *sql.Tx, t songTable, in identityInput,
 	rows rowsPicked) ([]backupRow, error) {
-	version := "0"
-	if versioned {
-		version = `r."version"`
-	}
-	found, err := tx.QueryContext(ctx, fmt.Sprintf(`SELECT r.id, COALESCE(r."%[1]s", ''), %[2]s
-		FROM src.%[3]s r WHERE (%[4]s) ORDER BY r.id`, key, version, t.name, rows.where), rows.arg)
+	found, err := tx.QueryContext(ctx, fmt.Sprintf(`SELECT r.id, COALESCE(r."%[1]s", '')
+		FROM src.%[2]s r WHERE (%[3]s) ORDER BY r.id`, in.matchedBy(t), t.name, rows.where), rows.arg)
 	if err != nil {
 		return nil, err
 	}
@@ -687,7 +679,7 @@ func pickedRows(ctx context.Context, tx *sql.Tx, t songTable, key string, versio
 	var list []backupRow
 	for found.Next() {
 		var r backupRow
-		if err := found.Scan(&r.id, &r.key, &r.version); err != nil {
+		if err := found.Scan(&r.id, &r.key); err != nil {
 			return nil, err
 		}
 		list = append(list, r)
@@ -695,14 +687,14 @@ func pickedRows(ctx context.Context, tx *sql.Tx, t songTable, key string, versio
 	return list, found.Err()
 }
 
-// rowsInBandmate is the rows of table already in Bandmate that one the plan
-// picked can match, by the folded name or identity in key, with the name
-// each carries here, for a table matched by name, and the version each
-// holds, where the table holds one.
-func rowsInBandmate(ctx context.Context, tx *sql.Tx, table, key string,
-	p identityPlan) (map[string]bandmateRow, error) {
+// rowsInBandmate is the rows of t already in Bandmate that one of those
+// picked can match, by their folded names or Identities, with the name each
+// carries here, for a table matched by name, and the version each holds,
+// where the table holds one.
+func rowsInBandmate(ctx context.Context, tx *sql.Tx, t songTable,
+	in identityInput) (map[string]bandmateRow, error) {
 	keys := []string{}
-	for _, pick := range p.picked {
+	for _, pick := range in.picked {
 		for _, r := range pick {
 			if !slices.Contains(keys, r.key) {
 				keys = append(keys, r.key)
@@ -714,14 +706,14 @@ func rowsInBandmate(ctx context.Context, tx *sql.Tx, table, key string,
 		return nil, err
 	}
 	name, version := "''", "0"
-	if p.matchedByName {
+	if in.matchedByName {
 		name = `"name"`
 	}
-	if p.versioned {
+	if in.versioned {
 		version = `"version"`
 	}
 	found, err := tx.QueryContext(ctx, fmt.Sprintf(`SELECT "%[1]s", id, %[2]s, %[3]s FROM main.%[4]s
-		WHERE "%[1]s" IN (SELECT value FROM json_each(?))`, key, name, version, table), string(list))
+		WHERE "%[1]s" IN (SELECT value FROM json_each(?))`, in.matchedBy(t), name, version, t.name), string(list))
 	if err != nil {
 		return nil, err
 	}
@@ -751,8 +743,8 @@ type decisionRow struct {
 	PriorVersion *int64  `json:"priorVersion,omitempty"`
 }
 
-// flag is b as the 0 or 1 a column holds for it.
-func flag(b bool) int {
+// zeroOrOne is b as the 0 or 1 a column holds for it.
+func zeroOrOne(b bool) int {
 	if b {
 		return 1
 	}
@@ -764,8 +756,8 @@ func flag(b bool) int {
 func writeDecisions(ctx context.Context, tx *sql.Tx, table string, decisions []idDecision) error {
 	written := make([]decisionRow, len(decisions))
 	for i, d := range decisions {
-		written[i] = decisionRow{Old: d.old, New: d.new, KeptBoth: flag(d.keptBoth),
-			Replaced: flag(d.replaced), Matched: flag(d.matched),
+		written[i] = decisionRow{Old: d.old, New: d.new, KeptBoth: zeroOrOne(d.keptBoth),
+			Replaced: zeroOrOne(d.replaced), Matched: zeroOrOne(d.matched),
 			MatchedName: d.matchedName, PriorVersion: d.priorVersion}
 	}
 	list, err := json.Marshal(written)

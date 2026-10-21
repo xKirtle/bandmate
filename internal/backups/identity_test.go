@@ -6,10 +6,10 @@ import (
 	"testing"
 )
 
-// The identity decisions a Restore makes, on plain values: which id each
-// Folder, Tag, Song and Beat brought back gets, and what that id means.
-// They were reachable only through the HTTP server, as generated SQL
-// writing into a temporary table, until they became a value (ADR 0026).
+// The id decisions a Restore makes, on plain values: which id each Folder,
+// Tag, Song and Beat brought back gets, and what that id means. They were
+// reachable only through the HTTP server, as generated SQL writing into a
+// temporary table, until they became a value (ADR 0026).
 
 // matchedAs is the name a Folder or Tag matched carries in Bandmate.
 func matchedAs(name string) *string { return &name }
@@ -17,28 +17,28 @@ func matchedAs(name string) *string { return &name }
 // following is the version a Song replaced holds in Bandmate.
 func following(version int64) *int64 { return &version }
 
-// songsPlan is a plan for the Songs picked, matched by identity, with a
-// version each, where Bandmate's last Song has id 7.
-func songsPlan(picked [][]backupRow, inBandmate map[string]bandmateRow, replacing ...int64) identityPlan {
-	return identityPlan{picked: picked, inBandmate: inBandmate, replacing: replacing,
+// songsPicked is the input for the Songs picked, matched by Identity and
+// holding a version each, where Bandmate's last Song has id 7.
+func songsPicked(picked [][]backupRow, inBandmate map[string]bandmateRow, replacing ...int64) identityInput {
+	return identityInput{picked: picked, inBandmate: inBandmate, replacing: replacing,
 		versioned: true, lastUsedID: 7}
 }
 
 func TestDecidingRestoredIDs(t *testing.T) {
 	tests := []struct {
 		name string
-		plan identityPlan
+		in   identityInput
 		want []idDecision
 	}{
 		{
-			name: "a Song replaced takes the id and follows the version of the one it replaces, and its Folder matches by name",
-			plan: songsPlan([][]backupRow{{{id: 3, key: "song-a", version: 4}}},
+			name: "a Song replaced takes the id and follows the version of the one it replaces",
+			in: songsPicked([][]backupRow{{{id: 3, key: "song-a"}}},
 				map[string]bandmateRow{"song-a": {id: 2, version: 9}}, 3),
 			want: []idDecision{{old: 3, new: 2, replaced: true, priorVersion: following(9)}},
 		},
 		{
-			name: "a Folder of that Song, matched by its folded name, takes that Folder's id and name",
-			plan: identityPlan{
+			name: "a Folder matched by its folded name takes that Folder's id and name",
+			in: identityInput{
 				picked:        [][]backupRow{{{id: 5, key: "ep one"}}},
 				inBandmate:    map[string]bandmateRow{"ep one": {id: 1, name: "EP One"}},
 				matchedByName: true,
@@ -48,7 +48,7 @@ func TestDecidingRestoredIDs(t *testing.T) {
 		},
 		{
 			name: "a Tag already in Bandmate in another case is that Tag, under the name it carries here",
-			plan: identityPlan{
+			in: identityInput{
 				picked:        [][]backupRow{{{id: 2, key: "album 2023"}}},
 				inBandmate:    map[string]bandmateRow{"album 2023": {id: 6, name: "Album 2023"}},
 				matchedByName: true,
@@ -57,8 +57,21 @@ func TestDecidingRestoredIDs(t *testing.T) {
 			want: []idDecision{{old: 2, new: 6, matched: true, matchedName: matchedAs("Album 2023")}},
 		},
 		{
+			// The Tag matched went with the Song being replaced, which is
+			// cleared to be made anew, so the Restore adds it back under the
+			// id and name this decision keeps.
+			name: "a Tag matched whose Song is replaced keeps that Tag's id and name all the same",
+			in: identityInput{
+				picked:        [][]backupRow{{{id: 4, key: "demos"}}},
+				inBandmate:    map[string]bandmateRow{"demos": {id: 3, name: "Demos"}},
+				matchedByName: true,
+				lastUsedID:    3,
+			},
+			want: []idDecision{{old: 4, new: 3, matched: true, matchedName: matchedAs("Demos")}},
+		},
+		{
 			name: "a Folder the Backup holds that no Folder here is named after is added, with a fresh id",
-			plan: identityPlan{
+			in: identityInput{
 				picked:        [][]backupRow{{{id: 5, key: "ep two"}}},
 				inBandmate:    map[string]bandmateRow{"ep one": {id: 1, name: "EP One"}},
 				matchedByName: true,
@@ -68,7 +81,7 @@ func TestDecidingRestoredIDs(t *testing.T) {
 		},
 		{
 			name: "a Beat used by a Song replaced that replace doesn't list is kept both, with a fresh id",
-			plan: identityPlan{
+			in: identityInput{
 				picked:     [][]backupRow{{{id: 1, key: "beat-a"}}},
 				inBandmate: map[string]bandmateRow{"beat-a": {id: 3}},
 				replacing:  []int64{},
@@ -78,7 +91,7 @@ func TestDecidingRestoredIDs(t *testing.T) {
 		},
 		{
 			name: "a Beat replaced takes the id of the one it replaces, and follows no version, as a Beat holds none",
-			plan: identityPlan{
+			in: identityInput{
 				picked:     [][]backupRow{{{id: 1, key: "beat-a"}}},
 				inBandmate: map[string]bandmateRow{"beat-a": {id: 3}},
 				replacing:  []int64{1},
@@ -88,7 +101,7 @@ func TestDecidingRestoredIDs(t *testing.T) {
 		},
 		{
 			name: "the same Beat, picked by two Songs, is decided once, where it's first picked",
-			plan: identityPlan{
+			in: identityInput{
 				picked: [][]backupRow{
 					{{id: 1, key: "beat-a"}, {id: 2, key: "beat-b"}},
 					{{id: 2, key: "beat-b"}, {id: 4, key: "beat-c"}},
@@ -100,7 +113,7 @@ func TestDecidingRestoredIDs(t *testing.T) {
 		},
 		{
 			name: "a Backup made before Folders existed holds no Folder to decide",
-			plan: identityPlan{
+			in: identityInput{
 				picked:        [][]backupRow{{}, {}},
 				inBandmate:    map[string]bandmateRow{"ep one": {id: 1, name: "EP One"}},
 				matchedByName: true,
@@ -110,13 +123,13 @@ func TestDecidingRestoredIDs(t *testing.T) {
 		},
 		{
 			name: "a Song from another install is not already here, however it's titled, and is added with a fresh id",
-			plan: songsPlan([][]backupRow{{{id: 1, key: "song-elsewhere", version: 2}}},
+			in: songsPicked([][]backupRow{{{id: 1, key: "song-elsewhere"}}},
 				map[string]bandmateRow{"song-here": {id: 4, version: 3}}, 1),
 			want: []idDecision{{old: 1, new: 8}},
 		},
 		{
 			name: "fresh ids are handed out in Backup-id order, pick by pick, past the table's last used id",
-			plan: identityPlan{
+			in: identityInput{
 				picked: [][]backupRow{
 					{{id: 9, key: "beat-c"}, {id: 2, key: "beat-a"}, {id: 6, key: "beat-b"}},
 					{{id: 1, key: "beat-d"}},
@@ -128,8 +141,8 @@ func TestDecidingRestoredIDs(t *testing.T) {
 		},
 		{
 			name: "a pick of Songs, some replaced and some not, takes the ids of those it replaces and fresh ones past the rest",
-			plan: songsPlan([][]backupRow{{{id: 1, key: "song-a", version: 1}}, {{id: 2, key: "song-b", version: 5}},
-				{{id: 3, key: "song-c", version: 2}}},
+			in: songsPicked([][]backupRow{{{id: 1, key: "song-a"}}, {{id: 2, key: "song-b"}},
+				{{id: 3, key: "song-c"}}},
 				map[string]bandmateRow{"song-a": {id: 5, version: 2}, "song-c": {id: 6, version: 4}}, 1, 3),
 			want: []idDecision{
 				{old: 1, new: 5, replaced: true, priorVersion: following(2)},
@@ -140,34 +153,11 @@ func TestDecidingRestoredIDs(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			got := decide(test.plan)
+			got := decideIDs(test.in)
 			if !reflect.DeepEqual(got, test.want) {
-				t.Errorf("decide() = %s, want %s", showDecisions(got), showDecisions(test.want))
+				t.Errorf("decideIDs() = %s, want %s", showDecisions(got), showDecisions(test.want))
 			}
 		})
-	}
-}
-
-// TestDecidingATagMatchedWhoseSongIsReplaced covers a name match whose row
-// went with the Song being replaced, as a Tag goes with the last Song
-// carrying it: the Tag keeps the matched Tag's id and name, so the Restore
-// can add it back under them once the Song it went with is cleared.
-func TestDecidingATagMatchedWhoseSongIsReplaced(t *testing.T) {
-	songs := decide(songsPlan([][]backupRow{{{id: 1, key: "song-a", version: 3}}},
-		map[string]bandmateRow{"song-a": {id: 2, version: 3}}, 1))
-	wantSongs := []idDecision{{old: 1, new: 2, replaced: true, priorVersion: following(3)}}
-	if !reflect.DeepEqual(songs, wantSongs) {
-		t.Fatalf("the Song: decide() = %s, want %s", showDecisions(songs), showDecisions(wantSongs))
-	}
-	tags := decide(identityPlan{
-		picked:        [][]backupRow{{{id: 4, key: "demos"}}},
-		inBandmate:    map[string]bandmateRow{"demos": {id: 3, name: "Demos"}},
-		matchedByName: true,
-		lastUsedID:    3,
-	})
-	wantTags := []idDecision{{old: 4, new: 3, matched: true, matchedName: matchedAs("Demos")}}
-	if !reflect.DeepEqual(tags, wantTags) {
-		t.Errorf("the Tag: decide() = %s, want %s", showDecisions(tags), showDecisions(wantTags))
 	}
 }
 
