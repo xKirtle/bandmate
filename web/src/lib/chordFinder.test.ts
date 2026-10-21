@@ -12,7 +12,8 @@ import {
   tonics,
   splitKey,
   joinKey,
-  flipQuality,
+  keyText,
+  otherQuality,
   standard,
   suggest,
   tuningName,
@@ -930,23 +931,31 @@ describe('a Key as a Tonic and a Quality', () => {
     expect(splitKey('')).toBeNull();
   });
 
-  it('joins a Tonic and a Quality as the pickers write it', () => {
-    expect(joinKey('G', false)).toBe('G');
-    expect(joinKey('E', true)).toBe('Em');
-    expect(keys).toContain(joinKey('D#', true));
+  it('joins a Tonic and a quality as the pickers write it', () => {
+    expect(joinKey({ tonic: 'G', minor: false })).toBe('G');
+    expect(joinKey({ tonic: 'E', minor: true })).toBe('Em');
+    expect(keys).toContain(joinKey({ tonic: 'D#', minor: true }));
   });
 
-  it('keeps the pitch and re-spells the Tonic when the Quality changes', () => {
-    expect(flipQuality('Eb', false)).toBe('D#');
-    expect(flipQuality('D#', true)).toBe('Eb');
-    expect(flipQuality('Ab', false)).toBe('G#');
-    expect(flipQuality('Bb', false)).toBe('A#');
-    expect(flipQuality('C', false)).toBe('C');
-    expect(flipQuality('F#', true)).toBe('F#');
+  it('writes a Key the one way the pickers spell it', () => {
+    expect(keyText('Db')).toBe('C#');
+    expect(keyText('Ebm')).toBe('D#m');
+    expect(keyText('G')).toBe('G');
+    expect(keyText('Do')).toBeNull();
+    expect(keys.every((key) => keyText(key) === key)).toBe(true);
   });
 
-  it('round-trips every Tonic through a change of Quality', () => {
+  it('keeps the pitch and re-spells the Tonic when the quality changes', () => {
+    expect(otherQuality({ tonic: 'Eb', minor: false })).toEqual({ tonic: 'D#', minor: true });
+    expect(otherQuality({ tonic: 'D#', minor: true })).toEqual({ tonic: 'Eb', minor: false });
+    expect(otherQuality({ tonic: 'Ab', minor: false })).toEqual({ tonic: 'G#', minor: true });
+    expect(otherQuality({ tonic: 'Bb', minor: false })).toEqual({ tonic: 'A#', minor: true });
+    expect(otherQuality({ tonic: 'C', minor: false })).toEqual({ tonic: 'C', minor: true });
+    expect(otherQuality({ tonic: 'F#', minor: true })).toEqual({ tonic: 'F#', minor: false });
+  });
+
+  it('round-trips every Tonic through a change of quality', () => {
     for (const minor of [false, true])
-      for (const tonic of tonics(minor)) expect(flipQuality(flipQuality(tonic, minor), !minor)).toBe(tonic);
+      for (const tonic of tonics(minor)) expect(otherQuality(otherQuality({ tonic, minor }))).toEqual({ tonic, minor });
   });
 });

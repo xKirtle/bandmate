@@ -5,13 +5,14 @@
   import ChordDiagram from './ChordDiagram.svelte';
   import {
     firstVoicing,
-    flipQuality,
     joinKey,
+    keyText,
     lookUp,
     nameIt,
     plucks,
     qualities,
     roots,
+    otherQuality,
     splitKey,
     suggest,
     tonics,
@@ -130,18 +131,18 @@
   // it's typed; the field re-spells itself once the Key is committed,
   // because a Key's spelling follows its signature, not the typist.
   // svelte-ignore state_referenced_locally
-  let keyText = $state(suggestKey);
+  let typedKey = $state(suggestKey);
   // svelte-ignore state_referenced_locally
-  let keyParts = $state<KeyParts>(splitKey(suggestKey) ?? { tonic: 'C', minor: false });
-  const keyRead = $derived(splitKey(keyText));
+  let keyPicked = $state<KeyParts>(splitKey(suggestKey) ?? { tonic: 'C', minor: false });
+  const keyRead = $derived(splitKey(typedKey));
   $effect.pre(() => {
-    if (keyRead) keyParts = keyRead;
+    if (keyRead) keyPicked = keyRead;
   });
 
   // The Key's Chords, and what usually follows the Chord picked after, if
   // any. Picking another Key starts again with none picked.
   let after = $state<string | null>(null);
-  const suggested = $derived(suggest(keyText, after));
+  const suggested = $derived(suggest(typedKey, after));
   const chords = $derived(suggested.kind === 'key' ? suggested.chords : []);
   const numeralOf = $derived(new Map(chords.map((c) => [c.chord, c.numeral])));
   const groups = $derived(
@@ -154,21 +155,15 @@
       .filter((g) => g.chords.length),
   );
 
-  /** The Key the text names, as the pickers write it, or null while it can't be read. */
-  function keyOf(text: string): string | null {
-    const read = splitKey(text);
-    return read && joinKey(read.tonic, read.minor);
-  }
-
   /**
    * The Key the field now names, kept for this device once it reads. A text
    * that names the Key already showing isn't a change: committing Dbm as
    * C#m mustn't throw away the Chord picked after it.
    */
   function setKey(text: string) {
-    keyText = text;
-    const key = keyOf(text);
-    if (!key || key === keyOf(suggestKey)) return;
+    typedKey = text;
+    const key = keyText(text);
+    if (!key || key === keyText(suggestKey)) return;
     after = null;
     onpickkey(key);
   }
@@ -179,16 +174,16 @@
    * Dbm could not be typed at all.
    */
   function commitKey() {
-    keyText = keyOf(keyText) ?? keyText;
+    typedKey = keyText(typedKey) ?? typedKey;
   }
 
   function pickTonic(tonic: string) {
-    setKey(joinKey(tonic, keyParts.minor));
+    setKey(joinKey({ tonic, minor: keyPicked.minor }));
   }
 
   function pickQuality(minor: boolean) {
-    if (minor === keyParts.minor) return;
-    setKey(joinKey(flipQuality(keyParts.tonic, keyParts.minor), minor));
+    if (minor === keyPicked.minor) return;
+    setKey(joinKey(otherQuality(keyPicked)));
   }
 </script>
 
@@ -401,7 +396,7 @@
             <input
               id="finder-key"
               type="text"
-              value={keyText}
+              value={typedKey}
               oninput={(e) => setKey(e.currentTarget.value)}
               onblur={commitKey}
               onkeydown={(e) => e.key === 'Enter' && commitKey()}
@@ -416,8 +411,8 @@
             <Picker
               id="finder-tonic"
               aria-labelledby="finder-tonic-label"
-              options={tonics(keyParts.minor)}
-              value={keyParts.tonic}
+              options={tonics(keyPicked.minor)}
+              value={keyPicked.tonic}
               onpick={pickTonic}
             />
           </div>
@@ -427,7 +422,7 @@
               id="finder-key-quality"
               aria-labelledby="finder-key-quality-label"
               options={[false, true]}
-              value={keyParts.minor}
+              value={keyPicked.minor}
               text={(minor) => (minor ? 'minor' : 'major')}
               onpick={pickQuality}
             />
@@ -446,10 +441,10 @@
         </div>
 
         {#if suggested.kind === 'unreadable'}
-          {#if keyText.trim()}
-            <p class="unknown" role="status">No Key I know is called “{keyText.trim()}”.</p>
+          {#if typedKey.trim()}
+            <p class="unknown" role="status">No Key I know is called “{typedKey.trim()}”.</p>
           {:else}
-            <p class="muted">Pick a Tonic and a Quality, or type a Key.</p>
+            <p class="muted">Pick a Tonic and a quality, or type a Key.</p>
           {/if}
         {:else}
           {#if after && suggested.follows}

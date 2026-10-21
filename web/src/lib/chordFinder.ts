@@ -183,10 +183,11 @@ export function keyName(text: string): string | null {
   return readKey(text)?.name ?? null;
 }
 
-/** A Key split into the Tonic and the Quality Suggest's pickers hold. */
+/** A Key split into the Tonic and the quality Suggest's pickers hold. */
 export interface KeyParts {
   /** The Tonic as this Key's own signature spells it: Eb in Eb major, D# in D# minor. */
   tonic: string;
+  /** Whether the quality is minor: a Key is a Tonic with major or minor on it. */
   minor: boolean;
 }
 
@@ -203,25 +204,35 @@ export function tonics(minor: boolean): readonly string[] {
   return keys.filter((key) => key.endsWith('m') === minor).map((key) => (minor ? key.slice(0, -1) : key));
 }
 
-/** A Key split into the Tonic and Quality the pickers hold, or null if it can't be read. */
+/** A Key split into the Tonic and quality the pickers hold, or null if it can't be read. */
 export function splitKey(text: string): KeyParts | null {
   const read = readKey(text);
   return read && { tonic: read.signature[read.tonic], minor: read.minor };
 }
 
-/** The Key a Tonic and a Quality name, as the pickers write it (G, Em). */
-export function joinKey(tonic: string, minor: boolean): string {
+/** The Key a Tonic and a quality name, as the pickers write it (G, Em). */
+export function joinKey({ tonic, minor }: KeyParts): string {
   return tonic + (minor ? 'm' : '');
 }
 
 /**
- * The same Tonic in the other Quality, re-spelled for it: Eb major flips to
- * D# minor, never Eb minor. The pitch is what's kept; the spelling follows
- * the signature of the Quality it lands in.
+ * A Key as the pickers write it (G, Em), spelled from its own signature, or
+ * null if it can't be read: Db is C#, and Ebm is D#m. It's to a Key what
+ * tuningText is to a tuning, the one spelling the app writes.
  */
-export function flipQuality(tonic: string, minor: boolean): string {
+export function keyText(text: string): string | null {
+  const parts = splitKey(text);
+  return parts && joinKey(parts);
+}
+
+/**
+ * The same pitch in the other quality, re-spelled for it: Eb major becomes
+ * D# minor, never Eb minor. The pitch is what's kept; the spelling follows
+ * the signature of the quality it lands in.
+ */
+export function otherQuality({ tonic, minor }: KeyParts): KeyParts {
   const at = tonics(minor).indexOf(tonic);
-  return at < 0 ? tonic : tonics(!minor)[at];
+  return { tonic: at < 0 ? tonic : tonics(!minor)[at], minor: !minor };
 }
 
 export type Suggest =
