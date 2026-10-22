@@ -1,6 +1,27 @@
 # Settings and Backups
 
-A reference for keeping copies of your work, moving it between installs, and setting Bandmate up the way you like: look up the part you need. Writing a song and recording it are on [Writing and recording](/features).
+A reference for setting Bandmate up the way you like, keeping copies of your work, and moving it between installs: look up the part you need. Writing a song and recording it are on [Writing and recording](/features).
+
+## Settings
+
+**Settings**, at the foot of the side bar, has four tabs:
+
+- **This device**: what each device keeps for itself.
+  - **Appearance**: three colour palettes, Terracotta (the default), Ink and Olive, each in light and dark. Follow your system's light or dark, or pick one.
+  - **Recording**: every input on this device, each channel of an audio interface on its own, with its latency. Pick the one you record from, and check its level with **Test input**. Open one to [calibrate](/features#calibrate) it, or type its latency. Inputs that aren't plugged in keep their latency, under **Not connected**, where you can forget them.
+  - **Rhyming dictionaries**: download one for each language you write in, so [Rhymes](/features#rhymes) can suggest words in it, or remove one you no longer need.
+  - **Chord diagrams**: flip them for left-handed playing.
+- **Shortcuts**: every [keyboard shortcut](/features#keyboard-shortcuts), with its keys. Open one to see what it does and where it works, and to [change its keys](#change-a-shortcut-s-keys), or search them as in the shortcuts list. Shown only on a bigger screen.
+- **Backups**: see [Backups](#backups).
+- **About**: the version you're running, what changed in it, whether a newer one is out, the yt-dlp in use, and the licenses of what ships in Bandmate.
+
+### Change a shortcut's keys
+
+In **Settings → Shortcuts**, open a shortcut. Click one of its keys and press the one you want, **Add key** to give it another, or remove a key with its ×. Esc cancels. A mouse shortcut, like Ctrl+click or Shift+drag, keeps its click, drag or scroll: choose which of Ctrl, Alt and Shift you hold with it, at least one.
+
+A key another shortcut already has is refused, with a link to that shortcut so you can free the key there first. So are keys the browser or the page needs, like Tab or Ctrl+W.
+
+**Reset** puts one shortcut back, and **Reset to defaults** puts them all back. Your keys are kept on each device, so each keyboard you use can have its own.
 
 ## Backups
 
@@ -23,24 +44,3 @@ Turn on **Make Backups on a schedule**, choose daily, weekly or monthly, and Ban
 Each is marked **Scheduled** in the list. Bandmate keeps only the newest Scheduled Backups, as many as you choose from 1 to 30, and deletes the oldest when a new one is made. Backups you make or upload are never deleted. Choosing fewer, or turning the schedule off, deletes nothing until the next one is made. To hold on to a Scheduled Backup, say one from before a big change, choose **Keep** in its ⋯ menu: it's then like a Backup you made, not counted among those kept, and never deleted unless you delete it.
 
 If one couldn't be made, for example because the disk is full, the Scheduled Backups card says why, as does Bandmate's log. Fix the cause, and Bandmate tries again within the hour.
-
-## Settings
-
-**Settings**, at the foot of the side bar, has four tabs:
-
-- **This device**: what each device keeps for itself.
-  - **Appearance**: three colour palettes, Terracotta (the default), Ink and Olive, each in light and dark. Follow your system's light or dark, or pick one.
-  - **Recording**: every input on this device, each channel of an audio interface on its own, with its latency. Pick the one you record from, and check its level with **Test input**. Open one to [calibrate](/features#calibrate) it, or type its latency. Inputs that aren't plugged in keep their latency, under **Not connected**, where you can forget them.
-  - **Rhyming dictionaries**: download one for each language you write in, so [Rhymes](/features#rhymes) can suggest words in it, or remove one you no longer need.
-  - **Chord diagrams**: flip them for left-handed playing.
-- **Shortcuts**: every [keyboard shortcut](/features#keyboard-shortcuts), with its keys. Open one to see what it does and where it works, and to [change its keys](#change-a-shortcut-s-keys), or search them as in the shortcuts list. Shown only on a bigger screen.
-- **Backups**: see [Backups](#backups).
-- **About**: the version you're running, what changed in it, whether a newer one is out, the yt-dlp in use, and the licenses of what ships in Bandmate.
-
-### Change a shortcut's keys
-
-In **Settings → Shortcuts**, open a shortcut. Click one of its keys and press the one you want, **Add key** to give it another, or remove a key with its ×. Esc cancels. A mouse shortcut, like Ctrl+click or Shift+drag, keeps its click, drag or scroll: choose which of Ctrl, Alt and Shift you hold with it, at least one.
-
-A key another shortcut already has is refused, with a link to that shortcut so you can free the key there first. So are keys the browser or the page needs, like Tab or Ctrl+W.
-
-**Reset** puts one shortcut back, and **Reset to defaults** puts them all back. Your keys are kept on each device, so each keyboard you use can have its own.
