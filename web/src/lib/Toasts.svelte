@@ -21,10 +21,20 @@
     /** How much of the foot of the window the docked Timeline takes, which the stack stays clear of. */
     dock?: number;
   } = $props();
+
+  /**
+   * Keeps the end of the stack in view as an error comes or goes: the
+   * surface refused latest is last, and once the stack is taller than its
+   * bound it's the one that would be scrolled out of sight.
+   */
+  const showingLatest = (stack: HTMLElement) => {
+    void saves.errors;
+    stack.scrollTop = stack.scrollHeight;
+  };
 </script>
 
 {#if saves.errors.length > 0}
-  <div class="stack" style:--dock="{dock}px">
+  <div class="stack" style:--dock="{dock}px" {@attach showingLatest}>
     <!-- The surface refused latest is last, so it's nearest the corner. -->
     {#each saves.errors as { surface, message } (surface)}
       <div class="toast" role="alert">

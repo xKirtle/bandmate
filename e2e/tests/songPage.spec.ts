@@ -61,10 +61,10 @@ async function altDragClip(page: Page, target: Locator, by: number) {
 
 /** A refused save's toast in the stack, labelled with the surface its edit was made on. */
 const saveError = (page: Page, surface = 'Details') =>
-  page.getByRole('alert').filter({ has: dismissError(page, surface) });
+  page.getByRole('alert').filter({ has: dismissButton(page, surface) });
 
-/** The dismiss of a surface's toast. */
-const dismissError = (page: Page, surface = 'Details') =>
+/** The dismiss button on a surface's toast. */
+const dismissButton = (page: Page, surface = 'Details') =>
   page.getByRole('button', { name: `Dismiss the ${surface} error` });
 
 test('a Clip moved, trimmed and deleted is undone and redone a step at a time', async ({ page, bandmate }) => {
@@ -1304,7 +1304,7 @@ test('a refused save stays in its toast until its dismiss is pressed', async ({ 
   // On no timer: still there a while later, until it's dismissed.
   await page.waitForTimeout(1000);
   await expect(saveError(page)).toContainText('Disk full');
-  await dismissError(page).click();
+  await dismissButton(page).click();
   await expect(saveError(page)).toHaveCount(0);
 });
 
