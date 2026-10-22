@@ -11,9 +11,17 @@ A reference for setting Bandmate up the way you like, keeping copies of your wor
   - **Recording**: every input on this device, each channel of an audio interface on its own, with its latency. Pick the one you record from, and check its level with **Test input**. Open one to [calibrate](/features#calibrate) it, or type its latency. Inputs that aren't plugged in keep their latency, under **Not connected**, where you can forget them.
   - **Rhyming dictionaries**: download one for each language you write in, so [Rhymes](/features#rhymes) can suggest words in it, or remove one you no longer need.
   - **Chord diagrams**: flip them for left-handed playing.
-- **Shortcuts**: every [keyboard shortcut](/features#keyboard-shortcuts), with its keys. Open one to see what it does and where it works, and to [change its keys](#change-a-shortcut-s-keys), or search them as in the shortcuts list. Shown only on a bigger screen.
+- **Shortcuts**: every [keyboard shortcut](#keyboard-shortcuts), with its keys. Open one to see what it does and where it works, and to [change its keys](#change-a-shortcut-s-keys), or search them as in the shortcuts list. Shown only on a bigger screen.
 - **Backups**: see [Backups](#backups).
 - **About**: the version you're running, what changed in it, whether a newer one is out, the yt-dlp in use, and the licenses of what ships in Bandmate.
+
+## Keyboard shortcuts
+
+On a song's page, press **?**, or the keyboard button by Write and Read, to see every shortcut. Type in the search at its top to find one by what it does or by its keys, like "split" or "Space".
+
+<img src="@screenshots/shortcuts-sheet.png" alt="The shortcuts list: a search and Change keys at its top, then each shortcut with what it does, where it works and its keys">
+
+On a Mac, ⌘ works wherever Ctrl does. To use other keys, see [below](#change-a-shortcut-s-keys).
 
 ### Change a shortcut's keys
 
