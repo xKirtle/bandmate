@@ -556,6 +556,19 @@ async function number(page, places, { first = 1, into } = {}) {
   await page.context().close();
 }
 
+// The shortcuts sheet on the hero Song, opened with ?, its first Shortcuts
+// at their default keys. It changes nothing in the Song.
+{
+  const page = await open(heroURL);
+  await page.keyboard.press("?");
+  const sheet = page.getByRole("dialog", { name: "Keyboard shortcuts" });
+  await sheet.waitFor();
+  // Without the focus ring opening it leaves on the search.
+  await sheet.getByRole("searchbox").blur();
+  await save(page, "shortcuts-sheet", { clip: await sheet.boundingBox() });
+  await page.context().close();
+}
+
 // A phone, held upright.
 const phone = {
   colorScheme: "dark",
