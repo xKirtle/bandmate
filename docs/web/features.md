@@ -74,7 +74,7 @@ The **Chords** page, in the side bar, helps with chords away from any song, on g
 
 ## Beats
 
-Keep the music you write to in one library, and use it in any song.
+The **Beats** page, in the side bar, is your Beat Library: the music you write to, kept in one place and used in any song.
 
 <img src="@screenshots/beat-library-labelled.png" alt="The Beat Library, numbered 1 to 6 to match the list below it">
 
