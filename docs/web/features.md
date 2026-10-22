@@ -89,10 +89,10 @@ You can also attach a song's finished recordings, made elsewhere, to listen back
 
 ### Beats from a link
 
-Paste a link to a video or track on YouTube, SoundCloud, Bandcamp or [any other site yt-dlp supports](https://github.com/yt-dlp/yt-dlp/blob/master/supportedsites.md), and Bandmate downloads its audio into your library, with the credit filled in.
+Paste a link to a video or track on YouTube, SoundCloud, Bandcamp or [any other site yt-dlp supports](https://github.com/yt-dlp/yt-dlp/blob/master/supportedsites.md), and Bandmate adds its audio to your library, with the credit filled in.
 
-- It takes one video or track at a time, not playlists or live streams, up to 500 MB [unless you change it](/self-hosting#configuration).
-- If a site stops working, open **Settings → About** and press **Update** beside yt-dlp, the downloader Bandmate uses. You don't need to wait for a new Bandmate.
+- One video or track at a time, not playlists or live streams, up to 500 MB [unless you change it](/self-hosting#configuration).
+- If a site stops working, press **Update** beside yt-dlp in **Settings → About**. You don't need to wait for a new Bandmate.
 
 ## Timeline
 
@@ -114,9 +114,9 @@ Every song has a timeline: its beat, your takes and any other audio, laid out on
 
 In a narrower window, Import audio, Mix down and then the input fold into a **⋯** at the end of the row, which lists just the ones that don't fit; the input is **Record from…** there. On a phone held upright, the timeline only plays, and offers just Mix down.
 
-**Undo** and **Redo** are at the top of the song's page, beside Write and Read. Undo takes back your latest change to the song, one at a time, whether to its sections, alternates and Scrapbook, the timeline or a line's timing, and Redo makes it again. They work in Read mode and on a phone too, even on a change you made in a wider window, until you leave the song. While you record a take, or a merge is being made, they're off. Undoing a change to the lyrics stops syncing.
+**Undo** and **Redo** are at the top of the song's page, beside Write and Read. Undo takes back your changes to the song's sections, alternates, Scrapbook, timeline and line timings, one at a time, until you leave the song. They're off while you record a take or a merge is being made.
 
-Typing in a section's lines, its label or an alternate's name can be undone once you leave the box: everything you typed there, from clicking in to clicking out, comes back as it was in one go. While you're still in the box, Ctrl+Z undoes your typing a bit at a time, as in any text box. Clicking Undo while you're typing takes back what you've typed since you clicked in.
+Undo takes back everything you typed in a section's lines, its label or an alternate's name since you clicked in, in one go. While you're still in the box, Ctrl+Z undoes your typing a bit at a time, as in any text box.
 
 A clip's **⋯** menu sets its **tempo** and **pitch**, each on its own or both together: slow a beat down to write over it, or move it a couple of semitones to suit your voice. Select several clips to change them all at once. The file itself is never changed, so you can always set them again, or reset them.
 
@@ -179,4 +179,4 @@ On a Mac, ⌘ works wherever Ctrl does. To use other keys, see [Change a shortcu
 
 ## What's next
 
-Ideas for Bandmate's future are on the [roadmap](https://github.com/xKirtle/bandmate/blob/main/docs/roadmap.md). It's a wishlist, not a queue: nothing on it is promised, and it isn't in the order things will be built. What each version added is in the [release notes](https://github.com/xKirtle/bandmate/releases).
+Ideas for Bandmate's future are on the [roadmap](https://github.com/xKirtle/bandmate/blob/main/docs/roadmap.md), a wishlist: nothing on it is promised, or in the order it'll be built. What each version added is in the [release notes](https://github.com/xKirtle/bandmate/releases).
