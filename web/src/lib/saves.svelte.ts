@@ -185,7 +185,7 @@ export class Saves {
   #queue: Promise<unknown> = Promise.resolve();
   /** Counts the saves queued. */
   #turns = 0;
-  /** The latest save queued before a save error that only a save asked for since clears. */
+  /** The latest save queued before the error about to be remembered, which only a save asked for since clears. */
   #errorKeptUntil = 0;
   #closed = false;
   #holds = 0;

@@ -184,12 +184,21 @@ describe('Saves, errors per surface', () => {
     expect(saves.errorOn('lyricSheet')).toMatch(/Can't reach Bandmate/);
   });
 
-  it('remembers a Section move refused from the Scrapbook against the Lyric Sheet', async () => {
+  it('remembers a Section move refused from the Scrapbook against the Lyric Sheet, like one made there', async () => {
     const server = new FakeSongServer(scrapbookSong());
     const saves = await savesFor(server);
+    // Moved out of the Scrapbook, which the fake server refuses.
     expect(await saves.changeLyricSheet({ kind: 'addToArrangement', sectionId: 1 })).toBe(false);
     expect(saves.errorOn('lyricSheet')).toMatch(/addToArrangement is not modelled/);
     expect(saves.errorOn('details')).toBeNull();
+
+    // The same move made in the Lyric Sheet, refused on the network.
+    const inSheet = new FakeSongServer(emptySong({ arrangement: [1], sections: scrapbookSong().sections }));
+    const sheetSaves = await savesFor(inSheet);
+    inSheet.failNext(1);
+    expect(await sheetSaves.changeLyricSheet({ kind: 'removeFromArrangement', sectionId: 1 })).toBe(false);
+    expect(sheetSaves.errorOn('lyricSheet')).toMatch(/Can't reach Bandmate/);
+    expect(sheetSaves.errorOn('details')).toBeNull();
   });
 });
 
