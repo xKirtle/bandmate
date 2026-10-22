@@ -62,10 +62,12 @@ A [Backup](/settings#backups) of a song holds its Snapshots, so restoring the Ba
 
 The **Chords** page, in the side bar, helps with chords away from any song, on guitar, in standard tuning or any other.
 
-- **Look up** a chord by name, like Cmaj7 or D/F#, and see the ways to play it, best first. Press the speaker to hear one strummed, in the tuning you picked. Prefer one, and that's the shape Read mode shows you.
+<img src="@screenshots/chords-look-up.png" alt="Look up showing Cmaj7: its notes, then its shapes as chord diagrams, best first">
+
+- **Look up** a chord by name, like Cmaj7 or D/F#. Press the speaker to hear a shape strummed, in the tuning you picked. Prefer one, and that's the shape Read mode shows you.
 - **Name it**: put your fingers on the fretboard, and Bandmate tells you which chord you're playing. Press the speaker to hear the shape strummed, even one that isn't a chord.
 - **Suggest**: pick a key — a tonic and major or minor, or type it — and see the chords that belong in it, the ones borrowed from other keys, and what usually comes after a chord. Each one shows a way to play it: the one you prefer, or else the best. Press the speaker to hear it strummed. **More Voicings** opens it in Look up, with the other ways.
-- Beside each speaker, the rising bars arpeggiate the shape: they play it one string at a time, low to high, so you can hear each note.
+- The rising bars arpeggiate the shape: they play it one string at a time, low to high, so you can hear each note.
 - Left-handed? Turn it on in Settings, under **This device**, and every diagram flips, the fretboard too.
 
 ## Listen
