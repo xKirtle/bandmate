@@ -2,7 +2,6 @@ import type { Clip, ClipFades, ClipMove, Track } from './api';
 import { clampMove, clampTrimEnd, clampTrimStart, draggedNudge, moveSelection, nudged } from './clipEdit';
 import { draggedFade, grabbedFade, isFadeEnd, type FadeEnd } from './clipFade';
 import { draggedGain } from './clipGain';
-import { activeTake } from './clipSource';
 import type { Edit } from './history';
 import type { PointerAt } from './pointerFollow';
 import { pastSlop, type Point } from './press';
@@ -19,7 +18,7 @@ import {
 } from './snapping';
 
 // Dragging a Clip, from press to release: its body moves it, along its
-// Track or onto another; an edge trims it; Alt+dragging a Clip of Takes
+// Track or onto another; an edge trims it; Alt+dragging any Clip
 // nudges its audio within it; its gain line sets its Gain, finely
 // with Shift held; a dot at either end of the gain line sets its fade in or
 // fade out. It stops at its neighbours, the source's ends and 0:00 as it
@@ -83,7 +82,7 @@ export interface PressKeys {
   free: boolean;
   /** Mod, so a click adds the Clip to the Selection or takes it out. */
   toggles: boolean;
-  /** Alt, so dragging a Clip of Takes nudges its audio inside it. */
+  /** Alt, so dragging a Clip nudges its audio inside it, whatever the Clip holds. */
   nudges: boolean;
 }
 
@@ -249,8 +248,7 @@ export class ClipDrag {
    * then, as clicking it does.
    */
   press(clip: Clip, grip: ClipGrip, at: PointerAt, keys: PressKeys, measured: ClipMeasure = {}) {
-    const take = activeTake(clip);
-    let mode: ClipDragMode = grip === 'move' && keys.nudges && take ? 'nudge' : grip;
+    let mode: ClipDragMode = grip === 'move' && keys.nudges ? 'nudge' : grip;
     let grab = at.time - clip.start;
     let rests = 0;
     if (isFadeEnd(grip)) {

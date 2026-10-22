@@ -42,6 +42,9 @@ const textSave = { method: 'PUT', url: '**/api/songs/*/alternates/*/text' };
 /** A Clip of Takes, with its Nudge and the Takes the shared Clip leaves to tests to read. */
 type TakesClip = Clip & { activeTakeId: number; nudge: number; takes: { id: number }[] };
 
+/** A Clip with its Nudge, which the shared Clip type leaves to tests to read. */
+type NudgedClip = Clip & { nudge: number };
+
 /** The field a menu's Nudge entry shows, in milliseconds. */
 const nudgeField = (page: Page) => page.getByRole('spinbutton', { name: 'ms' });
 
@@ -335,6 +338,27 @@ test('a Clip of Takes Alt+dragged left nudges its audio earlier, past zero, and 
   await page.keyboard.press('ContextMenu');
   await page.getByRole('menuitem', { name: /^Nudge/ }).click();
   await expect(nudgeField(page)).toHaveValue('-4200');
+});
+
+test('a Clip of a Beat Alt+dragged nudges its audio too, and never moves the Clip', async ({ page, bandmate }) => {
+  const song = await heroSong(bandmate);
+  await page.goto(`/songs/${song.id}`);
+  const beat = clip(page, 'Lorem Click');
+  await expect(beat).toHaveAccessibleName('Lorem Click, 0:00 to 1:30');
+  const [before] = await serverClips(bandmate, song.id, 'Beat');
+  expect(before).toMatchObject({ start: 0, offset: 0, nudge: 0 });
+
+  await altDragClip(page, beat, 40);
+
+  const nudgeOf = async () => ((await serverClips(bandmate, song.id, 'Beat'))[0] as NudgedClip).nudge;
+  await expect.poll(nudgeOf).toBeGreaterThan(0);
+  // The Clip kept its place and its window: only the Beat's audio moved.
+  expect((await serverClips(bandmate, song.id, 'Beat'))[0]).toMatchObject({
+    start: 0,
+    offset: before.offset,
+    length: before.length,
+  });
+  await expect(beat).toHaveAccessibleName(/^Lorem Click, (selected, )?0:00 to 1:30$/);
 });
 
 test('a negative Nudge typed in the Clip menu moves the audio as dragging left by as much does', async ({

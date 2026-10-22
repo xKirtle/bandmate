@@ -46,7 +46,7 @@ export type ClipMenuState = {
   canRecord: boolean;
   /** The name of the Sound a Clip of a Sound plays, or null for another Clip. */
   soundName: string | null;
-  /** The keys that nudge a Clip's audio, as shown, or null for none. */
+  /** The keys that nudge a Clip's audio by dragging it, as shown, or null for none. */
   nudgeKeys: string | null;
   /** The keys that copy, as shown, or null for none. */
   copyKeys: string | null;
@@ -108,9 +108,7 @@ export function clipActions(
     ...stretchActions(clip, commands, target, command),
     command(
       'nudge',
-      // The keys are named on a Clip of Takes, which is where the drag
-      // nudges: dragging another Clip with them held moves it instead.
-      nudgeAction(clip.nudge, clip.activeTakeId === null ? null : state.nudgeKeys, (ms) => {
+      nudgeAction(clip.nudge, state.nudgeKeys, (ms) => {
         void commands.run({ kind: 'nudge', target, ms });
       }),
     ),
@@ -234,7 +232,7 @@ function nudgeAction(nudge: number, nudgeKeys: string | null, set: (ms: number) 
   return {
     icon: MoveHorizontal,
     label: 'Nudge',
-    title: `Move the Clip's audio within it, in milliseconds, later if positive${nudgeKeys ? `; or ${nudgeKeys} the Clip` : ''}`,
+    title: `How far the Clip's audio is moved within it, in milliseconds, later if positive${nudgeKeys ? `; or ${nudgeKeys} the Clip` : ''}`,
     field: {
       value: Math.round(nudge * 1000),
       unit: 'ms',

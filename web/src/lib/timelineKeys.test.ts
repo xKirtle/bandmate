@@ -86,11 +86,11 @@ group('startOrEnd', () => {
 });
 
 group('nudges', () => {
-  it('nudges a Take inside its Clip when dragged with Alt', () => {
+  it("nudges a Clip's audio inside it when dragged with Alt", () => {
     expect(nudges(held({ altKey: true }))).toBe(true);
   });
 
-  it('moves the Clip when dragged without Alt', () => {
+  it('moves the Clip when dragged without Alt, as no nudge is asked for', () => {
     expect(nudges(held())).toBe(false);
     expect(nudges(held({ shiftKey: true }))).toBe(false);
   });
@@ -394,7 +394,7 @@ group('Keys as rebound', () => {
     rebind({
       toggleClip: { keys: [{ key: 'click', alt: true }] },
       addBox: { keys: [{ key: 'drag', shift: true }] },
-      nudgeTake: { keys: [{ key: 'drag', mod: true, alt: true }] },
+      nudgeClip: { keys: [{ key: 'drag', mod: true, alt: true }] },
       skipSnapping: { keys: [{ key: 'drag', alt: true }] },
       zoom: { keys: [{ key: 'wheel', shift: true }] },
     });

@@ -182,7 +182,7 @@ group('The list', () => {
       { name: 'Add or remove a Clip', group: 'Mouse', keys: 'Ctrl+click' },
       { name: 'Select Clips with a box', group: 'Mouse', keys: 'drag' },
       { name: 'Add Clips with a box', group: 'Mouse', keys: 'Ctrl+drag' },
-      { name: 'Nudge a Take inside its Clip', group: 'Mouse', keys: 'Alt+drag' },
+      { name: "Nudge a Clip's audio inside it", group: 'Mouse', keys: 'Alt+drag' },
       { name: 'Skip snapping', group: 'Mouse', keys: 'Shift+drag' },
       { name: 'Zoom the Timeline', group: 'Mouse', keys: 'Ctrl+wheel' },
     ]);

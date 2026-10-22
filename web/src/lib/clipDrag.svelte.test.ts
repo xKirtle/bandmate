@@ -258,7 +258,7 @@ describe('ClipDrag', () => {
       expect(drag.clip).toBeNull();
     });
 
-    it("nudges the Clip's audio instead with Alt held, for a Clip of Takes", () => {
+    it("nudges the Clip's audio instead with Alt held, on a Clip of Takes", () => {
       const { drag, press } = timelineDrag();
       press(3, 'move', 30, { nudges: true });
 
@@ -286,14 +286,31 @@ describe('ClipDrag', () => {
       expect(drag.release()).toEqual({ edit: { kind: 'setClipNudge', clipId: 3, nudge: -0.5 } });
     });
 
-    it('moves a Clip of a Beat with Alt held, as it has no Take to nudge', () => {
+    it("nudges a Clip of a Beat's audio with Alt held, never moving it", () => {
       const { drag, press } = timelineDrag();
       press(1, 'move', 15, { nudges: true });
 
       drag.move(at(16));
 
-      expect(drag.mode).toBe('move');
-      expect(drag.release()?.edit.kind).toBe('moveClip');
+      expect(drag.mode).toBe('nudge');
+      const [shown] = drag.shown;
+      // The Clip stays where it is: only the Beat's audio inside it moves.
+      expect(shown.at).toMatchObject({ start: 10, length: 10 });
+      expect(shown.trackId).toBe(1);
+      expect(shown.clip).toMatchObject({ nudge: 1 });
+      expect(drag.release()).toEqual({ edit: { kind: 'setClipNudge', clipId: 1, nudge: 1 } });
+    });
+
+    it("nudges a Clip of a Sound's audio with Alt held, as it does any other", () => {
+      const sound = { ...clip(4, 10, 20), beatId: null, soundId: 1 };
+      const { drag, press } = timelineDrag([track(1, [sound])]);
+      press(4, 'move', 15, { nudges: true });
+
+      drag.move(at(16));
+
+      expect(drag.mode).toBe('nudge');
+      expect(drag.shown[0].at).toMatchObject({ start: 10, length: 10 });
+      expect(drag.release()).toEqual({ edit: { kind: 'setClipNudge', clipId: 4, nudge: 1 } });
     });
 
     it('saves no Nudge when let go where the audio was', () => {

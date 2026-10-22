@@ -34,7 +34,7 @@ group('listGroups', () => {
         'Add or remove a Clip',
         'Select Clips with a box',
         'Add Clips with a box',
-        'Nudge a Take inside its Clip',
+        "Nudge a Clip's audio inside it",
         'Skip snapping',
         'Zoom the Timeline',
       ],
@@ -174,8 +174,8 @@ group('searchGroups', () => {
     expect(found('Shift+F10', 'mac')).toEqual(["Open a Clip's menu"]);
     for (const mod of ['Cmd+Z', 'Command+Z', 'Ctrl+Z', 'Control+Z']) expect(found(mod, 'mac')).toEqual(['Undo']);
     expect(found('cmd+shift+z', 'mac')).toEqual(['Redo']);
-    expect(found('option', 'mac')).toEqual(['Nudge a Cue by 0.1 s', 'Nudge a Take inside its Clip']);
-    expect(found('Alt+drag', 'mac')).toEqual(['Nudge a Take inside its Clip']);
+    expect(found('option', 'mac')).toEqual(['Nudge a Cue by 0.1 s', "Nudge a Clip's audio inside it"]);
+    expect(found('Alt+drag', 'mac')).toEqual(["Nudge a Clip's audio inside it"]);
   });
 
   it('finds a Shortcut by its description', () => {
