@@ -556,6 +556,62 @@ async function number(page, places, { first = 1, into } = {}) {
   await page.context().close();
 }
 
+// Rhymes on, suggesting rhymes for labore, the last word of Verse 1, with
+// the caret after it. The English rhyming dictionary is downloaded first,
+// to this shot's browser context alone, so no other shot has it.
+{
+  // Tall enough that the Timeline sits below the shot.
+  const page = await open(`${base}/settings`, {
+    ...desktop,
+    viewport: { width: 1440, height: 2000 },
+  });
+  await page
+    .getByRole("list", { name: "Rhyming dictionaries" })
+    .getByRole("listitem")
+    .filter({ hasText: "English" })
+    .getByRole("button", { name: "Download" })
+    .click();
+  await page.getByText(/^Downloaded, updated/).waitFor();
+  await page.goto(heroURL);
+  await page.waitForLoadState("networkidle");
+  await page.getByRole("button", { name: "Rhymes", exact: true }).click();
+  const verse = page.getByRole("article", { name: "Verse 1" });
+  await verse.locator("textarea").click();
+  await page.keyboard.press("Control+End");
+  const rhymes = page.getByRole("region", { name: "Rhymes" });
+  await rhymes.getByRole("heading", { name: "Perfect" }).waitFor();
+  // Off the Lyric Sheet, which the click leaves hovered.
+  await page.mouse.move(0, 0);
+
+  // The side column's other cards, under the Rhymes card, are hidden.
+  const card = page.locator(".part", { has: rhymes });
+  await page
+    .locator(".part")
+    .filter({ hasNot: rhymes })
+    .evaluateAll((parts) =>
+      parts.forEach((part) => (part.style.visibility = "hidden")),
+    );
+
+  // From the Lyric Sheet's heading, with the Rhymes button, down to Verse 1's
+  // foot, across to the Rhymes card's edge.
+  const sheet = await page
+    .getByRole("region", { name: "Lyric Sheet" })
+    .boundingBox();
+  const side = await card.boundingBox();
+  const end = await verse.boundingBox();
+  const left = sheet.x - 24;
+  const top = sheet.y - 8;
+  await save(page, "rhymes", {
+    clip: {
+      x: left,
+      y: top,
+      width: side.x + side.width + 24 - left,
+      height: Math.max(end.y + end.height, side.y + side.height) + 8 - top,
+    },
+  });
+  await page.context().close();
+}
+
 // A phone, held upright.
 const phone = {
   colorScheme: "dark",
