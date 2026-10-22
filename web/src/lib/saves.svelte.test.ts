@@ -111,6 +111,88 @@ describe('Saves', () => {
   });
 });
 
+describe('Saves, errors per surface', () => {
+  /** A Song of one Section in the Scrapbook, to move into the Arrangement. */
+  const scrapbookSong = () =>
+    emptySong({
+      scrapbook: [1],
+      sections: [{ id: 1, label: 'Idea', alternates: [{ id: 1, name: '', active: true, lines: [] }] }],
+    });
+
+  it('remembers a refused Details save against the Details, and no other surface', async () => {
+    const server = new FakeSongServer();
+    const saves = await savesFor(server);
+    server.failNext(1);
+    expect(await saves.submit(update(server, { key: 'Am' }))).toBe('failed');
+    expect(saves.errorOn('details')).toMatch(/Can't reach Bandmate/);
+    expect(saves.errorOn('timeline')).toBeNull();
+    expect(saves.errorOn('cues')).toBeNull();
+    expect(saves.errorOn('lyricSheet')).toBeNull();
+  });
+
+  it('keeps one error per surface, the latest on a surface in place of the one before it', async () => {
+    const server = new FakeSongServer();
+    const saves = await savesFor(server);
+    saves.report('BPM must be a whole number');
+    saves.report('Capo must be a whole number');
+    expect(saves.errorOn('details')).toBe('Capo must be a whole number');
+    expect(saves.saveError).toBe('Capo must be a whole number');
+  });
+
+  it('shows the surface that failed latest, holding what the others said', async () => {
+    const server = new FakeSongServer();
+    const saves = await savesFor(server);
+    saves.report('Capo must be a whole number');
+    expect(await saves.make(() => Promise.reject(new Error("Couldn't merge the Clips.")))).toBeNull();
+    expect(saves.saveError).toBe("Couldn't merge the Clips.");
+    saves.report('BPM must be a whole number');
+    expect(saves.saveError).toBe('BPM must be a whole number');
+    expect(saves.errorOn('timeline')).toBe("Couldn't merge the Clips.");
+  });
+
+  it("clears the error of the surface a save lands on, leaving the other surfaces' standing", async () => {
+    const server = new FakeSongServer();
+    const saves = await savesFor(server);
+    saves.report('Capo must be a whole number');
+    expect(await saves.make(() => Promise.reject(new Error("Couldn't merge the Clips.")))).toBeNull();
+    expect(await saves.edit({ kind: 'setLoop', loop: { start: 0, end: 4, on: true } })).not.toBeNull();
+    expect(saves.errorOn('timeline')).toBeNull();
+    expect(saves.errorOn('details')).toBe('Capo must be a whole number');
+    expect(saves.saveError).toBe('Capo must be a whole number');
+    expect(await saves.change(update(server, { capo: 2 }))).toBe(true);
+    expect(saves.errorOn('details')).toBeNull();
+    expect(saves.saveError).toBeNull();
+  });
+
+  it('remembers a refused undo or redo against the surface of the edit it replayed', async () => {
+    const server = new FakeSongServer(cuedSong());
+    const saves = await savesFor(server);
+    await saves.edit({ kind: 'setLoop', loop: { start: 0, end: 4, on: true } });
+    server.failNext(1);
+    expect(await saves.undo()).toBeNull();
+    expect(saves.errorOn('timeline')).toMatch(/Can't reach Bandmate/);
+
+    await saves.cue(setCue(10, 1.5), 'the Cue of Line 1');
+    server.failNext(1);
+    expect(await saves.undo()).toBeNull();
+    expect(saves.errorOn('cues')).toMatch(/Can't reach Bandmate/);
+
+    await saves.changeLyricSheet({ kind: 'addToScrapbook' });
+    expect(await saves.undo()).not.toBeNull();
+    server.failNext(1);
+    expect(await saves.redo()).toBeNull();
+    expect(saves.errorOn('lyricSheet')).toMatch(/Can't reach Bandmate/);
+  });
+
+  it('remembers a Section move refused from the Scrapbook against the Lyric Sheet', async () => {
+    const server = new FakeSongServer(scrapbookSong());
+    const saves = await savesFor(server);
+    expect(await saves.changeLyricSheet({ kind: 'addToArrangement', sectionId: 1 })).toBe(false);
+    expect(saves.errorOn('lyricSheet')).toMatch(/addToArrangement is not modelled/);
+    expect(saves.errorOn('details')).toBeNull();
+  });
+});
+
 describe('Saves, refreshing', () => {
   it('waits for saves on their way, then shows the Song as changed elsewhere', async () => {
     const server = new FakeSongServer();
@@ -196,7 +278,10 @@ describe('Saves, Cue changes', () => {
     expect(cueOf(saves.song, 10)).toBeNull();
     expect(cueOf(saves.song, 11)).toBe(3);
     expect(saves.saveError).toMatch(/^Couldn't save the Cue of Line 1, so it was taken back\./);
+    // A save on another surface says nothing about the Cue that was taken back.
     expect(await saves.change(update(server, { key: 'Am' }))).toBe(true);
+    expect(saves.errorOn('cues')).toMatch(/^Couldn't save the Cue of Line 1, so it was taken back\./);
+    expect(await saves.cue(setCue(10, 1.5), 'the Cue of Line 1')).toBe(true);
     expect(saves.saveError).toBeNull();
   });
 

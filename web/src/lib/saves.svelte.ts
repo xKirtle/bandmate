@@ -5,9 +5,16 @@
 // land in that order, each built against the Song and Timeline as saved
 // when its turn comes. Nothing throws: a save refused because the Song
 // changed elsewhere marks it stale; any other failure becomes the save
-// error, which a later save clears. Callers react to a save after awaiting
+// error of the surface its edit was made on, which a later save landing on
+// that surface clears (ADR 0029). Callers react to a save after awaiting
 // its result: their code up to its next await runs before the next turn
 // starts.
+//
+// Which surface an edit was made on is the method it arrives through, not
+// anything a caller passes: submit, setTags and report are the Details,
+// edit and make the Timeline, cue the Cues, changeLyricSheet the Lyric
+// Sheet. An undo or a redo takes its surface from the kind of the edit it
+// replays.
 //
 // A Cue change shows at once, made on top of the Song as saved (see
 // cueChanges.ts), so syncing keeps its rhythm. Its save is tried again for
@@ -60,6 +67,13 @@ import { savedRetrying, waitFor, type SongServer, type Wait } from './songServer
 
 /** How a save ended: saved, failed, refused as the Song changed elsewhere, or never sent as the Song's being deleted. */
 export type Submitted = 'saved' | 'failed' | 'stale' | 'closed';
+
+/**
+ * One of the Song page's four surfaces an edit can be made on, which a
+ * refused save is remembered against (ADR 0029). The Scrapbook's Section
+ * moves are the Lyric Sheet's, as they're the same change made elsewhere.
+ */
+export type Surface = 'details' | 'timeline' | 'cues' | 'lyricSheet';
 
 /** What a Timeline edit did: the Timeline as saved before it, and the Timeline it left. */
 export interface Edited {
@@ -144,8 +158,8 @@ export class Saves {
   savedTimeline: Timeline = $state.raw()!;
   /** Whether a save was refused, or a refresh couldn't be shown, because the Song changed elsewhere since it loaded. */
   stale = $state(false);
-  /** Why the latest save failed, until a later one lands. */
-  saveError = $state<string | null>(null);
+  /** Why the latest save on each surface failed, the surface that failed latest last. */
+  #errors: Map<Surface, Refused> = $state.raw(new Map());
   /** How many saves are queued or on their way. */
   pending = $state(0);
   /** How many times a refresh has replaced the Song and its Timeline with those changed elsewhere. */
@@ -193,6 +207,21 @@ export class Saves {
   /** The Song as saved. */
   get savedSong(): Song {
     return this.#savedSong;
+  }
+
+  /**
+   * Why the latest save failed, whichever surface it was made on, until a
+   * later save lands on that surface.
+   */
+  get saveError(): string | null {
+    let latest: string | null = null;
+    for (const refused of this.#errors.values()) latest = refused.message;
+    return latest;
+  }
+
+  /** Why the latest save on a surface failed, until a later one there lands. */
+  errorOn(surface: Surface): string | null {
+    return this.#errors.get(surface)?.message ?? null;
   }
 
   /** Whether anything isn't saved yet: saves on their way, Cue changes, or edits being typed. */
@@ -256,6 +285,7 @@ export class Saves {
   changeLyricSheet = (change: LyricSheetChange, visit?: FieldVisit): Promise<boolean> => {
     this.#undoablesQueued++;
     return this.#turn(
+      'lyricSheet',
       async (saved) => ({ before: saved, after: await this.#server.apply(saved, change) }),
       ({ before, after }) => {
         this.#savedSong = after;
@@ -272,6 +302,7 @@ export class Saves {
   /** Queues a change like change, resolving to how it ended. */
   submit = (op: (saved: Song) => Promise<Song>): Promise<Submitted> =>
     this.#turn(
+      'details',
       op,
       (s) => (this.#savedSong = s),
       (ended) => ended,
@@ -303,6 +334,7 @@ export class Saves {
     let edited: Edited | null = null;
     this.#undoablesQueued++;
     return this.#turn(
+      'timeline',
       (at) => work(at, this.savedTimeline, this.#server),
       ({ timeline, kept }) => {
         const before = this.savedTimeline;
@@ -369,10 +401,15 @@ export class Saves {
    */
   #step(next: () => Step | null): Promise<Undone | null> {
     let undone: Undone | null = null;
+    // The edit to replay is picked in the turn, so its surface is only
+    // known by the time a refusal has one to be remembered against.
+    let replaying: Surface = 'timeline';
     return this.#turn(
+      () => replaying,
       async (at) => {
         const step = next();
         if (!step) return null;
+        replaying = surfaceOfEdit(step.edit);
         const before = this.savedTimeline;
         return { step, before, after: await this.#send(at, step.edit) };
       },
@@ -434,6 +471,7 @@ export class Saves {
   setTags = (tags: string[]): Promise<string[] | null> => {
     let saved: string[] | null = null;
     return this.#turn(
+      'details',
       () => this.#server.setTags(tags),
       (s) => {
         saved = s;
@@ -482,6 +520,7 @@ export class Saves {
       }
     };
     return this.#turn(
+      'cues',
       op,
       () => {},
       (ended) => {
@@ -502,9 +541,12 @@ export class Saves {
     throw refused;
   }
 
-  /** Shows an error found before saving, e.g. a field typed wrong, until a later save lands. */
+  /**
+   * Shows an error found before saving a Detail, e.g. a field typed wrong,
+   * until a later Details save lands.
+   */
   report = (message: string) => {
-    this.saveError = message;
+    this.#refuse('details', message);
   };
 
   /**
@@ -572,28 +614,34 @@ export class Saves {
       await deleteSend(this.#savedSong);
       return true;
     } catch (e) {
-      this.#fail(e);
+      // The Delete is pressed in the Song's header, with its Details.
+      this.#fail(e, 'details');
       this.#closed = false;
       return false;
     }
   };
 
   /**
-   * Queues a turn: op runs against the Song as saved once the turns before
-   * it are over, show shows what it returns, and the result says how it
-   * ended to the caller. Never rejects.
+   * Queues a turn on a surface: op runs against the Song as saved once the
+   * turns before it are over, show shows what it returns, and the result
+   * says how it ended to the caller. Never rejects.
    */
-  #turn<T, R>(op: (saved: Song) => Promise<T>, show: (result: T) => void, result: (ended: Submitted) => R): Promise<R> {
+  #turn<T, R>(
+    on: OnSurface,
+    op: (saved: Song) => Promise<T>,
+    show: (result: T) => void,
+    result: (ended: Submitted) => R,
+  ): Promise<R> {
     if (this.#closed) return Promise.resolve(result('closed'));
     this.pending++;
     const turn = ++this.#turns;
     const done = this.#queue.then(async (): Promise<R> => {
       try {
         show(await op(this.#savedSong));
-        if (turn > this.#errorKeptUntil) this.saveError = null;
+        this.#landed(surfaceOf(on), turn);
         return result('saved');
       } catch (e) {
-        return result(this.#fail(e));
+        return result(this.#fail(e, surfaceOf(on)));
       } finally {
         this.pending--;
       }
@@ -602,14 +650,34 @@ export class Saves {
     return done;
   }
 
-  #fail(e: unknown): Submitted {
+  #fail(e: unknown, surface: Surface): Submitted {
     if (e instanceof ApiError && e.stale) {
       this.stale = true;
       this.#forget();
       return 'stale';
     }
-    this.saveError = (e as Error).message;
+    this.#refuse(surface, (e as Error).message);
     return 'failed';
+  }
+
+  /** Remembers why a save was refused against its surface, in place of the error that surface held. */
+  #refuse(surface: Surface, message: string) {
+    const errors = new Map(this.#errors);
+    // Taken out before it goes back in, so the surface that failed latest
+    // is last, and its message is the one saveError gives.
+    errors.delete(surface);
+    errors.set(surface, { message, keptUntil: this.#errorKeptUntil });
+    this.#errorKeptUntil = 0;
+    this.#errors = errors;
+  }
+
+  /** Clears a surface's error as a save lands there, leaving every other surface's standing. */
+  #landed(surface: Surface, turn: number) {
+    const refused = this.#errors.get(surface);
+    if (!refused || turn <= refused.keptUntil) return;
+    const errors = new Map(this.#errors);
+    errors.delete(surface);
+    this.#errors = errors;
   }
 }
 
@@ -624,3 +692,21 @@ interface Step {
   edit: HistoryEdit;
   done: (edited: Edited) => Undone;
 }
+
+/** A save refused: why, and the turn until which a save landing doesn't clear it. */
+interface Refused {
+  message: string;
+  keptUntil: number;
+}
+
+/**
+ * The surface a turn is on: the one its method stands for, or, for an undo
+ * or a redo, whichever the edit it turns out to replay was made on.
+ */
+type OnSurface = Surface | (() => Surface);
+
+const surfaceOf = (on: OnSurface): Surface => (typeof on === 'function' ? on() : on);
+
+/** The surface an edit kept to undo was made on. */
+const surfaceOfEdit = (edit: HistoryEdit): Surface =>
+  edit.kind === 'restoreCues' ? 'cues' : edit.kind === 'putSheetBack' ? 'lyricSheet' : 'timeline';
