@@ -18,11 +18,11 @@ A Backup restores into the same version of Bandmate or a newer one. To copy ever
 
 ### Scheduled Backups
 
-Turn on **Make Backups on a schedule**, choose daily, weekly or monthly, and Bandmate backs up everything on its own, the first as soon as you turn it on. If Bandmate was off when one came due, it makes one when it starts. If nothing in your Songs or Beats has changed since the last one, it skips it, so copies of the same work don't push out older Backups. The schedule is the same from every device.
+Turn on **Make Backups on a schedule**, choose daily, weekly or monthly, and Bandmate backs up everything on its own, the first as soon as you turn it on. If Bandmate was off when one came due, it makes one when it starts. If nothing in your Songs or Beats has changed since the last one, and it's still there, it skips it, so copies of the same work don't push out older Backups. The schedule is the same from every device.
 
-Each is marked **Scheduled** in the list. Bandmate keeps only the newest Scheduled Backups, as many as you choose from 1 to 30, and deletes the oldest when a new one is made. Backups you make or upload are never deleted. Choosing fewer, or turning the schedule off, deletes nothing until the next one is made. To hold on to a Scheduled Backup, say one from before a big change, choose **Keep** in its ⋯ menu: it's then like a Backup you made, never deleted unless you delete it.
+Each is marked **Scheduled** in the list. Bandmate keeps only the newest Scheduled Backups, as many as you choose from 1 to 30, and deletes the oldest when a new one is made. Backups you make or upload are never deleted. Choosing fewer, or turning the schedule off, deletes nothing until the next one is made. To hold on to a Scheduled Backup, say one from before a big change, choose **Keep** in its ⋯ menu: it's then like a Backup you made, not counted among those kept, and never deleted unless you delete it.
 
-If one couldn't be made, for example because the disk is full, the card says why, as does Bandmate's log. Fix the cause, and Bandmate tries again within the hour.
+If one couldn't be made, for example because the disk is full, the Scheduled Backups card says why, as does Bandmate's log. Fix the cause, and Bandmate tries again within the hour.
 
 ## Settings
 
