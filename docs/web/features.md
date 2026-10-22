@@ -1,14 +1,6 @@
-# Features
+# Writing and recording
 
-Bandmate follows a song from the first idea to a rough recording. Here's what you can do with it.
-
-## The Tour
-
-New to Bandmate? The Tour is a quick look at its core: a song's sections, lines and chords, the timeline with a beat on it, and recording a take. It shows them on a demo song built into Bandmate, which never appears among your songs or beats, or in your backups.
-
-While Bandmate has no songs or folders, the Songs page offers it under **Write your first Song**: **New here? Take the Tour**. Once you've written a song or made a folder, the offer is gone, and it's back only if you delete every song and folder. It's on a computer or tablet only: the Tour needs a wide window.
-
-Each step lights up one part of the page and says what it is. The page under it is only for looking at, so a stray click or key changes nothing. Go on with **Next** or →, and back with **Back** or ←. **End tour** or Esc ends it at any step, and **Finish** at the last: either way, you're back where you took it from.
+A reference for writing and recording a song in Bandmate, from the first idea to a rough recording: look up the part you're stuck on. Settings and Backups are on [a page of their own](/settings).
 
 ## Your songs
 
@@ -62,7 +54,7 @@ Snapshots thin out as they age, so months of history stay short enough to look t
 
 **Restore this Snapshot** makes your lyrics and Scrapbook the Snapshot's. What you have now is kept as a Snapshot first, marked "Before restoring", so you can go back, and Undo takes the restore back too. Lines that are still there keep their timings as they are now, and lines it brings back get the timings they had.
 
-A [Backup](#backups) of a song holds its Snapshots, kept or not, so restoring the Backup, here or on another install, brings them back too.
+A [Backup](/settings#backups) of a song holds its Snapshots, kept or not, so restoring the Backup, here or on another install, brings them back too.
 
 ## Chords
 
@@ -190,43 +182,6 @@ Holding a shortcut's keys down does it once, however long you hold them: a held 
 These are the defaults. To change a shortcut's keys, open it in **Settings → Shortcuts**: click one of its keys and press the one you want, or **Add key** to give it another, or remove a key with its ×. Esc cancels. For a mouse shortcut, like Ctrl+click or Shift+drag, choose which of Ctrl, Alt and Shift (⌘, ⌥ and ⇧ on a Mac) you hold, at least one: the click, drag or scroll stays as it is, and pinching always zooms. A key another shortcut already has is refused, with a link to that shortcut so you can free the key there first, and so are keys the browser or the page needs, like Tab or Ctrl+W, and Shift alone with the scroll wheel, which scrolls the timeline sideways. **Reset** puts one shortcut back, and **Reset to defaults** puts them all back. Your keys are kept on each device, so each keyboard you use can have its own.
 
 On a Mac, ⌘ works wherever Ctrl does.
-
-## Backups
-
-Keep copies of your work, and move it between installs.
-
-<img src="@screenshots/backups-labelled.png" alt="Settings' Backups, numbered 1 to 5 to match the list below it">
-
-1. **Scheduled Backups**: have Bandmate back up everything on its own. See [below](#scheduled-backups).
-2. **Upload** a Backup, made by this Bandmate or another.
-3. **New Backup**: of the songs you choose, your beat library, or both.
-4. **A Backup**, with when it was made and its size.
-5. **Restore** what you pick from it, or download it to keep it somewhere safe. Where a song is already here, you choose to replace it or keep both. On a phone, Restore and Download are in the Backup's ⋯ menu.
-
-A Backup restores into the same version of Bandmate or a newer one. To copy everything at once, see [copying the data folder](/self-hosting#copying-the-data-folder).
-
-### Scheduled Backups
-
-Turn on **Make Backups on a schedule**, choose daily, weekly or monthly, and Bandmate backs up everything on its own, each time that long has passed since its last Scheduled Backup. The first is made as soon as you turn the schedule on. Turning it off and on again doesn't make an extra one: the next still comes a day, week or month after the last. If Bandmate was off when one came due, it makes one when it starts, just one however long it was off. If nothing has changed in your Songs or Beats since the last one, and you haven't deleted it, Bandmate skips it, so a quiet month doesn't push out older Backups that differ, and looks again a day, week or month later. The schedule is the same from every device.
-
-Each is marked **Scheduled** in the list, and you can restore, download, rename or delete it like any other. Bandmate keeps only the newest Scheduled Backups, as many as you choose from 1 to 30, and deletes the oldest when a new one is made. Backups you make or upload are never deleted. Choosing fewer, or turning the schedule off, deletes nothing at once: the extras go when the next one is made.
-
-To hold on to a Scheduled Backup, say one from before a big change, choose **Keep** in its ⋯ menu. It's then like a Backup you made: no longer marked Scheduled, not counted among those kept, and never deleted unless you delete it.
-
-Under the settings, the card says when the last Scheduled Backup was made, that nothing has changed since, or that there's nothing to back up. If one couldn't be made, for example because the disk is full, the card says why, as does Bandmate's log. Fix the cause and Bandmate makes it at its next try, within the hour.
-
-## Settings
-
-**Settings**, at the foot of the side bar, has four tabs:
-
-- **This device**: what each device keeps for itself.
-  - **Appearance**: three colour palettes, Terracotta (the default), Ink and Olive, each in light and dark. Follow your system's light or dark, or pick one. More palettes may come.
-  - **Recording**: every input on this device, each channel of an audio interface on its own, with its latency or "Not calibrated" or "Skipped". Pick the one you record from, and check its level with **Test input** above the list: Bandmate only listens while it's on, and asks for the microphone the first time. Open any of them to calibrate it as in [Calibrate](#calibrate) without recording from it, or type its latency. Inputs that aren't plugged in keep their latency, listed under **Not connected**, to forget.
-  - **Rhyming dictionaries**: one for each language Bandmate suggests rhymes in, each with its download size. Download the ones you write in, so [Rhymes](#rhymes) can suggest words in them, or remove one you no longer need.
-  - **Chord diagrams**: flip them for left-handed playing.
-- **Shortcuts**: every [keyboard shortcut](#keyboard-shortcuts), with its keys. Open one to see what it does and where it works, and to [change its keys](#keyboard-shortcuts), or search them as in the shortcuts list. Shown only on a bigger screen.
-- **Backups**: see [Backups](#backups).
-- **About**: the version you're running, what changed in it, whether a newer one is out, the yt-dlp in use, and the packages and data that ship in Bandmate, with their licenses.
 
 ## What's next
 
