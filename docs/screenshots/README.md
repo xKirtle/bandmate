@@ -5,18 +5,22 @@ The screenshots in the README and on the docs site, `docs/web/`, taken in the da
 | File                    | Shows                                                          |
 | ----------------------- | -------------------------------------------------------------- |
 | `write-mode.png`        | The hero Song in Write mode on desktop, with the Timeline open |
-| `write-mode-labelled.png` | The hero Song in Write mode with the Chorus's Alternates open, numbered for the feature tour's key: Status, Details, Write and Read, a Section's Label, Chords, a Chord Line, an Alternate, a Cue, the Scrapbook and Rhymes |
+| `write-mode-labelled.png` | The hero Song in Write mode with the Chorus's Alternates open, numbered for the key on Writing and recording: Status, Details, Write and Read, a Section's Label, Chords, a Chord Line, an Alternate, a Cue, the Scrapbook and Rhymes |
 | `timeline-labelled.png` | The hero Song's Timeline with a Loop from 0:20 to 0:40 on, the playhead in it and the Take's Clip selected, numbered: Play, Loop, the Loop's stretch, Record, Import audio, Mix down, the mic button, Add a Track, the Chosen Track, the Beat's Clip and the Take's Clip |
 | `take-menu-labelled.png` | The Take's Clip menu, numbered: Retake, Takes and Nudge |
 | `input-picker-labelled.png` | The mic button's popover, the default input picked and hearing Chromium's fake microphone, numbered 4 and 5: Input and Level |
 | `beat-library-labelled.png` | The Beat Library, numbered: Add from link, the search, the Beat's title, its producer, the Song using it and Edit |
 | `backups-labelled.png` | Settings' Backups holding the demo Backup, numbered: Scheduled Backups, Upload, New Backup, the Backup and Restore |
 | `song-list.png` | The Songs page on desktop: both Folders, then the Songs in none, down to just below the list |
+| `chords-look-up.png` | The Chords page's Look up with Cmaj7 typed, in standard tuning: its notes and first page of Voicings, best first |
+| `shortcuts-sheet.png` | The shortcuts sheet on the hero Song, opened with ?, down to its first few Shortcuts at their default keys, above the first group its scroll cuts off |
 | `phone-song-list.png` | The Songs page on a phone: both Folders, then the Songs in none |
 | `phone-timeline.png` | The hero Song on a phone held sideways, the Timeline filling the screen |
 | `phone-lyric-sheet.png` | The hero Song in Read mode on a phone                          |
 | `read-mode.png`         | The hero Song in Read mode, with the Line playing highlighted  |
 | `sync-mode.webp`        | Sync mode cueing the Bridge's Lines, animated                  |
+| `snapshots.png` | The hero Song's Snapshots, grouped into the last 24 hours, daily and weekly, the oldest Kept and open beside Now, with Verse 1's third Line rewritten since. The capture takes them just before, so it shows them as taken over weeks |
+| `rhymes.png` | The hero Song in Rhyme mode with the Chorus's second Alternate chosen, suggesting rhymes for error, its last word, with the caret after it. The capture chooses that Alternate after the Snapshots, so Verse 1 shows their rewrite, and downloads the English rhyming dictionary to that shot's browser alone |
 | `calibrating.webp` | Calibrating the default input hands-free in Settings → Recording, from Calibrate to Save, animated. Chromium's fake microphone hears a click file the script writes, so it measures and finishes as it would for real |
 
 The demo content is lorem ipsum, kept in the Backup [`demo.bandmate`](demo.bandmate) beside this file: a hero Song with Chords, a Chord Line, a second Alternate of the Chorus with words of its own, Cues, a Scrapbook Section, a click-track Beat and two Takes, and six other Songs across every Status, one of them in the Folder "Album 2025". Restoring it is also a quick way to fill a dev stack with Songs that have Timelines.
@@ -56,7 +60,7 @@ When the UI changes and the screenshots go stale, restore the demo into a fresh 
 
    It drives Chromium at `/usr/bin/chromium` (set `CHROMIUM` to use another) against `http://localhost:8080` (set `BANDMATE_URL` to use another), and writes the images here. The animations are recorded from Chromium's screencast, timed against the Timeline playing and the calibration's clicks, so leave the machine idle while it runs, about a minute.
 
-Capturing leaves the Bridge cued, so restore again from step 1 before capturing again.
+Capturing leaves the Bridge cued, and Verse 1 rewritten with Snapshots taken, so restore again from step 1 before capturing again.
 
 ## Changing the demo
 

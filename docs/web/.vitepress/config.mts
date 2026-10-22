@@ -3,6 +3,13 @@ import { defineConfig } from 'vitepress';
 
 const repo = 'https://github.com/xKirtle/bandmate';
 
+// Writing and recording keeps the old Features page's address, which the
+// app's Tour links to.
+const usingBandmate = [
+  { text: 'Writing and recording', link: '/features' },
+  { text: 'Settings and Backups', link: '/settings' },
+];
+
 // Published to GitHub Pages at xkirtle.github.io/bandmate when a release is
 // tagged, so it describes the latest release, never unreleased main.
 export default defineConfig({
@@ -16,18 +23,17 @@ export default defineConfig({
   themeConfig: {
     logo: '/favicon.svg',
     nav: [
-      { text: 'Features', link: '/features' },
+      {
+        text: 'Using Bandmate',
+        activeMatch: '^/(features|settings)',
+        items: usingBandmate,
+      },
       { text: 'Self-hosting', link: '/self-hosting' },
       { text: 'Releases', link: `${repo}/releases` },
     ],
     sidebar: [
-      {
-        text: 'Bandmate',
-        items: [
-          { text: 'Features', link: '/features' },
-          { text: 'Self-hosting', link: '/self-hosting' },
-        ],
-      },
+      { text: 'Using Bandmate', items: usingBandmate },
+      { text: 'Self-hosting', link: '/self-hosting' },
       {
         text: 'In the repository',
         items: [
@@ -40,7 +46,7 @@ export default defineConfig({
     ],
     outline: [2, 3],
     socialLinks: [{ icon: 'github', link: repo }],
-    editLink: { pattern: `${repo}/edit/main/site/:path`, text: 'Edit this page on GitHub' },
+    editLink: { pattern: `${repo}/edit/main/docs/web/:path`, text: 'Edit this page on GitHub' },
     search: { provider: 'local' },
     footer: { message: 'Released under the GNU Affero General Public License v3.0.' },
   },

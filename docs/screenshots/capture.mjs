@@ -132,9 +132,10 @@ function animate(shot, name, { start, end, fps = 30, width = 1400 }) {
   await page.context().close();
 }
 
-// The numbered shots, for the feature tour (docs/web/features.md): each number is
-// placed beside what it names as the page is captured, so it follows the UI
-// as it changes. The tour's key under each shot says what the numbers are.
+// The numbered shots, for the wiki's Using Bandmate pages (docs/web/features.md
+// and settings.md): each number is placed beside what it names as the page is
+// captured, so it follows the UI as it changes. The key under each shot says
+// what the numbers are.
 
 /** Where an element's text ends, on its last line: the place for a number. */
 async function textEnd(locator) {
@@ -538,6 +539,51 @@ async function number(page, places, { first = 1, into } = {}) {
   await page.context().close();
 }
 
+// The Chords page's Look up, with Cmaj7 typed: its first page of Voicings,
+// best first, in standard tuning.
+{
+  const page = await open(`${base}/chords`);
+  const lookUp = page.getByRole("tabpanel", { name: "Look up" });
+  const chord = lookUp.getByLabel("Chord", { exact: true });
+  await chord.fill("Cmaj7");
+  await lookUp.getByRole("list", { name: /^Voicings of Cmaj7/ }).waitFor();
+  // Without the focus ring typing leaves on the field.
+  await chord.blur();
+  await page.mouse.move(0, 0);
+  await save(page, "chords-look-up", {
+    clip: await page.getByRole("main").boundingBox(),
+  });
+  await page.context().close();
+}
+
+// The shortcuts sheet on the hero Song, opened with ?, its first Shortcuts
+// at their default keys. It changes nothing in the Song.
+{
+  const page = await open(heroURL);
+  await page.keyboard.press("?");
+  const sheet = page.getByRole("dialog", { name: "Keyboard shortcuts" });
+  await sheet.waitFor();
+  // Opening it focuses the search: blurred, so the shot has no focus ring.
+  await sheet.getByRole("searchbox").blur();
+  // Down to just above the first group its scroll cuts off, if one is.
+  const box = await sheet.boundingBox();
+  const list = await sheet
+    .getByRole("region", { name: "Shortcuts" })
+    .boundingBox();
+  let bottom = box.y + box.height;
+  for (const heading of await sheet.getByRole("heading", { level: 3 }).all()) {
+    const { y, height } = await heading.boundingBox();
+    if (y + height > list.y + list.height) {
+      bottom = y - 8;
+      break;
+    }
+  }
+  await save(page, "shortcuts-sheet", {
+    clip: { ...box, height: bottom - box.y },
+  });
+  await page.context().close();
+}
+
 // A phone, held upright.
 const phone = {
   colorScheme: "dark",
@@ -617,6 +663,152 @@ const phone = {
   const shot = await stop();
   await page.context().close();
   animate(shot, "sync-mode", { start, end });
+}
+
+/** Sends a request to path under the hero Song's API, giving its JSON. */
+async function api(method, path, body) {
+  const response = await fetch(`${base}/api/songs/${hero.id}${path}`, {
+    method,
+    headers: { "content-type": "application/json" },
+    body: body && JSON.stringify(body),
+  });
+  if (!response.ok)
+    throw new Error(`${method} ${path}: ${await response.text()}`);
+  return response.json();
+}
+
+// The Snapshots dialog: the hero Song's first Snapshot, Kept, beside the Song
+// now, with Verse 1's third Line rewritten since. It changes the Lyric Sheet
+// and Scrapbook, so it comes after every other shot of the hero Song.
+{
+  // The first change takes a Snapshot of the demo's Lyric Sheet, then each
+  // Scrapbook Section deleted takes one, named for it.
+  const verse = (await api("GET", "")).sections.find(
+    (s) => s.label === "Verse 1",
+  ).alternates[0];
+  const lines = verse.lines.map((l) => l.text);
+  lines[2] = "[Am]Sed quia non [F]numquam";
+  await api("PUT", `/alternates/${verse.id}/text`, { text: lines.join("\n") });
+  for (const label of [
+    "Dolor riff",
+    "Second hook",
+    "Outro idea",
+    "Alt bridge",
+  ]) {
+    const sheet = await api("POST", "/scrapbook", { label });
+    await api("DELETE", `/sections/${sheet.scrapbook.at(-1)}`);
+  }
+  const taken = await api("GET", "/snapshots");
+  const first = taken.at(-1);
+  await api("PATCH", `/snapshots/${first.id}`, { kept: true });
+
+  // They were all taken just now; the list is grouped by age, so they're
+  // shown as taken over weeks, newest first: two today, two in the days
+  // before, and the Kept first one weeks ago.
+  const ago = (days, hours, minutes) => {
+    const when = new Date();
+    when.setDate(when.getDate() - days);
+    if (days) when.setHours(hours, minutes);
+    else when.setTime(when.getTime() - (hours * 60 + minutes) * 60_000);
+    return when.toISOString();
+  };
+  const takenAt = [
+    ago(0, 0, 20),
+    ago(0, 2, 50),
+    ago(2, 21, 40),
+    ago(9, 19, 5),
+    ago(45, 20, 15),
+  ];
+  const page = await open(heroURL);
+  await page.route(`${base}/api/songs/${hero.id}/snapshots`, async (route) => {
+    const list = await (await route.fetch()).json();
+    await route.fulfill({
+      json: list.map((s, i) => ({ ...s, takenAt: takenAt[i] ?? s.takenAt })),
+    });
+  });
+  await page.getByRole("button", { name: "Snapshots" }).click();
+  const dialog = page.getByRole("dialog", { name: "Snapshots" });
+  await dialog
+    .getByRole("list", { name: "Weekly, before that" })
+    .getByRole("button")
+    .first()
+    .click();
+  await dialog
+    .getByText(/^Differs:/)
+    .first()
+    .waitFor();
+  // Off the list, which the click leaves hovered.
+  await page.mouse.move(0, 0);
+  await save(page, "snapshots", { clip: await dialog.boundingBox() });
+  await page.context().close();
+}
+
+// Rhyme mode, suggesting Rhymes for error, the last word of the Chorus's
+// second Alternate, with the caret after it. Choosing that Alternate changes
+// the Song, so it comes after the Snapshots, which it would add to, and
+// chooses the first again after. The English rhyming dictionary is
+// downloaded first, to this shot's browser context alone, so no other shot
+// has it.
+{
+  const [first, second] = (await api("GET", "")).sections.find(
+    (s) => s.label === "Chorus",
+  ).alternates;
+  await api("POST", `/alternates/${second.id}/activate`);
+  // Tall enough that the Timeline sits below the shot.
+  const page = await open(`${base}/settings`, {
+    ...desktop,
+    viewport: { width: 1440, height: 2000 },
+  });
+  await page
+    .getByRole("list", { name: "Rhyming dictionaries" })
+    .getByRole("listitem")
+    .filter({ hasText: "English" })
+    .getByRole("button", { name: "Download" })
+    .click();
+  await page.getByText(/^Downloaded, updated/).waitFor();
+  // In the same context, which holds the dictionary.
+  await page.goto(heroURL);
+  await page.waitForLoadState("networkidle");
+  await page.getByRole("button", { name: "Rhymes", exact: true }).click();
+  const chorus = page.getByRole("article", { name: "Chorus" });
+  await chorus.locator("textarea").click();
+  await page.keyboard.press("Control+End");
+  const rhymes = page.getByRole("region", { name: "Rhymes" });
+  await rhymes.getByRole("heading", { name: "Perfect" }).waitFor();
+  const word = await rhymes.getByRole("searchbox").inputValue();
+  if (word !== "error")
+    throw new Error(`Rhymes are for ${word}, not error: has the demo changed?`);
+  // Off the Lyric Sheet, which the click leaves hovered.
+  await page.mouse.move(0, 0);
+
+  // The side column's other cards, under the Rhymes card, are hidden.
+  const card = page.locator(".part", { has: rhymes });
+  await page
+    .locator(".part")
+    .filter({ hasNot: rhymes })
+    .evaluateAll((parts) =>
+      parts.forEach((part) => (part.style.visibility = "hidden")),
+    );
+
+  // From the Lyric Sheet's heading, with the Rhymes button, down to the
+  // Chorus's foot, across to the Rhymes card's edge.
+  const sheet = await page
+    .getByRole("region", { name: "Lyric Sheet" })
+    .boundingBox();
+  const side = await card.boundingBox();
+  const end = await chorus.boundingBox();
+  const left = sheet.x - 24;
+  const top = sheet.y - 8;
+  await save(page, "rhymes", {
+    clip: {
+      x: left,
+      y: top,
+      width: side.x + side.width + 24 - left,
+      height: Math.max(end.y + end.height, side.y + side.height) + 8 - top,
+    },
+  });
+  await page.context().close();
+  await api("POST", `/alternates/${first.id}/activate`);
 }
 
 // Calibrating an Input hands-free, from Settings → Recording, as an animated

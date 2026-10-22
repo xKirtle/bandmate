@@ -1,14 +1,6 @@
-# Features
+# Writing and recording
 
-Bandmate follows a song from the first idea to a rough recording. Here's what you can do with it.
-
-## The Tour
-
-New to Bandmate? The Tour is a quick look at its core: a song's sections, lines and chords, the timeline with a beat on it, and recording a take. It shows them on a demo song built into Bandmate, which never appears among your songs or beats, or in your backups.
-
-While Bandmate has no songs or folders, the Songs page offers it under **Write your first Song**: **New here? Take the Tour**. Once you've written a song or made a folder, the offer is gone, and it's back only if you delete every song and folder. It's on a computer or tablet only: the Tour needs a wide window.
-
-Each step lights up one part of the page and says what it is. The page under it is only for looking at, so a stray click or key changes nothing. Go on with **Next** or →, and back with **Back** or ←. **End tour** or Esc ends it at any step, and **Finish** at the last: either way, you're back where you took it from.
+A reference for writing and recording a song in Bandmate, from the first idea to a rough recording: look up the part you're stuck on. Settings, keyboard shortcuts and Backups are on [a page of their own](/settings).
 
 ## Your songs
 
@@ -44,7 +36,9 @@ Hover or tap a chord, or tap its shape at the top, to step through the other way
 
 ### Rhymes
 
-The **Rhymes** button suggests rhymes for the word you're writing. It's there on a wide window, like a desktop's, and can't be on while you [sync](#sync).
+Turn **Rhymes** on as you write. It's there on a wide window, like a desktop's, and can't be on while you [sync](#sync).
+
+<img src="@screenshots/rhymes.png" alt="Rhymes on beside the Lyric Sheet, suggesting rhymes for error, the last word of the line being written">
 
 - Download a rhyming dictionary for each language you write in, in **Settings → Rhyming dictionaries**, on each device you write on.
 - A song's rhymes are in the languages set in its details.
@@ -54,29 +48,33 @@ Want rhymes in your language? See [Adding a rhyming language](https://github.com
 
 ### Snapshots
 
-Bandmate keeps copies of a song's lyrics and Scrapbook as they were, on its own, so you can get back to how a song was before you changed it. It takes one each time you start editing again after 10 minutes or more away, unless nothing has changed since the last. It also takes one just before you delete a section from the Scrapbook, or one of a section's alternates, marked with what you deleted, such as "Before deleting “Verse 3”". Deleting doesn't ask first: Undo brings it back while you're still on the song, and restoring that Snapshot does after you've left.
+Bandmate keeps copies of a song's lyrics and Scrapbook as they were, so you can get back to how the song was before you changed it. It takes one each time you start editing after 10 minutes or more away, and one just before you delete a section from the Scrapbook, or one of a section's alternates. Deleting doesn't ask first: Undo brings it back while you're still on the song, and restoring that Snapshot does after you've left.
 
-In Write mode, the clock button beside Write and Read opens them, newest first. Pick one to see its lyrics and Scrapbook beside the song as it is now, line by line, so it's plain what restoring it would change: a line that differs is highlighted on both sides, and a section that's only in the Snapshot, or only there now, shows on its side alone. Lines show their chords above the words, as Read mode does. Where there isn't room for both side by side, such as on a phone, **This Snapshot** and **Now** are two tabs. Step to the one before or after with ‹ › or the ↑ ↓ keys. You can select and copy a line from it, to take back just that line.
+In Write mode, the clock button beside Write and Read opens them. Pick one to see it beside the song as it is now, and step to the one before or after with ‹ › or the ↑ ↓ keys. To take back just one line, select and copy it from the Snapshot.
 
-Snapshots thin out as they age, so months of history stay short enough to look through: every one from the last day stays, then one a day for a month, then one a week. A day is yours, where you were writing, so a late-night session counts as one day wherever you are. The list is grouped the same way: the last 24 hours, then daily, then weekly. To keep one for good, such as the version you played at an open mic, press the lock beside it to **Keep** it, and it's never thinned. Press the lock again to let it thin out like the rest.
+<img src="@screenshots/snapshots.png" alt="The Snapshots, grouped by age, with a kept one open beside Now and a changed line highlighted on both sides">
 
-**Restore this Snapshot** makes your lyrics and Scrapbook the Snapshot's. What you have now is kept as a Snapshot first, marked "Before restoring", so you can go back, and Undo takes the restore back too. Lines that are still there keep their timings as they are now, and lines it brings back get the timings they had.
+Snapshots thin out as they age: every one from the last day stays, then one a day for a month, then one a week. To keep one for good, such as the version you played at an open mic, press its lock to **Keep** it, and it's never thinned. Press the lock again to let it thin out.
 
-A [Backup](#backups) of a song holds its Snapshots, kept or not, so restoring the Backup, here or on another install, brings them back too.
+**Restore this Snapshot** makes your lyrics and Scrapbook the Snapshot's. What you have now is kept as a Snapshot first, marked "Before restoring", and Undo takes the restore back too. Lines still there keep their timings, and lines it brings back get the timings they had.
+
+A [Backup](/settings#backups) of a song holds its Snapshots, so restoring the Backup, here or on another install, brings them back too.
 
 ## Chords
 
 The **Chords** page, in the side bar, helps with chords away from any song, on guitar, in standard tuning or any other.
 
-- **Look up** a chord by name, like Cmaj7 or D/F#, and see the ways to play it, best first. Press the speaker to hear one strummed, in the tuning you picked. Prefer one, and that's the shape Read mode shows you.
+<img src="@screenshots/chords-look-up.png" alt="Look up showing Cmaj7: its notes, then its shapes as chord diagrams, best first">
+
+- **Look up** a chord by name, like Cmaj7 or D/F#. Press the speaker to hear a shape strummed, in the tuning you picked. Prefer one, and that's the shape Read mode shows you.
 - **Name it**: put your fingers on the fretboard, and Bandmate tells you which chord you're playing. Press the speaker to hear the shape strummed, even one that isn't a chord.
 - **Suggest**: pick a key — a tonic and major or minor, or type it — and see the chords that belong in it, the ones borrowed from other keys, and what usually comes after a chord. Each one shows a way to play it: the one you prefer, or else the best. Press the speaker to hear it strummed. **More Voicings** opens it in Look up, with the other ways.
-- Beside each speaker, the rising bars arpeggiate the shape: they play it one string at a time, low to high, so you can hear each note.
+- The rising bars arpeggiate the shape: they play it one string at a time, low to high, so you can hear each note.
 - Left-handed? Turn it on in Settings, under **This device**, and every diagram flips, the fretboard too.
 
-## Listen
+## Beats
 
-Keep the music you write to in one library, and use it in any song.
+The **Beats** page, in the side bar, is your Beat Library: the music you write to, kept in one place and used in any song.
 
 <img src="@screenshots/beat-library-labelled.png" alt="The Beat Library, numbered 1 to 6 to match the list below it">
 
@@ -91,10 +89,10 @@ You can also attach a song's finished recordings, made elsewhere, to listen back
 
 ### Beats from a link
 
-Paste a link to a video or track on YouTube, SoundCloud, Bandcamp or [any other site yt-dlp supports](https://github.com/yt-dlp/yt-dlp/blob/master/supportedsites.md), and Bandmate downloads its audio into your library, with the credit filled in.
+Paste a link to a video or track on YouTube, SoundCloud, Bandcamp or [any other site yt-dlp supports](https://github.com/yt-dlp/yt-dlp/blob/master/supportedsites.md), and Bandmate adds its audio to your library, with the credit filled in.
 
-- It takes one video or track at a time, not playlists or live streams, up to 500 MB [unless you change it](/self-hosting#configuration).
-- If a site stops working, open **Settings → About** and press **Update** beside yt-dlp, the downloader Bandmate uses. You don't need to wait for a new Bandmate.
+- One video or track at a time, not playlists or live streams, up to 500 MB [unless you change it](/self-hosting#configuration).
+- If a site stops working, press **Update** beside yt-dlp in **Settings → About**. You don't need to wait for a new Bandmate.
 
 ## Timeline
 
@@ -116,13 +114,15 @@ Every song has a timeline: its beat, your takes and any other audio, laid out on
 
 In a narrower window, Import audio, Mix down and then the input fold into a **⋯** at the end of the row, which lists just the ones that don't fit; the input is **Record from…** there. On a phone held upright, the timeline only plays, and offers just Mix down.
 
-**Undo** and **Redo** are at the top of the song's page, beside Write and Read. Undo takes back your latest change to the song, one at a time, whether to its sections, alternates and Scrapbook, the timeline or a line's timing, and Redo makes it again. They work in Read mode and on a phone too, even on a change you made in a wider window, until you leave the song. While you record a take, or a merge is being made, they're off. Undoing a change to the lyrics stops syncing.
+**Undo** and **Redo** are at the top of the song's page, beside Write and Read. Undo takes back your changes to the song's sections, alternates, Scrapbook, timeline and line timings, one at a time, until you leave the song, in Read mode and on a phone too. They're off while you record a take or a merge is being made. Undoing a change to the lyrics stops syncing.
 
-Typing in a section's lines, its label or an alternate's name can be undone once you leave the box: everything you typed there, from clicking in to clicking out, comes back as it was in one go. While you're still in the box, Ctrl+Z undoes your typing a bit at a time, as in any text box. Clicking Undo while you're typing takes back what you've typed since you clicked in.
+Undo takes back everything you typed in a section's lines, its label or an alternate's name since you clicked in, in one go. While you're still in the box, Ctrl+Z undoes your typing a bit at a time, as in any text box.
 
 A clip's **⋯** menu sets its **tempo** and **pitch**, each on its own or both together: slow a beat down to write over it, or move it a couple of semitones to suit your voice. Select several clips to change them all at once. The file itself is never changed, so you can always set them again, or reset them.
 
 Zoom in with Ctrl and the scroll wheel, or by pinching.
+
+Hold ← or → on the ruler to scan the song, faster with Shift.
 
 ## Sync
 
@@ -169,65 +169,6 @@ Calibrate each input in **Settings → Recording**, so your takes land on the be
 
 If you know an input's latency already, you can **Type it** in instead, though measuring it is more accurate. Bandmate also offers to calibrate before your first take on an input.
 
-## Keyboard shortcuts
-
-On a song's page, press **?**, or the keyboard button by Write and Read, to see every shortcut. Type in the search at its top to find one by what it does or by its keys, like "split" or "Space", or press **Change keys** for **Settings → Shortcuts**, which lists them too. The ones you'll use most:
-
-| Keys | What they do |
-| --- | --- |
-| Space | Play or pause |
-| R | Record a take, or stop |
-| Ctrl+Z, Ctrl+Shift+Z | Undo, redo |
-| Home, End | Go to the start or the end |
-| S | Split a clip at the playhead |
-| Ctrl+C, Ctrl+X, Ctrl+V | Copy, cut and paste clips |
-| Delete | Delete the selected clips |
-| Enter | In Sync mode, mark the next line as starting now |
-| Ctrl+scroll | Zoom the timeline |
-
-Holding a shortcut's keys down does it once, however long you hold them: a held Ctrl+V pastes one copy, and a held Ctrl+Z undoes one edit. Three keep going while you hold them: ← and → on the ruler, which scan the song 5 seconds at a time, or 15 with Shift; Alt+↑ and Alt+↓ on a line's time, which nudge it a tenth of a second at a time; and Home and End, which hold the playhead at the start or the end rather than letting the page scroll.
-
-These are the defaults. To change a shortcut's keys, open it in **Settings → Shortcuts**: click one of its keys and press the one you want, or **Add key** to give it another, or remove a key with its ×. Esc cancels. For a mouse shortcut, like Ctrl+click or Shift+drag, choose which of Ctrl, Alt and Shift (⌘, ⌥ and ⇧ on a Mac) you hold, at least one: the click, drag or scroll stays as it is, and pinching always zooms. A key another shortcut already has is refused, with a link to that shortcut so you can free the key there first, and so are keys the browser or the page needs, like Tab or Ctrl+W, and Shift alone with the scroll wheel, which scrolls the timeline sideways. **Reset** puts one shortcut back, and **Reset to defaults** puts them all back. Your keys are kept on each device, so each keyboard you use can have its own.
-
-On a Mac, ⌘ works wherever Ctrl does.
-
-## Backups
-
-Keep copies of your work, and move it between installs.
-
-<img src="@screenshots/backups-labelled.png" alt="Settings' Backups, numbered 1 to 5 to match the list below it">
-
-1. **Scheduled Backups**: have Bandmate back up everything on its own. See [below](#scheduled-backups).
-2. **Upload** a Backup, made by this Bandmate or another.
-3. **New Backup**: of the songs you choose, your beat library, or both.
-4. **A Backup**, with when it was made and its size.
-5. **Restore** what you pick from it, or download it to keep it somewhere safe. Where a song is already here, you choose to replace it or keep both. On a phone, Restore and Download are in the Backup's ⋯ menu.
-
-A Backup restores into the same version of Bandmate or a newer one. To copy everything at once, see [copying the data folder](/self-hosting#copying-the-data-folder).
-
-### Scheduled Backups
-
-Turn on **Make Backups on a schedule**, choose daily, weekly or monthly, and Bandmate backs up everything on its own, each time that long has passed since its last Scheduled Backup. The first is made as soon as you turn the schedule on. Turning it off and on again doesn't make an extra one: the next still comes a day, week or month after the last. If Bandmate was off when one came due, it makes one when it starts, just one however long it was off. If nothing has changed in your Songs or Beats since the last one, and you haven't deleted it, Bandmate skips it, so a quiet month doesn't push out older Backups that differ, and looks again a day, week or month later. The schedule is the same from every device.
-
-Each is marked **Scheduled** in the list, and you can restore, download, rename or delete it like any other. Bandmate keeps only the newest Scheduled Backups, as many as you choose from 1 to 30, and deletes the oldest when a new one is made. Backups you make or upload are never deleted. Choosing fewer, or turning the schedule off, deletes nothing at once: the extras go when the next one is made.
-
-To hold on to a Scheduled Backup, say one from before a big change, choose **Keep** in its ⋯ menu. It's then like a Backup you made: no longer marked Scheduled, not counted among those kept, and never deleted unless you delete it.
-
-Under the settings, the card says when the last Scheduled Backup was made, that nothing has changed since, or that there's nothing to back up. If one couldn't be made, for example because the disk is full, the card says why, as does Bandmate's log. Fix the cause and Bandmate makes it at its next try, within the hour.
-
-## Settings
-
-**Settings**, at the foot of the side bar, has four tabs:
-
-- **This device**: what each device keeps for itself.
-  - **Appearance**: three colour palettes, Terracotta (the default), Ink and Olive, each in light and dark. Follow your system's light or dark, or pick one. More palettes may come.
-  - **Recording**: every input on this device, each channel of an audio interface on its own, with its latency or "Not calibrated" or "Skipped". Pick the one you record from, and check its level with **Test input** above the list: Bandmate only listens while it's on, and asks for the microphone the first time. Open any of them to calibrate it as in [Calibrate](#calibrate) without recording from it, or type its latency. Inputs that aren't plugged in keep their latency, listed under **Not connected**, to forget.
-  - **Rhyming dictionaries**: one for each language Bandmate suggests rhymes in, each with its download size. Download the ones you write in, so [Rhymes](#rhymes) can suggest words in them, or remove one you no longer need.
-  - **Chord diagrams**: flip them for left-handed playing.
-- **Shortcuts**: every [keyboard shortcut](#keyboard-shortcuts), with its keys. Open one to see what it does and where it works, and to [change its keys](#keyboard-shortcuts), or search them as in the shortcuts list. Shown only on a bigger screen.
-- **Backups**: see [Backups](#backups).
-- **About**: the version you're running, what changed in it, whether a newer one is out, the yt-dlp in use, and the packages and data that ship in Bandmate, with their licenses.
-
 ## What's next
 
-Ideas for Bandmate's future are on the [roadmap](https://github.com/xKirtle/bandmate/blob/main/docs/roadmap.md). It's a wishlist, not a queue: nothing on it is promised, and it isn't in the order things will be built. What each version added is in the [release notes](https://github.com/xKirtle/bandmate/releases).
+Ideas for Bandmate's future are on the [roadmap](https://github.com/xKirtle/bandmate/blob/main/docs/roadmap.md), a wishlist: nothing on it is promised, and it isn't in the order things will be built. What each version added is in the [release notes](https://github.com/xKirtle/bandmate/releases).
