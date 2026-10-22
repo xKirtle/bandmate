@@ -14,19 +14,22 @@ import (
 // in SQL (see giveFreshIDs and ADR 0026).
 
 // backupRow is a row of a table whose ids a Restore decides, as the Backup
-// holds it: its id there, and the folded name or Identity it's matched by.
+// holds it: its id there, the folded name or Identity it's matched by, and
+// its title, for a Song or Beat.
 type backupRow struct {
-	id  int64
-	key string
+	id    int64
+	key   string
+	title string
 }
 
 // bandmateRow is a row already in Bandmate that one from the Backup can
-// match: its id here, the name it carries here, for a Folder or Tag, and
-// the version it holds, for a Song.
+// match: its id here, the name it carries here, for a Folder or Tag, the
+// version it holds, for a Song, and its title, for a Song or Beat.
 type bandmateRow struct {
 	id      int64
 	name    string
 	version int64
+	title   string
 }
 
 // identityInput is what the id decisions for one table are worked out from.
@@ -51,6 +54,10 @@ type identityInput struct {
 	// versioned tells whether the table's rows hold a version a replaced
 	// row's follows, i.e. Songs'.
 	versioned bool
+	// titled tells whether the table's rows hold a title, i.e. Songs' and
+	// Beats', which what's already in Bandmate lists and the decisions
+	// ignore.
+	titled bool
 	// lastUsedID is the highest id the table has used in Bandmate, held now
 	// or not: a fresh id is the next one past it.
 	lastUsedID int64

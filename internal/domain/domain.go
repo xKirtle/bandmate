@@ -80,7 +80,7 @@ func ExpectOneRow(res sql.Result) error {
 	return nil
 }
 
-// Queryer is what both *sql.DB and *sql.Tx offer for reading.
+// Queryer is what *sql.DB, *sql.Tx and *sql.Conn all offer for reading.
 type Queryer interface {
 	QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error)
 	QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row
