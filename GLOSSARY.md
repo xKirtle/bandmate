@@ -18,6 +18,10 @@ _Avoid_: optimistic, pending, draft
 Reversing the Song's latest edits on this visit to it, newest first, whether to the Lyric Sheet and Scrapbook, the Timeline or a Cue; **Redo** makes them again, until a new edit is made. Typing in one visit to a text field is one edit. It lasts until leaving the Song, or until the Song is found to have changed elsewhere.
 _Avoid_: Snapshot (a Snapshot outlasts the visit), revert
 
+**Surface**:
+One of the four parts of the Song page an edit is made on: the Details, the Timeline, the Cues or the Lyric Sheet, which takes in the Scrapbook too. A save that's refused is reported against the Surface its edit was made on, never against a field or Clip within it.
+_Avoid_: panel, area; Section (a Section is part of the Lyric Sheet)
+
 **Folder**:
 A named place on the Songs page that keeps some Songs together, like an EP's, so a growing list stays in order. A Song sits in one Folder at most, or in none, and Folders don't hold other Folders. A Folder is only a name: deleting it can leave its Songs in no Folder, or delete them too; deleting them is refused if the Folder holds a different number of Songs by then than the user was asked about, so none filed into it meanwhile goes unseen.
 _Avoid_: Album (a release), Playlist, Collection, Group
