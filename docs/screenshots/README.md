@@ -13,7 +13,7 @@ The screenshots in the README and on the docs site, `docs/web/`, taken in the da
 | `backups-labelled.png` | Settings' Backups holding the demo Backup, numbered: Scheduled Backups, Upload, New Backup, the Backup and Restore |
 | `song-list.png` | The Songs page on desktop: both Folders, then the Songs in none, down to just below the list |
 | `chords-look-up.png` | The Chords page's Look up with Cmaj7 typed, in standard tuning: its notes and first page of Voicings, best first |
-| `shortcuts-sheet.png` | The shortcuts sheet on the hero Song, opened with ?, down to its first few Shortcuts at their default keys |
+| `shortcuts-sheet.png` | The shortcuts sheet on the hero Song, opened with ?, down to its first few Shortcuts at their default keys, above the first group its scroll cuts off |
 | `phone-song-list.png` | The Songs page on a phone: both Folders, then the Songs in none |
 | `phone-timeline.png` | The hero Song on a phone held sideways, the Timeline filling the screen |
 | `phone-lyric-sheet.png` | The hero Song in Read mode on a phone                          |

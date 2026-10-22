@@ -171,7 +171,7 @@ If you know an input's latency already, you can **Type it** in instead, though m
 
 On a song's page, press **?**, or the keyboard button by Write and Read, to see every shortcut. Type in the search at its top to find one by what it does or by its keys, like "split" or "Space".
 
-<img src="@screenshots/shortcuts-sheet.png" alt="The shortcuts sheet: a search and Change keys at its top, then each shortcut with what it does, where it works and its keys">
+<img src="@screenshots/shortcuts-sheet.png" alt="The shortcuts list: a search and Change keys at its top, then each shortcut with what it does, where it works and its keys">
 
 Hold ← or → on the ruler to scan the song, faster with Shift.
 

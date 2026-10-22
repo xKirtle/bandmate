@@ -43,6 +43,6 @@ Under the settings, the card says when the last Scheduled Backup was made, that 
 
 In **Settings → Shortcuts**, open a shortcut. Click one of its keys and press the one you want, **Add key** to give it another, or remove a key with its ×. Esc cancels. A mouse shortcut, like Ctrl+click or Shift+drag, keeps its click, drag or scroll: choose which of Ctrl, Alt and Shift you hold with it, at least one.
 
-A key another shortcut already has is refused, with a link to that shortcut so you can free the key there first. So are keys the browser or the page needs, like Tab, Esc or Ctrl+W.
+A key another shortcut already has is refused, with a link to that shortcut so you can free the key there first. So are keys the browser or the page needs, like Tab or Ctrl+W.
 
 **Reset** puts one shortcut back, and **Reset to defaults** puts them all back. Your keys are kept on each device, so each keyboard you use can have its own.

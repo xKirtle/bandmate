@@ -563,9 +563,24 @@ async function number(page, places, { first = 1, into } = {}) {
   await page.keyboard.press("?");
   const sheet = page.getByRole("dialog", { name: "Keyboard shortcuts" });
   await sheet.waitFor();
-  // Without the focus ring opening it leaves on the search.
+  // Opening it focuses the search: blurred, so the shot has no focus ring.
   await sheet.getByRole("searchbox").blur();
-  await save(page, "shortcuts-sheet", { clip: await sheet.boundingBox() });
+  // Down to just above the first group its scroll cuts off, if one is.
+  const box = await sheet.boundingBox();
+  const list = await sheet
+    .getByRole("region", { name: "Shortcuts" })
+    .boundingBox();
+  let bottom = box.y + box.height;
+  for (const heading of await sheet.getByRole("heading", { level: 3 }).all()) {
+    const { y, height } = await heading.boundingBox();
+    if (y + height > list.y + list.height) {
+      bottom = y - 8;
+      break;
+    }
+  }
+  await save(page, "shortcuts-sheet", {
+    clip: { ...box, height: bottom - box.y },
+  });
   await page.context().close();
 }
 
