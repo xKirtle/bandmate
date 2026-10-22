@@ -52,6 +52,56 @@ func TestARestoreListsTheSongsAndBeatsAlreadyInBandmate(t *testing.T) {
 	}
 }
 
+func TestWhatsAlreadyInBandmateListsEachSongAndBeatThePicksBringBackOnceByTitle(t *testing.T) {
+	ts := newTestServer(t)
+	// Beats picked, and Beats the Songs picked use: Both is picked and used
+	// by Same, and Shared is used by both Songs titled Same.
+	banana, apple := ts.beatOfLength("Banana", 20), ts.beatOfLength("apple", 20)
+	both, shared := ts.beatOfLength("Both", 20), ts.beatOfLength("Shared", 20)
+	goneBeat := ts.beatOfLength("Gone", 20)
+	bananaSong, appleSong := ts.createSong("Banana"), ts.createSong("apple")
+	same, sameToo := ts.createSong("Same"), ts.createSong("Same")
+	goneSong := ts.createSong("Gone")
+	timelineChange(t, ts.addBeatToSong(same.ID, shared.ID))
+	timelineChange(t, ts.addBeatToSong(same.ID, both.ID))
+	timelineChange(t, ts.addBeatToSong(sameToo.ID, shared.ID))
+	made := ts.backUp(map[string]any{"allSongs": true, "beatLibrary": true})
+	// Titled here so that sorting by them, rather than by the Backup's,
+	// would put every list in another order.
+	for id, title := range map[int64]string{bananaSong.ID: "aardvark", appleSong.ID: "Zebra", same.ID: "Zulu", sameToo.ID: "Alpha"} {
+		ts.updateSong(id, map[string]any{"title": title})
+	}
+	for id, title := range map[int64]string{banana.ID: "aardvark", apple.ID: "Zebra", both.ID: "Alpha", shared.ID: "Able"} {
+		expectStatus(t, ts.Do(http.MethodPatch, beatPath(id), map[string]any{"title": title}), http.StatusOK)
+	}
+	expectStatus(t, ts.Do(http.MethodDelete, songPath(goneSong.ID), nil), http.StatusNoContent)
+	expectStatus(t, ts.Do(http.MethodDelete, beatPath(goneBeat.ID), nil), http.StatusNoContent)
+
+	songs, beats := ts.presentPicked(made.ID, map[string]any{
+		"songs": []int64{sameToo.ID, goneSong.ID, same.ID, bananaSong.ID, appleSong.ID},
+		"beats": []int64{goneBeat.ID, both.ID, banana.ID, apple.ID},
+	})
+
+	wantSongs := []presentItem{
+		{appleSong.ID, "apple", restoredSong{appleSong.ID, "Zebra"}},
+		{bananaSong.ID, "Banana", restoredSong{bananaSong.ID, "aardvark"}},
+		{same.ID, "Same", restoredSong{same.ID, "Zulu"}},
+		{sameToo.ID, "Same", restoredSong{sameToo.ID, "Alpha"}},
+	}
+	if !reflect.DeepEqual(songs, wantSongs) {
+		t.Errorf("songs already in Bandmate = %+v, want %+v", songs, wantSongs)
+	}
+	wantBeats := []presentItem{
+		{apple.ID, "apple", restoredSong{apple.ID, "Zebra"}},
+		{banana.ID, "Banana", restoredSong{banana.ID, "aardvark"}},
+		{both.ID, "Both", restoredSong{both.ID, "Alpha"}},
+		{shared.ID, "Shared", restoredSong{shared.ID, "Able"}},
+	}
+	if !reflect.DeepEqual(beats, wantBeats) {
+		t.Errorf("beats already in Bandmate = %+v, want %+v", beats, wantBeats)
+	}
+}
+
 func TestAReplacedBeatTakesTheBackupsDetailsForEverySongUsingIt(t *testing.T) {
 	ts := newTestServer(t)
 	used := ts.uploadBeat(fakeAudio("used.mp3").with(map[string]any{
