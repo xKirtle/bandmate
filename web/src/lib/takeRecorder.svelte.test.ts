@@ -255,7 +255,7 @@ describe('TakeRecorder', () => {
     server.failNext(1);
     await recorder.stop();
 
-    expect(saves.saveError).toBe("Can't reach Bandmate. Check your connection.");
+    expect(saves.errorOn('timeline')).toBe("Can't reach Bandmate. Check your connection.");
     expect(server.timeline.tracks[0].clips).toEqual([]);
     expect(recorder.unsaved).toHaveLength(1);
     // Still kept in the browser, for another tab or a later visit to offer back.

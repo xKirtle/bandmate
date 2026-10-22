@@ -281,7 +281,7 @@ describe('Sync mode, the Line up next', () => {
     await settled();
     expect(cueOf(saves.song, 12)).toBeNull();
     expect(cueOf(server.song, 12)).toBeNull();
-    expect(saves.saveError).toMatch(/^Couldn't save the Cue of Line 3 of Verse, so it was taken back\./);
+    expect(saves.errorOn('cues')).toMatch(/^Couldn't save the Cue of Line 3 of Verse, so it was taken back\./);
     expect(syncMode.next).toEqual({ section: 1, line: 13 });
   });
 

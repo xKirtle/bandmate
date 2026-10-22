@@ -75,6 +75,20 @@ export type Submitted = 'saved' | 'failed' | 'stale' | 'closed';
  */
 export type Surface = 'details' | 'timeline' | 'cues' | 'lyricSheet';
 
+/** What each surface is called where a refused save says it came from. */
+export const surfaceNames: Record<Surface, string> = {
+  details: 'Details',
+  timeline: 'Timeline',
+  cues: 'Cues',
+  lyricSheet: 'Lyric Sheet',
+};
+
+/** A save refused: the surface its edit was made on, and why it failed. */
+export interface Refusal {
+  surface: Surface;
+  message: string;
+}
+
 /** What a Timeline edit did: the Timeline as saved before it, and the Timeline it left. */
 export interface Edited {
   before: Timeline;
@@ -210,19 +224,26 @@ export class Saves {
   }
 
   /**
-   * Why the latest save failed, whichever surface it was made on, until a
-   * later save lands on that surface.
+   * Why the save on each surface that was refused failed, the surface
+   * refused latest last, which is the order the toast stack draws them in
+   * (see Toasts.svelte). Four at most, one per surface.
    */
-  get saveError(): string | null {
-    let latest: string | null = null;
-    for (const refused of this.#errors.values()) latest = refused.message;
-    return latest;
+  get errors(): Refusal[] {
+    return [...this.#errors].map(([surface, { message }]) => ({ surface, message }));
   }
 
   /** Why the latest save on a surface failed, until a later one there lands. */
   errorOn(surface: Surface): string | null {
     return this.#errors.get(surface)?.message ?? null;
   }
+
+  /**
+   * Forgets a surface's error, as its dismiss is pressed: it's the reader's
+   * answer to it, so a later save landing there has nothing left to clear.
+   */
+  dismiss = (surface: Surface) => {
+    this.#forgetError(surface);
+  };
 
   /** Whether anything isn't saved yet: saves on their way, Cue changes, or edits being typed. */
   get unsaved(): boolean {
@@ -673,7 +694,7 @@ export class Saves {
   #refuse(surface: Surface, message: string) {
     const errors = new Map(this.#errors);
     // Taken out before it goes back in, so the surface that failed latest
-    // is last, and its message is the one saveError gives.
+    // is last, which is the order the toast stack reads errors in.
     errors.delete(surface);
     errors.set(surface, { message, keptUntil: this.#errorKeptUntil });
     this.#errorKeptUntil = 0;
@@ -684,6 +705,12 @@ export class Saves {
   #landed(surface: Surface, turn: number) {
     const refused = this.#errors.get(surface);
     if (!refused || turn <= refused.keptUntil) return;
+    this.#forgetError(surface);
+  }
+
+  /** Forgets the error a surface held, if it held one. */
+  #forgetError(surface: Surface) {
+    if (!this.#errors.has(surface)) return;
     const errors = new Map(this.#errors);
     errors.delete(surface);
     this.#errors = errors;

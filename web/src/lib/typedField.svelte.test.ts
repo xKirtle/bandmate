@@ -160,7 +160,7 @@ describe('TypedField', () => {
     field.destroy();
     expect(committed).toEqual([]);
     expect(saves.unsaved).toBe(false);
-    expect(saves.saveError).toBeNull();
+    expect(saves.errors).toEqual([]);
   });
 
   it('shows what’s saved again once a commit fails', async () => {
@@ -334,7 +334,7 @@ describe('TypedField, a Cue’s time', () => {
     field.destroy();
     await settled();
     expect(server.sent).toBe(sent);
-    expect(saves.saveError).toBeNull();
+    expect(saves.errors).toEqual([]);
     expect(saves.unsaved).toBe(false);
   });
 
