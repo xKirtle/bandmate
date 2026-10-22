@@ -317,10 +317,10 @@ type Kept = { keys?: Record<string, unknown>; fresh?: unknown };
  */
 const formerIds: Partial<Record<ShortcutId, string>> = { nudgeClip: 'nudgeTake' };
 
-/** What a Shortcut is kept as on this device, under its id or the one it had before it was renamed. */
-function keptAs(kept: Kept, id: ShortcutId): unknown {
+/** Every id a Shortcut may be kept under on this device: its own, then the one it had before it was renamed. */
+function keptIds(id: ShortcutId): string[] {
   const former = formerIds[id];
-  return kept.keys?.[id] ?? (former === undefined ? undefined : kept.keys?.[former]);
+  return former === undefined ? [id] : [id, former];
 }
 
 function readKey(value: unknown): Key | null {
@@ -357,7 +357,9 @@ export function readShortcutKeys(storage: Storage | undefined): ShortcutKeys {
   const keys = { ...defaultKeyset } as Record<ShortcutId, OneWay | TwoWay>;
   const changed = new Set<ShortcutId>();
   for (const id of ids) {
-    const value = keptAs(kept, id);
+    const value = keptIds(id)
+      .map((keptId) => kept.keys?.[keptId])
+      .find((v) => v !== undefined);
     if (typeof value !== 'object' || value === null) continue;
     const lists = listsOf(id).map((list) => readList((value as Record<string, unknown>)[list]));
     if (lists.some((l) => l === null)) continue;
@@ -365,7 +367,7 @@ export function readShortcutKeys(storage: Storage | undefined): ShortcutKeys {
     changed.add(id);
   }
   const marked: unknown[] = Array.isArray(kept.fresh) ? kept.fresh : [];
-  const fresh = new Set(ids.filter((id) => marked.includes(id) || marked.includes(formerIds[id])));
+  const fresh = new Set(ids.filter((id) => keptIds(id).some((keptId) => marked.includes(keptId))));
   // A Shortcut at its defaults goes without those the user gave another.
   const given = ids.filter((id) => changed.has(id)).flatMap((id) => allOf(keys as Keyset, id));
   for (const id of ids) {

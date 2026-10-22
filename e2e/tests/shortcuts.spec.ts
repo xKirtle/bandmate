@@ -264,14 +264,14 @@ test("a mouse Shortcut changes only what's held, at least one modifier, none ano
   await expect(addBox.locator('summary kbd')).toHaveText(['Ctrl+Alt+drag']);
   await expect(addBox.locator('summary')).toContainText('Changed');
 
-  // Alt alone is how a Take is nudged.
+  // Alt alone is how a Clip's audio is nudged.
   await ctrl.click();
-  await expect(addBox.getByRole('status')).toHaveText('Alt+drag is already used by Nudge a Take inside its Clip.');
+  await expect(addBox.getByRole('status')).toHaveText("Alt+drag is already used by Nudge a Clip's audio inside it.");
   await page.keyboard.press('Escape');
   await expect(addBox.getByRole('status')).toHaveCount(0);
   await ctrl.click();
-  await addBox.getByRole('button', { name: 'Nudge a Take inside its Clip' }).click();
-  await expect(fold(page, 'Nudge a Take inside its Clip')).toHaveAttribute('open', '');
+  await addBox.getByRole('button', { name: "Nudge a Clip's audio inside it" }).click();
+  await expect(fold(page, "Nudge a Clip's audio inside it")).toHaveAttribute('open', '');
 
   await shift.click();
   await addBox.getByRole('button', { name: 'Reset' }).click();

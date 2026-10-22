@@ -86,11 +86,11 @@ group('startOrEnd', () => {
 });
 
 group('nudges', () => {
-  it('nudges a Take inside its Clip when dragged with Alt', () => {
+  it("nudges a Clip's audio inside it when dragged with Alt", () => {
     expect(nudges(held({ altKey: true }))).toBe(true);
   });
 
-  it('moves the Clip when dragged without Alt', () => {
+  it('moves the Clip when dragged without Alt, as no nudge is asked for', () => {
     expect(nudges(held())).toBe(false);
     expect(nudges(held({ shiftKey: true }))).toBe(false);
   });
