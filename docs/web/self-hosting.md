@@ -188,12 +188,12 @@ Then set `BANDMATE_IMAGE=ghcr.io/xkirtle/bandmate:0.14.2` in `.env` and run `doc
 
 ### Copying the data folder
 
-Stop Bandmate, so nothing is mid-write, and copy `data`. It holds everything: the database, audio, Covers, Backups and Upgrade copies. To back up only some Songs or Beats, from the app, see [Backups](/features#backups).
+Stop Bandmate, so nothing is mid-write, and copy `data`. It holds everything: the database, audio, Covers, Backups and Upgrade copies. To back up only some Songs or Beats, from the app, see [Backups](/settings#backups).
 
 ## Mounting your own yt-dlp
 
 ::: warning For advanced setups only
-Most installs never need this: **Update**, in Settings → About, keeps yt-dlp current, as the [feature tour](/features#beats-from-a-link) describes.
+Most installs never need this: **Update**, in Settings → About, keeps yt-dlp current, as [Beats from a link](/features#beats-from-a-link) describes.
 :::
 
 You need this only if Update says it **can't run programs from the data folder**. That happens when the data folder is mounted `noexec`, as on some NAS systems. Instead, give Bandmate a yt-dlp of your own:
