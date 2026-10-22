@@ -620,6 +620,83 @@ const phone = {
   animate(shot, "sync-mode", { start, end });
 }
 
+// The Snapshots dialog: the hero Song's first Snapshot, Kept, beside the Song
+// now, with Verse 1's third Line rewritten since. It changes the Lyric Sheet
+// and Scrapbook, so it comes after every other shot of the hero Song.
+{
+  /** Sends a request to path under the hero Song's API, giving its JSON. */
+  const api = async (method, path, body) => {
+    const response = await fetch(`${base}/api/songs/${hero.id}${path}`, {
+      method,
+      headers: { "content-type": "application/json" },
+      body: body && JSON.stringify(body),
+    });
+    if (!response.ok)
+      throw new Error(`${method} ${path}: ${await response.text()}`);
+    return response.json();
+  };
+  // The first change takes a Snapshot of the demo's Lyric Sheet, then each
+  // Scrapbook Section deleted takes one, named for it.
+  const verse = (await api("GET", "")).sections.find(
+    (s) => s.label === "Verse 1",
+  ).alternates[0];
+  const lines = verse.lines.map((l) => l.text);
+  lines[2] = "[Am]Sed quia non [F]numquam";
+  await api("PUT", `/alternates/${verse.id}/text`, { text: lines.join("\n") });
+  for (const label of [
+    "Dolor riff",
+    "Second hook",
+    "Outro idea",
+    "Alt bridge",
+  ]) {
+    const sheet = await api("POST", "/scrapbook", { label });
+    await api("DELETE", `/sections/${sheet.scrapbook.at(-1)}`);
+  }
+  const taken = await api("GET", "/snapshots");
+  const first = taken.at(-1);
+  await api("PATCH", `/snapshots/${first.id}`, { kept: true });
+
+  // They were all taken just now; the list is grouped by age, so they're
+  // shown as taken over weeks, newest first: two today, two in the days
+  // before, and the Kept first one weeks ago.
+  const ago = (days, hours, minutes) => {
+    const when = new Date();
+    when.setDate(when.getDate() - days);
+    if (days) when.setHours(hours, minutes);
+    else when.setTime(when.getTime() - (hours * 60 + minutes) * 60_000);
+    return when.toISOString();
+  };
+  const takenAt = [
+    ago(0, 0, 20),
+    ago(0, 2, 50),
+    ago(2, 21, 40),
+    ago(9, 19, 5),
+    ago(45, 20, 15),
+  ];
+  const page = await open(heroURL);
+  await page.route(`${base}/api/songs/${hero.id}/snapshots`, async (route) => {
+    const list = await (await route.fetch()).json();
+    await route.fulfill({
+      json: list.map((s, i) => ({ ...s, takenAt: takenAt[i] ?? s.takenAt })),
+    });
+  });
+  await page.getByRole("button", { name: "Snapshots" }).click();
+  const dialog = page.getByRole("dialog", { name: "Snapshots" });
+  await dialog
+    .getByRole("list", { name: "Weekly, before that" })
+    .getByRole("button")
+    .first()
+    .click();
+  await dialog
+    .getByText(/^Differs:/)
+    .first()
+    .waitFor();
+  // Off the list, which the click leaves hovered.
+  await page.mouse.move(0, 0);
+  await save(page, "snapshots", { clip: await dialog.boundingBox() });
+  await page.context().close();
+}
+
 // Calibrating an Input hands-free, from Settings → Recording, as an animated
 // WebP. Its own Chromium's fake microphone hears a click every 0.75 s, as
 // often as calibrating plays them, each a few ms off, as a real mic hears
