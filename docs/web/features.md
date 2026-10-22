@@ -1,6 +1,6 @@
 # Writing and recording
 
-A reference for writing and recording a song in Bandmate, from the first idea to a rough recording: look up the part you're stuck on. Settings and Backups are on [a page of their own](/settings).
+A reference for writing and recording a song in Bandmate, from the first idea to a rough recording: look up the part you're stuck on. Settings, keyboard shortcuts and Backups are on [a page of their own](/settings).
 
 ## Your songs
 
@@ -122,6 +122,8 @@ A clip's **⋯** menu sets its **tempo** and **pitch**, each on its own or both 
 
 Zoom in with Ctrl and the scroll wheel, or by pinching.
 
+Hold ← or → on the ruler to scan the song, faster with Shift.
+
 ## Sync
 
 Line your lyrics up with the music, so you always know where you are.
@@ -166,16 +168,6 @@ Calibrate each input in **Settings → Recording**, so your takes land on the be
 <img src="@screenshots/calibrating.webp" alt="Calibrating an input hands-free in Settings → Recording: the metronome swings as each click is heard, then the result is saved">
 
 If you know an input's latency already, you can **Type it** in instead, though measuring it is more accurate. Bandmate also offers to calibrate before your first take on an input.
-
-## Keyboard shortcuts
-
-On a song's page, press **?**, or the keyboard button by Write and Read, to see every shortcut. Type in the search at its top to find one by what it does or by its keys, like "split" or "Space".
-
-<img src="@screenshots/shortcuts-sheet.png" alt="The shortcuts list: a search and Change keys at its top, then each shortcut with what it does, where it works and its keys">
-
-Hold ← or → on the ruler to scan the song, faster with Shift.
-
-On a Mac, ⌘ works wherever Ctrl does. To use other keys, see [Change a shortcut's keys](/settings#change-a-shortcut-s-keys).
 
 ## What's next
 
