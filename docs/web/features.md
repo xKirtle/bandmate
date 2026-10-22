@@ -72,7 +72,7 @@ The **Chords** page, in the side bar, helps with chords away from any song, on g
 - The rising bars arpeggiate the shape: they play it one string at a time, low to high, so you can hear each note.
 - Left-handed? Turn it on in Settings, under **This device**, and every diagram flips, the fretboard too.
 
-## Listen
+## Beats
 
 Keep the music you write to in one library, and use it in any song.
 
