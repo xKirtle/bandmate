@@ -556,63 +556,6 @@ async function number(page, places, { first = 1, into } = {}) {
   await page.context().close();
 }
 
-// Rhyme mode, suggesting Rhymes for labore, the last word of Verse 1, with
-// the caret after it. The English rhyming dictionary is downloaded first,
-// to this shot's browser context alone, so no other shot has it.
-{
-  // Tall enough that the Timeline sits below the shot.
-  const page = await open(`${base}/settings`, {
-    ...desktop,
-    viewport: { width: 1440, height: 2000 },
-  });
-  await page
-    .getByRole("list", { name: "Rhyming dictionaries" })
-    .getByRole("listitem")
-    .filter({ hasText: "English" })
-    .getByRole("button", { name: "Download" })
-    .click();
-  await page.getByText(/^Downloaded, updated/).waitFor();
-  // In the same context, which holds the dictionary.
-  await page.goto(heroURL);
-  await page.waitForLoadState("networkidle");
-  await page.getByRole("button", { name: "Rhymes", exact: true }).click();
-  const verse = page.getByRole("article", { name: "Verse 1" });
-  await verse.locator("textarea").click();
-  await page.keyboard.press("Control+End");
-  const rhymes = page.getByRole("region", { name: "Rhymes" });
-  await rhymes.getByRole("heading", { name: "Perfect" }).waitFor();
-  // Off the Lyric Sheet, which the click leaves hovered.
-  await page.mouse.move(0, 0);
-
-  // The side column's other cards, under the Rhymes card, are hidden.
-  const card = page.locator(".part", { has: rhymes });
-  await page
-    .locator(".part")
-    .filter({ hasNot: rhymes })
-    .evaluateAll((parts) =>
-      parts.forEach((part) => (part.style.visibility = "hidden")),
-    );
-
-  // From the Lyric Sheet's heading, with the Rhymes button, down to Verse 1's
-  // foot, across to the Rhymes card's edge.
-  const sheet = await page
-    .getByRole("region", { name: "Lyric Sheet" })
-    .boundingBox();
-  const side = await card.boundingBox();
-  const end = await verse.boundingBox();
-  const left = sheet.x - 24;
-  const top = sheet.y - 8;
-  await save(page, "rhymes", {
-    clip: {
-      x: left,
-      y: top,
-      width: side.x + side.width + 24 - left,
-      height: Math.max(end.y + end.height, side.y + side.height) + 8 - top,
-    },
-  });
-  await page.context().close();
-}
-
 // A phone, held upright.
 const phone = {
   colorScheme: "dark",
@@ -694,21 +637,22 @@ const phone = {
   animate(shot, "sync-mode", { start, end });
 }
 
+/** Sends a request to path under the hero Song's API, giving its JSON. */
+async function api(method, path, body) {
+  const response = await fetch(`${base}/api/songs/${hero.id}${path}`, {
+    method,
+    headers: { "content-type": "application/json" },
+    body: body && JSON.stringify(body),
+  });
+  if (!response.ok)
+    throw new Error(`${method} ${path}: ${await response.text()}`);
+  return response.json();
+}
+
 // The Snapshots dialog: the hero Song's first Snapshot, Kept, beside the Song
 // now, with Verse 1's third Line rewritten since. It changes the Lyric Sheet
 // and Scrapbook, so it comes after every other shot of the hero Song.
 {
-  /** Sends a request to path under the hero Song's API, giving its JSON. */
-  const api = async (method, path, body) => {
-    const response = await fetch(`${base}/api/songs/${hero.id}${path}`, {
-      method,
-      headers: { "content-type": "application/json" },
-      body: body && JSON.stringify(body),
-    });
-    if (!response.ok)
-      throw new Error(`${method} ${path}: ${await response.text()}`);
-    return response.json();
-  };
   // The first change takes a Snapshot of the demo's Lyric Sheet, then each
   // Scrapbook Section deleted takes one, named for it.
   const verse = (await api("GET", "")).sections.find(
@@ -769,6 +713,74 @@ const phone = {
   await page.mouse.move(0, 0);
   await save(page, "snapshots", { clip: await dialog.boundingBox() });
   await page.context().close();
+}
+
+// Rhyme mode, suggesting Rhymes for error, the last word of the Chorus's
+// second Alternate, with the caret after it. Choosing that Alternate changes
+// the Song, so it comes after the Snapshots, which it would add to, and
+// chooses the first again after. The English rhyming dictionary is
+// downloaded first, to this shot's browser context alone, so no other shot
+// has it.
+{
+  const [first, second] = (await api("GET", "")).sections.find(
+    (s) => s.label === "Chorus",
+  ).alternates;
+  await api("POST", `/alternates/${second.id}/activate`);
+  // Tall enough that the Timeline sits below the shot.
+  const page = await open(`${base}/settings`, {
+    ...desktop,
+    viewport: { width: 1440, height: 2000 },
+  });
+  await page
+    .getByRole("list", { name: "Rhyming dictionaries" })
+    .getByRole("listitem")
+    .filter({ hasText: "English" })
+    .getByRole("button", { name: "Download" })
+    .click();
+  await page.getByText(/^Downloaded, updated/).waitFor();
+  // In the same context, which holds the dictionary.
+  await page.goto(heroURL);
+  await page.waitForLoadState("networkidle");
+  await page.getByRole("button", { name: "Rhymes", exact: true }).click();
+  const chorus = page.getByRole("article", { name: "Chorus" });
+  await chorus.locator("textarea").click();
+  await page.keyboard.press("Control+End");
+  const rhymes = page.getByRole("region", { name: "Rhymes" });
+  await rhymes.getByRole("heading", { name: "Perfect" }).waitFor();
+  const word = await rhymes.getByRole("searchbox").inputValue();
+  if (word !== "error")
+    throw new Error(`Rhymes are for ${word}, not error: has the demo changed?`);
+  // Off the Lyric Sheet, which the click leaves hovered.
+  await page.mouse.move(0, 0);
+
+  // The side column's other cards, under the Rhymes card, are hidden.
+  const card = page.locator(".part", { has: rhymes });
+  await page
+    .locator(".part")
+    .filter({ hasNot: rhymes })
+    .evaluateAll((parts) =>
+      parts.forEach((part) => (part.style.visibility = "hidden")),
+    );
+
+  // From the Lyric Sheet's heading, with the Rhymes button, down to the
+  // Chorus's foot, across to the Rhymes card's edge.
+  const sheet = await page
+    .getByRole("region", { name: "Lyric Sheet" })
+    .boundingBox();
+  const side = await card.boundingBox();
+  const end = await chorus.boundingBox();
+  const left = sheet.x - 24;
+  const top = sheet.y - 8;
+  await save(page, "rhymes", {
+    clip: {
+      x: left,
+      y: top,
+      width: side.x + side.width + 24 - left,
+      height: Math.max(end.y + end.height, side.y + side.height) + 8 - top,
+    },
+  });
+  await page.context().close();
+  await api("POST", `/alternates/${first.id}/activate`);
 }
 
 // Calibrating an Input hands-free, from Settings → Recording, as an animated

@@ -13,13 +13,13 @@ The screenshots in the README and on the docs site, `docs/web/`, taken in the da
 | `backups-labelled.png` | Settings' Backups holding the demo Backup, numbered: Scheduled Backups, Upload, New Backup, the Backup and Restore |
 | `song-list.png` | The Songs page on desktop: both Folders, then the Songs in none, down to just below the list |
 | `chords-look-up.png` | The Chords page's Look up with Cmaj7 typed, in standard tuning: its notes and first page of Voicings, best first |
-| `rhymes.png` | The hero Song in Rhyme mode, suggesting rhymes for labore, Verse 1's last word, with the caret after it. The capture downloads the English rhyming dictionary to that shot's browser alone |
 | `phone-song-list.png` | The Songs page on a phone: both Folders, then the Songs in none |
 | `phone-timeline.png` | The hero Song on a phone held sideways, the Timeline filling the screen |
 | `phone-lyric-sheet.png` | The hero Song in Read mode on a phone                          |
 | `read-mode.png`         | The hero Song in Read mode, with the Line playing highlighted  |
 | `sync-mode.webp`        | Sync mode cueing the Bridge's Lines, animated                  |
 | `snapshots.png` | The hero Song's Snapshots, grouped into the last 24 hours, daily and weekly, the oldest Kept and open beside Now, with Verse 1's third Line rewritten since. The capture takes them just before, so it shows them as taken over weeks |
+| `rhymes.png` | The hero Song in Rhyme mode with the Chorus's second Alternate chosen, suggesting rhymes for error, its last word, with the caret after it. The capture chooses that Alternate after the Snapshots, so Verse 1 shows their rewrite, and downloads the English rhyming dictionary to that shot's browser alone |
 | `calibrating.webp` | Calibrating the default input hands-free in Settings → Recording, from Calibrate to Save, animated. Chromium's fake microphone hears a click file the script writes, so it measures and finishes as it would for real |
 
 The demo content is lorem ipsum, kept in the Backup [`demo.bandmate`](demo.bandmate) beside this file: a hero Song with Chords, a Chord Line, a second Alternate of the Chorus with words of its own, Cues, a Scrapbook Section, a click-track Beat and two Takes, and six other Songs across every Status, one of them in the Folder "Album 2025". Restoring it is also a quick way to fill a dev stack with Songs that have Timelines.
