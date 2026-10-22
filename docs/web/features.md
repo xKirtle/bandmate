@@ -1,6 +1,6 @@
 # Writing and recording
 
-A reference for writing and recording a song in Bandmate, from the first idea to a rough recording: look up the part you're stuck on. Backups and Settings have a page of their own, [Settings and Backups](/settings).
+A reference for writing and recording a song in Bandmate, from the first idea to a rough recording: look up the part you're stuck on. Settings and Backups are on [a page of their own](/settings).
 
 ## Your songs
 
