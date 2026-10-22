@@ -11,10 +11,10 @@
 // starts.
 //
 // Which surface an edit was made on is the method it arrives through, not
-// anything a caller passes: submit, setTags and report are the Details,
-// edit and make the Timeline, cue the Cues, changeLyricSheet the Lyric
-// Sheet. An undo or a redo takes its surface from the kind of the edit it
-// replays.
+// anything a caller passes: submit, setTags and report are the Details, as
+// is a field typed in place, which saves through submit; edit and make are
+// the Timeline, cue the Cues, and changeLyricSheet the Lyric Sheet. An undo
+// or a redo takes its surface from the kind of the edit it replays.
 //
 // A Cue change shows at once, made on top of the Song as saved (see
 // cueChanges.ts), so syncing keeps its rhythm. Its save is tried again for
@@ -402,8 +402,9 @@ export class Saves {
   #step(next: () => Step | null): Promise<Undone | null> {
     let undone: Undone | null = null;
     // The edit to replay is picked in the turn, so its surface is only
-    // known by the time a refusal has one to be remembered against.
-    let replaying: Surface = 'timeline';
+    // known by the time a refusal has one to be remembered against, and an
+    // undo with nothing left to replay never has one.
+    let replaying: Surface | null = null;
     return this.#turn(
       () => replaying,
       async (at) => {
@@ -638,7 +639,10 @@ export class Saves {
     const done = this.#queue.then(async (): Promise<R> => {
       try {
         show(await op(this.#savedSong));
-        this.#landed(surfaceOf(on), turn);
+        // An undo or a redo that found nothing to replay has no surface, and
+        // sent nothing, so it clears no error.
+        const landedOn = surfaceOf(on);
+        if (landedOn) this.#landed(landedOn, turn);
         return result('saved');
       } catch (e) {
         return result(this.#fail(e, surfaceOf(on)));
@@ -650,13 +654,18 @@ export class Saves {
     return done;
   }
 
-  #fail(e: unknown, surface: Surface): Submitted {
+  /**
+   * How a turn ended once its save threw. The surface is only ever none
+   * when an undo or a redo threw before picking the edit it would replay,
+   * leaving nothing for its message to be remembered against.
+   */
+  #fail(e: unknown, surface: Surface | null): Submitted {
     if (e instanceof ApiError && e.stale) {
       this.stale = true;
       this.#forget();
       return 'stale';
     }
-    this.#refuse(surface, (e as Error).message);
+    if (surface) this.#refuse(surface, (e as Error).message);
     return 'failed';
   }
 
@@ -701,12 +710,13 @@ interface Refused {
 
 /**
  * The surface a turn is on: the one its method stands for, or, for an undo
- * or a redo, whichever the edit it turns out to replay was made on.
+ * or a redo, whichever the edit it turns out to replay was made on, and
+ * none while it has yet to pick one, or found none to.
  */
-type OnSurface = Surface | (() => Surface);
+type OnSurface = Surface | (() => Surface | null);
 
-const surfaceOf = (on: OnSurface): Surface => (typeof on === 'function' ? on() : on);
+const surfaceOf = (on: OnSurface): Surface | null => (typeof on === 'function' ? on() : on);
 
-/** The surface an edit kept to undo was made on. */
+/** The surface an edit kept to undo was made on; every Timeline edit is the Timeline's. */
 const surfaceOfEdit = (edit: HistoryEdit): Surface =>
   edit.kind === 'restoreCues' ? 'cues' : edit.kind === 'putSheetBack' ? 'lyricSheet' : 'timeline';

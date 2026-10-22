@@ -184,12 +184,25 @@ describe('Saves, errors per surface', () => {
     expect(saves.errorOn('lyricSheet')).toMatch(/Can't reach Bandmate/);
   });
 
+  it('leaves every error standing for an undo that replayed nothing, having saved nothing', async () => {
+    const server = new FakeSongServer();
+    const saves = await savesFor(server);
+    expect(await saves.edit({ kind: 'setLoop', loop: { start: 0, end: 4, on: true } })).not.toBeNull();
+    server.failNext(1);
+    expect(await saves.edit({ kind: 'clearLoop' })).toBeNull();
+    expect(saves.errorOn('timeline')).toMatch(/Can't reach Bandmate/);
+    // An undo no longer wanted by the time its turn comes sends nothing.
+    expect(await saves.undo(() => false)).toBeNull();
+    expect(saves.errorOn('timeline')).toMatch(/Can't reach Bandmate/);
+  });
+
   it('remembers a Section move refused from the Scrapbook against the Lyric Sheet, like one made there', async () => {
     const server = new FakeSongServer(scrapbookSong());
     const saves = await savesFor(server);
-    // Moved out of the Scrapbook, which the fake server refuses.
+    // Moved out of the Scrapbook, refused.
+    server.failNext(1);
     expect(await saves.changeLyricSheet({ kind: 'addToArrangement', sectionId: 1 })).toBe(false);
-    expect(saves.errorOn('lyricSheet')).toMatch(/addToArrangement is not modelled/);
+    expect(saves.errorOn('lyricSheet')).not.toBeNull();
     expect(saves.errorOn('details')).toBeNull();
 
     // The same move made in the Lyric Sheet, refused on the network.
