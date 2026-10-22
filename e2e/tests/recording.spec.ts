@@ -506,7 +506,9 @@ test('stopping during the lead-in keeps nothing, and says so', async ({ page, ba
   // Stopped as soon as it can be, well inside the 2 s lead-in.
   await stopButton(page).click();
 
-  await expect(page.getByRole('alert')).toHaveText(
+  // In the toast stack, labelled with the Timeline, which found it itself.
+  await expect(page.getByRole('alert')).toContainText('Timeline');
+  await expect(page.getByRole('alert')).toContainText(
     'Recording stopped during the lead-in, so there was nothing to keep.',
   );
   await expect(recordButton(page)).toBeEnabled();

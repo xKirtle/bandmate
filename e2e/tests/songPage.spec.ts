@@ -793,6 +793,34 @@ async function transportOffers(page: Page, count = 3) {
   return offers;
 }
 
+test('an audio file the Timeline can’t take says so in the toast stack, labelled Timeline, until the next import', async ({
+  page,
+  bandmate,
+}) => {
+  const song = await heroSong(bandmate);
+  await page.goto(`/songs/${song.id}`);
+  await expect(clip(page, 'Take 2')).toBeVisible();
+
+  /** Imports files with Import audio…, on the transport row. */
+  async function importAudio(file: Parameters<Page['setInputFiles']>[1]) {
+    const chooser = page.waitForEvent('filechooser');
+    await timeline(page).getByRole('button', { name: 'Import audio…' }).click();
+    await (await chooser).setFiles(file);
+  }
+
+  await importAudio({ name: 'notes.txt', mimeType: 'text/plain', buffer: Buffer.from('Not audio') });
+  await expect(saveError(page, 'Timeline')).toContainText(
+    '“notes.txt” can\'t be played in this browser. Try an mp3, wav, flac, m4a or ogg file.',
+  );
+  // The Timeline has no bar of its own: the stack is the one place it says so.
+  await expect(timeline(page).getByRole('alert')).toHaveCount(0);
+
+  // Importing again takes it back.
+  await importAudio(toneWav('night drive.wav', 2));
+  await expect(clip(page, 'night drive')).toBeVisible();
+  await expect(saveError(page, 'Timeline')).toHaveCount(0);
+});
+
 test("the transport row's actions sit on it where there's room, and fold into its ⋯ as it narrows: Import audio first, then Mix down, then the mic", async ({
   page,
   bandmate,

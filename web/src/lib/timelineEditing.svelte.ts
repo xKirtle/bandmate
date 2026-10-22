@@ -103,8 +103,12 @@ export class TimelineEditing {
   #importing = $state<string | null>(null);
   /** Imports run one at a time, in the order they were asked for. */
   #imports: Promise<void> = Promise.resolve();
-  /** What the files imported refused said, until a new import or a Merge. */
-  #error = $state<string | null>(null);
+  /**
+   * What the files imported refused said, joined into one message, until a
+   * new import or a Merge: it's reported as the Timeline's error, whole,
+   * each time one more is refused.
+   */
+  #refused: string | null = null;
   /**
    * The values shown over the Timeline as saved, by field, e.g. "track 3
    * volume", and which Song they were set over: they go once a refresh
@@ -319,7 +323,7 @@ export class TimelineEditing {
    * Sound, rendered from the Timeline as saved once the edits queued
    * before it land, with its Tracks' levels as they are then. Until it's
    * saved, or fails, the Timeline is frozen; if rendering or saving fails,
-   * nothing changes, and the save error says why. Once saved, the merged
+   * nothing changes, and the Timeline's error says why. Once saved, the merged
    * Clip becomes the Selection, its Track the Chosen Track, and the Merge
    * note names any Track that came out silent. It's kept in the history as
    * replacing the Clips with it, so redoing it never renders it again.
@@ -328,7 +332,7 @@ export class TimelineEditing {
   merge = async (): Promise<boolean> => {
     if (!this.mergeable) return false;
     const clipIds = new Set(this.#selection.ids);
-    this.#error = null;
+    this.#startOver();
     this.#mergeNote = null;
     // What it says once made, worked out in its turn.
     let note: string | null = null;
@@ -373,18 +377,22 @@ export class TimelineEditing {
   /**
    * Imports audio files as Sounds onto a Track, each after the last, e.g.
    * from Import audio… or dropped, once the imports asked for before are
-   * done; refused while frozen. Each one refused says why in the error as
-   * it's refused, and a new import clears what the last ones said, unless
-   * one is still under way. Resolves once they're done.
+   * done; refused while frozen. Each one refused says why in the
+   * Timeline's error as it's refused, joined to what the ones before it
+   * said, and a new import takes back what the last ones said, unless one
+   * is still under way. Resolves once they're done.
    */
   importFiles = (files: File[], trackId: number): Promise<void> => {
     if (this.frozen) return Promise.resolve();
-    if (this.#importing === null) this.#error = null;
+    if (this.#importing === null) this.#startOver();
     const done = this.#imports.then(async () => {
       await importEach(
         files,
         (file) => this.#importSound(file, trackId),
-        (message) => (this.#error = this.#error ? `${this.#error} ${message}` : message),
+        (message) => {
+          this.#refused = this.#refused ? `${this.#refused} ${message}` : message;
+          this.#saves.reportOnTimeline(this.#refused);
+        },
       );
       this.#importing = null;
     });
@@ -413,14 +421,13 @@ export class TimelineEditing {
     return this.#importing;
   }
 
-  /** What the files imported refused said, until a new import, a Merge, or it's dismissed. */
-  get error(): string | null {
-    return this.#error;
-  }
-
-  /** Dismisses what the files imported refused said. */
-  dismissError() {
-    this.#error = null;
+  /**
+   * Takes back what the files imported refused said, as an import or a
+   * Merge starts, and starts joining them over.
+   */
+  #startOver() {
+    this.#refused = null;
+    this.#saves.retractOnTimeline();
   }
 }
 

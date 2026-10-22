@@ -1091,62 +1091,79 @@ describe('Timeline editing, a Sound import', () => {
     expect(server.timeline.sounds.map((s) => s.name)).toEqual(['night drive', 'night ride', 'outro']);
   });
 
-  it('joins what each file refused says into its error, which the next import clears', async () => {
+  it('joins what each file refused says into the Timeline’s error, which the next import takes back', async () => {
     const server = new FakeSongServer(emptySong(), twoTracks());
-    const { editing, audio } = await editingFor(server);
+    const { saves, editing, audio } = await editingFor(server);
     audio.refusing.set('huge.wav', '“huge.wav” is 300 MB, over the upload limit of 200 MB.');
     audio.refusing.set('notes.txt', '“notes.txt” can’t be played in this browser.');
     await editing.importFiles([audioFile('huge.wav'), audioFile('intro.wav'), audioFile('notes.txt')], 1);
-    expect(editing.error).toBe(
-      '“huge.wav” is 300 MB, over the upload limit of 200 MB. “notes.txt” can’t be played in this browser.',
-    );
-    // The one between them was imported.
+    // One message, though the one between them was imported.
+    expect(saves.errors).toEqual([
+      {
+        surface: 'timeline',
+        message: '“huge.wav” is 300 MB, over the upload limit of 200 MB. “notes.txt” can’t be played in this browser.',
+      },
+    ]);
     expect(soundsOn(server, 1)).toEqual([['intro', 30]]);
     const next = editing.importFiles([audioFile('outro.wav')], 1);
-    expect(editing.error).toBeNull();
+    expect(saves.errorOn('timeline')).toBeNull();
     await next;
-    expect(editing.error).toBeNull();
+    expect(saves.errorOn('timeline')).toBeNull();
   });
 
-  it('keeps what the files before it refused while an import still runs', async () => {
+  it('keeps what the files before it refused while an import still runs, joining what it refuses on', async () => {
     const server = new FakeSongServer(emptySong(), twoTracks());
-    const { editing, audio } = await editingFor(server);
+    const { saves, editing, audio } = await editingFor(server);
     audio.refusing.set('huge.wav', 'Too big.');
+    audio.refusing.set('notes.txt', 'Not audio.');
     const release = audio.holdNext();
     const first = editing.importFiles([audioFile('intro.wav'), audioFile('huge.wav')], 1);
     await vi.advanceTimersByTimeAsync(0);
     // Asked for while the first is under way, which then refuses a file.
-    const second = editing.importFiles([audioFile('outro.wav')], 1);
+    const second = editing.importFiles([audioFile('notes.txt')], 1);
     release();
     await Promise.all([first, second]);
-    expect(editing.error).toBe('Too big.');
+    expect(saves.errorOn('timeline')).toBe('Too big. Not audio.');
   });
 
-  it('has its error cleared by a Merge’s press, or dismissed', async () => {
+  it('leaves a Timeline save refused standing as an import starts, then puts what it refuses in its place', async () => {
+    const server = new FakeSongServer(emptySong(), twoTracks());
+    const { saves, editing, audio } = await editingFor(server);
+    server.failNext(1);
+    expect(await editing.edit({ kind: 'clearLoop' })).toBeNull();
+    const refused = saves.errorOn('timeline');
+    expect(refused).toMatch(/Can't reach Bandmate/);
+    audio.refusing.set('huge.wav', 'Too big.');
+    const release = audio.holdNext();
+    const importing = editing.importFiles([audioFile('huge.wav')], 1);
+    expect(saves.errorOn('timeline')).toBe(refused);
+    release();
+    await importing;
+    expect(saves.errorOn('timeline')).toBe('Too big.');
+  });
+
+  it('has what the files refused taken back by a Merge’s press', async () => {
     const server = new FakeSongServer(emptySong(), mergeTracks());
-    const { editing, selection, audio } = await editingFor(server);
+    const { saves, editing, selection, audio } = await editingFor(server);
     audio.refusing.set('huge.wav', 'Too big.');
     await editing.importFiles([audioFile('huge.wav')], 1);
-    expect(editing.error).toBe('Too big.');
-    editing.dismissError();
-    expect(editing.error).toBeNull();
-    await editing.importFiles([audioFile('huge.wav')], 1);
+    expect(saves.errorOn('timeline')).toBe('Too big.');
     selection.selectEdited([1, 3]);
     const merging = editing.merge();
-    expect(editing.error).toBeNull();
+    expect(saves.errorOn('timeline')).toBeNull();
     await merging;
   });
 
   it('is refused while frozen', async () => {
     const server = new FakeSongServer(emptySong(), mergeTracks());
-    const { editing, selection, state, audio } = await editingFor(server);
+    const { saves, editing, selection, state, audio } = await editingFor(server);
     audio.refusing.set('huge.wav', 'Too big.');
     await editing.importFiles([audioFile('huge.wav')], 1);
     state.recording = true;
     await editing.importFiles([audioFile('intro.wav')], 1);
     expect(editing.importing).toBeNull();
     // What the last import said stands.
-    expect(editing.error).toBe('Too big.');
+    expect(saves.errorOn('timeline')).toBe('Too big.');
     state.recording = false;
     selection.selectEdited([1, 3]);
     const release = audio.holdNext();
@@ -1175,7 +1192,6 @@ describe('Timeline editing, a Sound import', () => {
     server.failNext(1);
     await editing.importFiles([audioFile('night drive.wav')], 2);
     expect(saves.errorOn('timeline')).toBe("Can't reach Bandmate. Check your connection.");
-    expect(editing.error).toBeNull();
     expect(server.timeline.tracks[1].clips).toEqual([]);
   });
 });
