@@ -135,7 +135,6 @@
     height?: number;
   } = $props();
 
-  let error = $state<string | null>(null);
   let collapsed = $state(false);
   let picking = $state(false);
   // A Beat just added whose BPM could become the Song's.
@@ -615,26 +614,24 @@
     // The server still enforces its limit.
     () => {},
   );
-  // What went wrong here, then what the files imported since refused.
-  const shownError = $derived([error, editing.error].filter((e) => e !== null).join(' ') || null);
-
   /**
-   * Shows what went wrong here, or with null clears it, replacing what the
-   * Timeline said before, what the files imported refused included.
+   * Shows what went wrong here, e.g. a recording with nothing to keep, as
+   * the Timeline's error in the Song page's toast stack, where its refused
+   * saves show too (ADR 0029); or with null takes back what it said, as the
+   * action it was about starts again.
    */
   function showError(message: string | null) {
-    error = message;
-    editing.dismissError();
+    if (message === null) saves.retractOnTimeline();
+    else saves.reportOnTimeline(message);
   }
 
   /**
    * Imports audio files as Sounds onto a Track, each after the last, from
    * Import audio… or dropped, unless frozen: see Timeline editing. A new
-   * import clears what the Timeline said before, unless one's under way.
+   * import takes back what the Timeline said before, unless one's under way.
    */
   function importFiles(files: File[], trackId: number) {
     if (frozen) return;
-    if (editing.importing === null) showError(null);
     void editing.importFiles(files, trackId);
   }
 
@@ -1017,13 +1014,13 @@
   }
 
   /**
-   * Runs a Clip command. Pressing Merge clears what the Timeline said
-   * before. A Split gets the Clip that has focus, and moves focus to its
-   * right half, so Delete then trims off what's after the playhead, not the
-   * left half alone; unless focus moved on from it since.
+   * Runs a Clip command. Pressing Merge takes back what the Timeline said
+   * before (see Timeline editing). A Split gets the Clip that has focus,
+   * and moves focus to its right half, so Delete then trims off what's
+   * after the playhead, not the left half alone; unless focus moved on
+   * from it since.
    */
   async function runCommand(command: ClipCommand): Promise<ClipCommandRan | null> {
-    if (command.kind === 'merge' && commands.can('merge', command.target) === null) showError(null);
     if (command.kind !== 'split') return commands.run(command);
     const focused = focusedClip(document.activeElement)?.id;
     const ran = await commands.run({ ...command, focused });
@@ -2331,15 +2328,6 @@
       </div>
     {/if}
   </div>
-  {#if shownError}
-    <!-- Over the page just above the Timeline, so showing it never moves anything. -->
-    <div class="error-bar" role="alert">
-      <span class="error">{shownError}</span>
-      <button type="button" class="dismiss" onclick={() => showError(null)} aria-label="Dismiss" title="Dismiss"
-        ><X /></button
-      >
-    </div>
-  {/if}
 </section>
 
 {#if calibrating}
@@ -3217,33 +3205,6 @@
   .offer {
     margin-top: calc(0.5 * var(--timeline-rem));
     font-size: calc(0.875 * var(--timeline-rem));
-  }
-  .error-bar {
-    position: absolute;
-    bottom: calc(100% + 0.5 * var(--timeline-rem));
-    left: max(var(--gutter), env(safe-area-inset-left));
-    right: max(var(--gutter), env(safe-area-inset-right));
-    display: flex;
-    align-items: center;
-    gap: calc(0.5 * var(--timeline-rem));
-    padding: calc(0.5 * var(--timeline-rem)) calc(0.75 * var(--timeline-rem));
-    border: 1px solid var(--danger);
-    border-radius: calc(0.5 * var(--timeline-rem));
-    background: var(--bg);
-    box-shadow: var(--shadow-float);
-  }
-  .error-bar .error {
-    flex: 1;
-    min-width: 0;
-  }
-  .dismiss {
-    flex-shrink: 0;
-    padding: 0 calc(0.25 * var(--timeline-rem));
-    border: none;
-    background: none;
-    color: var(--text-muted);
-    font-size: calc(1.25 * var(--timeline-rem));
-    cursor: pointer;
   }
 
   /*

@@ -12,9 +12,10 @@
 //
 // Which surface an edit was made on is the method it arrives through, not
 // anything a caller passes: submit, setTags and report are the Details, as
-// is a field typed in place, which saves through submit; edit and make are
-// the Timeline, cue the Cues, and changeLyricSheet the Lyric Sheet. An undo
-// or a redo takes its surface from the kind of the edit it replays.
+// is a field typed in place, which saves through submit; edit, make and
+// reportOnTimeline are the Timeline, cue the Cues, and changeLyricSheet the
+// Lyric Sheet. An undo or a redo takes its surface from the kind of the
+// edit it replays.
 //
 // A Cue change shows at once, made on top of the Song as saved (see
 // cueChanges.ts), so syncing keeps its rhythm. Its save is tried again for
@@ -201,6 +202,8 @@ export class Saves {
   #turns = 0;
   /** The latest save queued before the error about to be remembered, which only a save asked for since clears. */
   #errorKeptUntil = 0;
+  /** How many hold what the Timeline found itself standing (see holdOnTimeline). */
+  #timelineHolds = 0;
   #closed = false;
   #holds = 0;
   #refreshOnRelease = false;
@@ -572,6 +575,44 @@ export class Saves {
   };
 
   /**
+   * Shows a problem the Timeline found itself rather than a save it was
+   * refused, e.g. an audio file it can't import, or a recording with
+   * nothing to keep, as the Timeline's error, in place of the one it held,
+   * until a later Timeline save lands, it's dismissed, or it's taken back.
+   */
+  reportOnTimeline = (message: string) => {
+    this.#refuse('timeline', message, true);
+  };
+
+  /**
+   * Takes back what the Timeline found itself, e.g. as the action it was
+   * about is started again. A Timeline save refused stays: only a save
+   * landing there, or its dismiss, answers that.
+   */
+  retractOnTimeline = () => {
+    if (this.#errors.get('timeline')?.found) this.#forgetError('timeline');
+  };
+
+  /**
+   * Keeps what the Timeline found itself standing as Timeline saves land,
+   * e.g. a run of imports' own, so what the run refused reads as one
+   * message to the end, until the function returned is called. From then
+   * only a Timeline save asked for since clears it.
+   */
+  holdOnTimeline = (): (() => void) => {
+    this.#timelineHolds++;
+    let released = false;
+    return () => {
+      if (released) return;
+      released = true;
+      this.#timelineHolds--;
+      if (this.#timelineHolds > 0) return;
+      const found = this.#errors.get('timeline');
+      if (found?.found) this.#errors = new Map(this.#errors).set('timeline', { ...found, keptUntil: this.#turns });
+    };
+  };
+
+  /**
    * Shows the Song as changed elsewhere since, e.g. on coming back to the
    * tab. It waits for saves already on their way, and never replaces edits
    * not saved yet: those are built against the Song as it was, so the Song
@@ -690,13 +731,16 @@ export class Saves {
     return 'failed';
   }
 
-  /** Remembers why a save was refused against its surface, in place of the error that surface held. */
-  #refuse(surface: Surface, message: string) {
+  /**
+   * Remembers why a save was refused against its surface, in place of the
+   * error that surface held, or with found, what the surface found itself.
+   */
+  #refuse(surface: Surface, message: string, found = false) {
     const errors = new Map(this.#errors);
     // Taken out before it goes back in, so the surface that failed latest
     // is last, which is the order the toast stack reads errors in.
     errors.delete(surface);
-    errors.set(surface, { message, keptUntil: this.#errorKeptUntil });
+    errors.set(surface, { message, keptUntil: this.#errorKeptUntil, found });
     this.#errorKeptUntil = 0;
     this.#errors = errors;
   }
@@ -705,6 +749,7 @@ export class Saves {
   #landed(surface: Surface, turn: number) {
     const refused = this.#errors.get(surface);
     if (!refused || turn <= refused.keptUntil) return;
+    if (refused.found && this.#timelineHolds > 0) return;
     this.#forgetError(surface);
   }
 
@@ -729,10 +774,14 @@ interface Step {
   done: (edited: Edited) => Undone;
 }
 
-/** A save refused: why, and the turn until which a save landing doesn't clear it. */
+/**
+ * A save refused: why, the turn until which a save landing doesn't clear
+ * it, and whether its surface found it itself rather than being refused.
+ */
 interface Refused {
   message: string;
   keptUntil: number;
+  found: boolean;
 }
 
 /**

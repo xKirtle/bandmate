@@ -506,9 +506,11 @@ test('stopping during the lead-in keeps nothing, and says so', async ({ page, ba
   // Stopped as soon as it can be, well inside the 2 s lead-in.
   await stopButton(page).click();
 
-  await expect(page.getByRole('alert')).toHaveText(
-    'Recording stopped during the lead-in, so there was nothing to keep.',
-  );
+  // In the toast stack, labelled with the Timeline, which found it itself.
+  const toast = page
+    .getByRole('alert')
+    .filter({ has: page.getByRole('button', { name: 'Dismiss the Timeline error' }) });
+  await expect(toast).toContainText('Recording stopped during the lead-in, so there was nothing to keep.');
   await expect(recordButton(page)).toBeEnabled();
   expect(await clipsOn(bandmate, song.id, 'Track 1')).toEqual([]);
   // Nor is it offered back as unsaved.
