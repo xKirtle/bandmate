@@ -151,9 +151,11 @@ function endsSyncMode(change: LyricSheetChange): boolean {
 /**
  * The Section whose Alternates a change makes anew, so anything sent to
  * them after it would be lost: one added to another. (Moving an Alternate
- * out makes that one anew too, but only an inactive one, which has no text
- * box; its name, typed on its card, is left as it was, saved as the card is
- * left.)
+ * out doesn't remake it: it keeps its id and its name, so a name typed on
+ * its card is saved as the card goes, after the move. The Section it lands
+ * in takes its Label from the name as saved, so a name still being typed
+ * doesn't reach that Label — the name itself isn't lost, and adding the
+ * Section back into another gives it again.)
  */
 function sectionRemadeBy(change: LyricSheetChange): number | null {
   return change.kind === 'addToSection' ? change.sectionId : null;
