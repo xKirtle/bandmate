@@ -35,6 +35,14 @@ Under the settings, the card says when the last Scheduled Backup was made, that 
   - **Recording**: every input on this device, each channel of an audio interface on its own, with its latency or "Not calibrated" or "Skipped". Pick the one you record from, and check its level with **Test input** above the list: Bandmate only listens while it's on, and asks for the microphone the first time. Open any of them to calibrate it as in [Calibrate](/features#calibrate) without recording from it, or type its latency. Inputs that aren't plugged in keep their latency, listed under **Not connected**, to forget.
   - **Rhyming dictionaries**: one for each language Bandmate suggests rhymes in, each with its download size. Download the ones you write in, so [Rhymes](/features#rhymes) can suggest words in them, or remove one you no longer need.
   - **Chord diagrams**: flip them for left-handed playing.
-- **Shortcuts**: every [keyboard shortcut](/features#keyboard-shortcuts), with its keys. Open one to see what it does and where it works, and to [change its keys](/features#keyboard-shortcuts), or search them as in the shortcuts list. Shown only on a bigger screen.
+- **Shortcuts**: every [keyboard shortcut](/features#keyboard-shortcuts), with its keys. Open one to see what it does and where it works, and to [change its keys](#change-a-shortcut-s-keys), or search them as in the shortcuts list. Shown only on a bigger screen.
 - **Backups**: see [Backups](#backups).
 - **About**: the version you're running, what changed in it, whether a newer one is out, the yt-dlp in use, and the packages and data that ship in Bandmate, with their licenses.
+
+### Change a shortcut's keys
+
+In **Settings → Shortcuts**, open a shortcut. Click one of its keys and press the one you want, **Add key** to give it another, or remove a key with its ×. Esc cancels. A mouse shortcut, like Ctrl+click or Shift+drag, keeps its click, drag or scroll: choose which of Ctrl, Alt and Shift you hold with it, at least one.
+
+A key another shortcut already has is refused, with a link to that shortcut so you can free the key there first. So are keys the browser or the page needs, like Tab or Ctrl+W.
+
+**Reset** puts one shortcut back, and **Reset to defaults** puts them all back. Your keys are kept on each device, so each keyboard you use can have its own.
