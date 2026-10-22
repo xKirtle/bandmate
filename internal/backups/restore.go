@@ -281,24 +281,21 @@ func (r *OpenedBackup) Present(ctx context.Context, picks Picks) (Presence, erro
 	if err != nil {
 		return Presence{}, err
 	}
-	var p Presence
-	for _, t := range songTables {
-		var list *[]Present
-		switch t.name {
-		case "songs":
-			list = &p.Songs
-		case "beats":
-			list = &p.Beats
-		default:
-			continue
-		}
-		in, err := broughtBack(ctx, conn, t, columns[t.name], picked)
-		if err != nil {
-			return Presence{}, err
-		}
-		*list = alreadyHere(in)
+	songs, err := broughtBack(ctx, conn, songTableNamed("songs"), columns["songs"], picked)
+	if err != nil {
+		return Presence{}, err
 	}
-	return p, nil
+	beats, err := broughtBack(ctx, conn, songTableNamed("beats"), columns["beats"], picked)
+	if err != nil {
+		return Presence{}, err
+	}
+	return Presence{Songs: alreadyHere(songs), Beats: alreadyHere(beats)}, nil
+}
+
+// songTableNamed is the table of songTables with the given name.
+func songTableNamed(name string) songTable {
+	i := slices.IndexFunc(songTables, func(t songTable) bool { return t.name == name })
+	return songTables[i]
 }
 
 // alreadyHere lists, by title, the rows a Restore brings back, as in holds
@@ -306,14 +303,15 @@ func (r *OpenedBackup) Present(ctx context.Context, picks Picks) (Presence, erro
 func alreadyHere(in identityInput) []Present {
 	list := []Present{}
 	listed := map[int64]bool{}
-	for _, pick := range in.picked {
-		for _, r := range pick {
-			match, inBandmate := in.inBandmate[r.key]
-			if !inBandmate || listed[r.id] {
+	for _, rows := range in.picked {
+		for _, row := range rows {
+			match, inBandmate := in.inBandmate[row.key]
+			if !inBandmate || listed[row.id] {
 				continue
 			}
-			listed[r.id] = true
-			list = append(list, Present{ID: r.id, Title: r.title, InBandmate: Song{ID: match.id, Title: match.title}})
+			listed[row.id] = true
+			list = append(list, Present{ID: row.id, Title: row.title,
+				InBandmate: Song{ID: match.id, Title: match.title}})
 		}
 	}
 	slices.SortFunc(list, func(a, b Present) int {
@@ -668,8 +666,12 @@ func broughtBack(ctx context.Context, q domain.Queryer, t songTable, columns []s
 // Folder, Tag, Song or Beat is stored without, matches nothing.
 func pickedRows(ctx context.Context, q domain.Queryer, t songTable, in identityInput,
 	rows rowsPicked) ([]backupRow, error) {
+	title := "''"
+	if in.titled {
+		title = `r."title"`
+	}
 	found, err := q.QueryContext(ctx, fmt.Sprintf(`SELECT r.id, COALESCE(r."%[1]s", ''), %[4]s
-		FROM src.%[2]s r WHERE (%[3]s) ORDER BY r.id`, in.matchedBy(t), t.name, rows.where, in.title("r.")), rows.arg)
+		FROM src.%[2]s r WHERE (%[3]s) ORDER BY r.id`, in.matchedBy(t), t.name, rows.where, title), rows.arg)
 	if err != nil {
 		return nil, err
 	}
@@ -703,15 +705,18 @@ func rowsInBandmate(ctx context.Context, q domain.Queryer, t songTable,
 	if err != nil {
 		return nil, err
 	}
-	name, version := "''", "0"
+	name, version, title := "''", "0", "''"
 	if in.matchedByName {
 		name = `"name"`
 	}
 	if in.versioned {
 		version = `"version"`
 	}
+	if in.titled {
+		title = `"title"`
+	}
 	found, err := q.QueryContext(ctx, fmt.Sprintf(`SELECT "%[1]s", id, %[2]s, %[3]s, %[5]s FROM main.%[4]s
-		WHERE "%[1]s" IN (SELECT value FROM json_each(?))`, in.matchedBy(t), name, version, t.name, in.title("")),
+		WHERE "%[1]s" IN (SELECT value FROM json_each(?))`, in.matchedBy(t), name, version, t.name, title),
 		string(list))
 	if err != nil {
 		return nil, err

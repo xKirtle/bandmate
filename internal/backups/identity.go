@@ -15,8 +15,7 @@ import (
 
 // backupRow is a row of a table whose ids a Restore decides, as the Backup
 // holds it: its id there, the folded name or Identity it's matched by, and
-// its title, for a Song or Beat, which what's already in Bandmate lists and
-// the decisions ignore.
+// its title, for a Song or Beat.
 type backupRow struct {
 	id    int64
 	key   string
@@ -25,8 +24,7 @@ type backupRow struct {
 
 // bandmateRow is a row already in Bandmate that one from the Backup can
 // match: its id here, the name it carries here, for a Folder or Tag, the
-// version it holds, for a Song, and its title, for a Song or Beat, which
-// what's already in Bandmate lists and the decisions ignore.
+// version it holds, for a Song, and its title, for a Song or Beat.
 type bandmateRow struct {
 	id      int64
 	name    string
@@ -63,15 +61,6 @@ type identityInput struct {
 	// lastUsedID is the highest id the table has used in Bandmate, held now
 	// or not: a fresh id is the next one past it.
 	lastUsedID int64
-}
-
-// title is the column holding the table's rows' titles, prefixed with
-// the alias of the table read, or an empty one where they hold none.
-func (in identityInput) title(alias string) string {
-	if in.titled {
-		return alias + `"title"`
-	}
-	return "''"
 }
 
 // matchedBy is the column of t holding what its rows are matched by: the
