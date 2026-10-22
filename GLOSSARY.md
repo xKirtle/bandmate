@@ -64,11 +64,11 @@ Making an independent copy of a Section, with all its Alternates and the same on
 _Avoid_: Repeat, share, Detach
 
 **Scrapbook**:
-A Song's collection of Sections that aren't in the Arrangement: leftovers and loose ideas kept for later, in the order they came into it. A Section taken out of the Arrangement goes to its end, unless it has nothing written in any Alternate (no Lines, or only blank ones), in which case it's deleted instead, as there's nothing to keep; a Section made in the Scrapbook stays there even while it's still empty. An inactive Alternate can also be moved out of its Section, becoming a Section of its own, into the Scrapbook or straight into the Arrangement; a Scrapbook Section, or a Section in the Arrangement, can in turn be added to another Section in the Arrangement, its Alternates joining that Section's, inactive. Cues go wherever their Lines go: into the Scrapbook, back out of it, and into another Section.
+A Song's collection of Sections that aren't in the Arrangement: leftovers and loose ideas kept for later, in the order they came into it. A Section taken out of the Arrangement goes to its end, unless it has nothing written in any Alternate (no Lines, or only blank ones), in which case it's deleted instead, as there's nothing to keep; a Section made in the Scrapbook stays there even while it's still empty. An inactive Alternate can also be moved out of its Section, becoming a Section of its own, labelled after both (see Alternate), into the Scrapbook or straight into the Arrangement; a Scrapbook Section, or a Section in the Arrangement, can in turn be added to another Section in the Arrangement, its Alternates joining that Section's, inactive. Cues go wherever their Lines go: into the Scrapbook, back out of it, and into another Section.
 _Avoid_: Trash, drafts, unused
 
 **Alternate**:
-One of several competing versions of a Section's Lines; exactly one Alternate is active at a time.
+One of several competing versions of a Section's Lines; exactly one Alternate is active at a time, and an Alternate may have a name of its own. It keeps that name wherever it goes: moved out as a Section of its own, that Section is labelled with the Label it left and the name together, e.g. "Verse 1 · Darker", a Label like any other to type over; added into another Section, it keeps the name again, only an unnamed Alternate taking the added Section's Label as its name.
 _Avoid_: Variant, option, draft
 
 **Alternates mode**:
