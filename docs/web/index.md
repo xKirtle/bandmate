@@ -25,7 +25,7 @@ features:
     link: /features#write
   - title: Listen
     details: Lay out your beats on a multi-track timeline. Upload a beat, or download one from YouTube, SoundCloud or Bandcamp.
-    link: /features#listen
+    link: /features#beats
   - title: Sync
     details: Tap along to mark when each line starts, and the lyrics light up and scroll as the song plays.
     link: /features#sync
