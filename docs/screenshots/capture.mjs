@@ -556,7 +556,7 @@ async function number(page, places, { first = 1, into } = {}) {
   await page.context().close();
 }
 
-// Rhymes on, suggesting rhymes for labore, the last word of Verse 1, with
+// Rhyme mode, suggesting Rhymes for labore, the last word of Verse 1, with
 // the caret after it. The English rhyming dictionary is downloaded first,
 // to this shot's browser context alone, so no other shot has it.
 {
@@ -572,6 +572,7 @@ async function number(page, places, { first = 1, into } = {}) {
     .getByRole("button", { name: "Download" })
     .click();
   await page.getByText(/^Downloaded, updated/).waitFor();
+  // In the same context, which holds the dictionary.
   await page.goto(heroURL);
   await page.waitForLoadState("networkidle");
   await page.getByRole("button", { name: "Rhymes", exact: true }).click();
