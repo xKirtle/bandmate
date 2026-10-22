@@ -36,7 +36,9 @@ Hover or tap a chord, or tap its shape at the top, to step through the other way
 
 ### Rhymes
 
-The **Rhymes** button suggests rhymes for the word you're writing. It's there on a wide window, like a desktop's, and can't be on while you [sync](#sync).
+Turn **Rhymes** on as you write. It's there on a wide window, like a desktop's, and can't be on while you [sync](#sync).
+
+<img src="@screenshots/rhymes.png" alt="Rhymes on beside the Lyric Sheet, suggesting rhymes for error, the last word of the line being written">
 
 - Download a rhyming dictionary for each language you write in, in **Settings → Rhyming dictionaries**, on each device you write on.
 - A song's rhymes are in the languages set in its details.

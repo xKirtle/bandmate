@@ -19,6 +19,7 @@ The screenshots in the README and on the docs site, `docs/web/`, taken in the da
 | `read-mode.png`         | The hero Song in Read mode, with the Line playing highlighted  |
 | `sync-mode.webp`        | Sync mode cueing the Bridge's Lines, animated                  |
 | `snapshots.png` | The hero Song's Snapshots, grouped into the last 24 hours, daily and weekly, the oldest Kept and open beside Now, with Verse 1's third Line rewritten since. The capture takes them just before, so it shows them as taken over weeks |
+| `rhymes.png` | The hero Song in Rhyme mode with the Chorus's second Alternate chosen, suggesting rhymes for error, its last word, with the caret after it. The capture chooses that Alternate after the Snapshots, so Verse 1 shows their rewrite, and downloads the English rhyming dictionary to that shot's browser alone |
 | `calibrating.webp` | Calibrating the default input hands-free in Settings → Recording, from Calibrate to Save, animated. Chromium's fake microphone hears a click file the script writes, so it measures and finishes as it would for real |
 
 The demo content is lorem ipsum, kept in the Backup [`demo.bandmate`](demo.bandmate) beside this file: a hero Song with Chords, a Chord Line, a second Alternate of the Chorus with words of its own, Cues, a Scrapbook Section, a click-track Beat and two Takes, and six other Songs across every Status, one of them in the Folder "Album 2025". Restoring it is also a quick way to fill a dev stack with Songs that have Timelines.
