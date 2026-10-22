@@ -54,11 +54,11 @@ describe('detailFields', () => {
     const { server, saves, details: d } = await details();
     d.bpm.shown = '12.5';
     expect(d.bpm.commit()).toBe(true);
-    expect(saves.saveError).toBe('BPM must be a whole number');
+    expect(saves.errorOn('details')).toBe('BPM must be a whole number');
     expect(d.bpm.shown).toBe('90');
     d.capo.shown = 'two';
     d.capo.commit();
-    expect(saves.saveError).toBe('Capo must be a whole number');
+    expect(saves.errorOn('details')).toBe('Capo must be a whole number');
     expect(d.capo.shown).toBe('');
     expect(saves.unsaved).toBe(false);
     await settled();
@@ -83,7 +83,7 @@ describe('detailFields', () => {
     d.title.commit();
     await settled();
     expect(d.title.shown).toBe('Anthem');
-    expect(saves.saveError).not.toBeNull();
+    expect(saves.errorOn('details')).not.toBeNull();
     expect(saves.unsaved).toBe(false);
   });
 
@@ -138,7 +138,7 @@ describe('detailFields', () => {
     const { server, saves, details: d } = await details();
     d.customTuning.shown = 'C G D';
     expect(d.customTuning.commit()).toBe(false);
-    expect(saves.saveError).toBe('A custom tuning is six notes, low string to high, like D A D G B E');
+    expect(saves.errorOn('details')).toBe('A custom tuning is six notes, low string to high, like D A D G B E');
     await settled();
     expect(server.landed).toBe(0);
   });
@@ -208,7 +208,7 @@ describe('masterFields', () => {
     await settled();
     expect(fields.name.shown).toBe('Live');
     expect(fields.notes.shown).toBe('');
-    expect(saves.saveError).not.toBeNull();
+    expect(saves.errorOn('details')).not.toBeNull();
     expect(saves.stale).toBe(false);
     expect(saves.unsaved).toBe(false);
   });
@@ -247,7 +247,7 @@ describe('masterFields', () => {
     fields.notes.destroy();
     await settled();
     expect(server.landed).toBe(landed);
-    expect(saves.saveError).toBeNull();
+    expect(saves.errors).toEqual([]);
     expect(saves.unsaved).toBe(false);
   });
 

@@ -133,7 +133,7 @@ describe("Lyric Sheet editing, an Alternate's text", () => {
     server.failNext(1);
     box.type('One\nTwo\nThree');
     await vi.advanceTimersByTimeAsync(800);
-    expect(saves.saveError).toMatch(/Can't reach Bandmate/);
+    expect(saves.errorOn('lyricSheet')).toMatch(/Can't reach Bandmate/);
     expect(box.text).toBe('One\nTwo\nThree');
     expect(textOf(saves.song)).toBe('One\nTwo');
     expect(editing.unsavedIn(1)).toBe(true);
@@ -143,7 +143,7 @@ describe("Lyric Sheet editing, an Alternate's text", () => {
     box.type('One\nTwo\nThree!');
     await vi.advanceTimersByTimeAsync(800);
     expect(textOf(server.song)).toBe('One\nTwo\nThree!');
-    expect(saves.saveError).toBeNull();
+    expect(saves.errors).toEqual([]);
     expect(editing.unsavedIn(1)).toBe(false);
   });
 
@@ -159,7 +159,7 @@ describe("Lyric Sheet editing, an Alternate's text", () => {
     box.blur();
     await settled();
     expect(textOf(server.song)).toBe('One\nTwo\nThree');
-    expect(saves.saveError).toBeNull();
+    expect(saves.errors).toEqual([]);
     expect(editing.unsavedIn(1)).toBe(false);
   });
 
@@ -186,7 +186,7 @@ describe("Lyric Sheet editing, an Alternate's text", () => {
     box.type('Mine, failed');
     box.blur();
     await settled();
-    expect(saves.saveError).not.toBeNull();
+    expect(saves.errorOn('lyricSheet')).not.toBeNull();
     expect(await saves.change((at) => server.update(at, { key: 'Am' }))).toBe(true);
     expect(textOf(saves.song)).toBe('Mine');
     expect(box.text).toBe('Mine, failed');
@@ -217,7 +217,7 @@ describe("Lyric Sheet editing, the Lyric Sheet's edits not saved yet", () => {
     expect(editing.unsavedIn(1)).toBe(true);
     await settled();
     expect(server.landed).toBe(0);
-    expect(saves.saveError).toMatch(/Can't reach Bandmate/);
+    expect(saves.errorOn('lyricSheet')).toMatch(/Can't reach Bandmate/);
     expect(editing.unsavedIn(1)).toBe(false);
     expect(saves.unsaved).toBe(false);
   });
@@ -357,7 +357,7 @@ describe("Lyric Sheet editing, a Section's Label", () => {
     label.shown = 'Chorus';
     label.commit();
     await settled();
-    expect(saves.saveError).toMatch(/Can't reach Bandmate/);
+    expect(saves.errorOn('lyricSheet')).toMatch(/Can't reach Bandmate/);
     expect(label.shown).toBe('Verse');
     expect(saves.unsaved).toBe(false);
   });
@@ -423,7 +423,7 @@ describe("Lyric Sheet editing, an Alternate's name", () => {
     name.shown = 'Darker';
     name.commit();
     await settled();
-    expect(saves.saveError).toMatch(/Can't reach Bandmate/);
+    expect(saves.errorOn('lyricSheet')).toMatch(/Can't reach Bandmate/);
     expect(name.shown).toBe('');
   });
 
@@ -490,7 +490,7 @@ describe('Lyric Sheet editing, a Label or an Alternate’s name typed as its Sec
     label.destroy();
     await settled();
     expect(server.landed).toBe(landed);
-    expect(saves.saveError).toBeNull();
+    expect(saves.errors).toEqual([]);
     expect(saves.unsaved).toBe(false);
   });
 });
@@ -542,7 +542,7 @@ describe('Lyric Sheet editing, the structure of the Lyric Sheet', () => {
     const server = new FakeSongServer(verseSong());
     const { saves, editing } = await editingFor(server);
     expect(await editing.change({ kind: 'addAlternate', sectionId: 1 })).toBe(false);
-    expect(saves.saveError).toMatch(/addAlternate is not modelled/);
+    expect(saves.errorOn('lyricSheet')).toMatch(/addAlternate is not modelled/);
   });
 });
 
@@ -614,7 +614,7 @@ describe('Lyric Sheet editing, sending what’s being typed first', () => {
     expect(server.landed).toBe(2);
     const joined = server.song.sections[0].alternates[1];
     expect(joined.lines.map((l) => l.text)).toEqual(['Up', 'Down', 'Around']);
-    expect(saves.saveError).toBeNull();
+    expect(saves.errors).toEqual([]);
     // Nothing is sent again as typing's pause comes round, or as the box closes.
     box.close();
     await vi.advanceTimersByTimeAsync(800);

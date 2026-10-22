@@ -20,6 +20,7 @@
   import TagChips from '../lib/TagChips.svelte';
   import TagsField from '../lib/TagsField.svelte';
   import Timeline from '../lib/Timeline.svelte';
+  import Toasts from '../lib/Toasts.svelte';
   import TuningField from '../lib/TuningField.svelte';
   import LanguagesField from '../lib/LanguagesField.svelte';
   import { LyricSheetEditing } from '../lib/lyricSheetEditing.svelte';
@@ -672,9 +673,9 @@
             <button type="button" class="button" onclick={reload}>Reload</button>
           </div>
         {/if}
-        {#if saves.saveError}
-          <p class="error" role="alert">{saves.saveError}</p>
-        {/if}
+        <!-- A refused save says so in the toast stack below, labelled with
+             the surface its edit was made on, rather than in a line here,
+             half a page from a Timeline or Lyric Sheet edit (ADR 0029). -->
       </div>
 
       <div class="sheet">
@@ -797,6 +798,12 @@
     onRecording={(on) => (recording = on)}
     onFreeze={(f) => (freeze = f)}
   />
+{/if}
+
+<!-- Every save the page was refused, one toast per surface, over the page in
+     the bottom corner of the window (see Toasts.svelte). -->
+{#if saves}
+  <Toasts {saves} dock={timelineHeight} />
 {/if}
 
 {#if showingShortcuts}
