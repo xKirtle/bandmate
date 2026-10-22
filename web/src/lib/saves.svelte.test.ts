@@ -243,6 +243,33 @@ describe('Saves, errors per surface', () => {
     expect(saves.errorOn('timeline')).toBeNull();
   });
 
+  it('keeps what the Timeline found itself while held, until a Timeline save asked for since it was let go lands', async () => {
+    const server = new FakeSongServer();
+    const saves = await savesFor(server);
+    const release = saves.holdOnTimeline();
+    saves.reportOnTimeline('Too big.');
+    const loop = { start: 0, end: 4, on: true };
+    expect(await saves.edit({ kind: 'setLoop', loop })).not.toBeNull();
+    expect(saves.errorOn('timeline')).toBe('Too big.');
+    // Queued before it's let go, so it's still the held run's.
+    const queued = saves.edit({ kind: 'clearLoop' });
+    release();
+    expect(await queued).not.toBeNull();
+    expect(saves.errorOn('timeline')).toBe('Too big.');
+    expect(await saves.edit({ kind: 'setLoop', loop })).not.toBeNull();
+    expect(saves.errorOn('timeline')).toBeNull();
+  });
+
+  it('lets a Timeline save refused clear as usual while held', async () => {
+    const server = new FakeSongServer();
+    const saves = await savesFor(server);
+    const release = saves.holdOnTimeline();
+    expect(await saves.make(() => Promise.reject(new Error("Couldn't merge the Clips.")))).toBeNull();
+    expect(await saves.edit({ kind: 'setLoop', loop: { start: 0, end: 4, on: true } })).not.toBeNull();
+    expect(saves.errorOn('timeline')).toBeNull();
+    release();
+  });
+
   it('takes back what the Timeline found itself, but never a Timeline save refused', async () => {
     const server = new FakeSongServer();
     const saves = await savesFor(server);

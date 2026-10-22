@@ -1015,9 +1015,10 @@
 
   /**
    * Runs a Clip command. Pressing Merge takes back what the Timeline said
-   * before (see Timeline editing). A Split gets the Clip that has focus, and moves focus to its
-   * right half, so Delete then trims off what's after the playhead, not the
-   * left half alone; unless focus moved on from it since.
+   * before (see Timeline editing). A Split gets the Clip that has focus,
+   * and moves focus to its right half, so Delete then trims off what's
+   * after the playhead, not the left half alone; unless focus moved on
+   * from it since.
    */
   async function runCommand(command: ClipCommand): Promise<ClipCommandRan | null> {
     if (command.kind !== 'split') return commands.run(command);

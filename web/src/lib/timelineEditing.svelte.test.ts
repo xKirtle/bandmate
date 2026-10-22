@@ -1111,6 +1111,32 @@ describe('Timeline editing, a Sound import', () => {
     expect(saves.errorOn('timeline')).toBeNull();
   });
 
+  it('keeps what a file refused standing as the files after it are imported, until a Timeline save asked for since lands', async () => {
+    const server = new FakeSongServer(emptySong(), twoTracks());
+    const { saves, editing, audio } = await editingFor(server);
+    audio.refusing.set('huge.wav', 'Too big.');
+    await editing.importFiles([audioFile('huge.wav'), audioFile('intro.wav')], 1);
+    expect(soundsOn(server, 1)).toEqual([['intro', 30]]);
+    expect(saves.errorOn('timeline')).toBe('Too big.');
+    expect(await editing.edit({ kind: 'setLoop', loop: { start: 0, end: 4, on: true } })).not.toBeNull();
+    expect(saves.errorOn('timeline')).toBeNull();
+  });
+
+  it('starts over what it joins once its error is dismissed', async () => {
+    const server = new FakeSongServer(emptySong(), twoTracks());
+    const { saves, editing, audio } = await editingFor(server);
+    audio.refusing.set('huge.wav', 'Too big.');
+    audio.refusing.set('notes.txt', 'Not audio.');
+    // Held as the file between them is imported, once the first is refused.
+    const answer = server.holdNextAnswer();
+    const importing = editing.importFiles([audioFile('huge.wav'), audioFile('intro.wav'), audioFile('notes.txt')], 1);
+    await vi.waitFor(() => expect(saves.errorOn('timeline')).toBe('Too big.'));
+    saves.dismiss('timeline');
+    answer();
+    await importing;
+    expect(saves.errorOn('timeline')).toBe('Not audio.');
+  });
+
   it('keeps what the files before it refused while an import still runs, joining what it refuses on', async () => {
     const server = new FakeSongServer(emptySong(), twoTracks());
     const { saves, editing, audio } = await editingFor(server);

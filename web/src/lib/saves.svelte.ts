@@ -202,6 +202,8 @@ export class Saves {
   #turns = 0;
   /** The latest save queued before the error about to be remembered, which only a save asked for since clears. */
   #errorKeptUntil = 0;
+  /** How many hold what the Timeline found itself standing (see holdOnTimeline). */
+  #timelineHolds = 0;
   #closed = false;
   #holds = 0;
   #refreshOnRelease = false;
@@ -592,6 +594,25 @@ export class Saves {
   };
 
   /**
+   * Keeps what the Timeline found itself standing as Timeline saves land,
+   * e.g. a run of imports' own, so what the run refused reads as one
+   * message to the end, until the function returned is called. From then
+   * only a Timeline save asked for since clears it.
+   */
+  holdOnTimeline = (): (() => void) => {
+    this.#timelineHolds++;
+    let released = false;
+    return () => {
+      if (released) return;
+      released = true;
+      this.#timelineHolds--;
+      if (this.#timelineHolds > 0) return;
+      const found = this.#errors.get('timeline');
+      if (found?.found) this.#errors = new Map(this.#errors).set('timeline', { ...found, keptUntil: this.#turns });
+    };
+  };
+
+  /**
    * Shows the Song as changed elsewhere since, e.g. on coming back to the
    * tab. It waits for saves already on their way, and never replaces edits
    * not saved yet: those are built against the Song as it was, so the Song
@@ -728,6 +749,7 @@ export class Saves {
   #landed(surface: Surface, turn: number) {
     const refused = this.#errors.get(surface);
     if (!refused || turn <= refused.keptUntil) return;
+    if (refused.found && this.#timelineHolds > 0) return;
     this.#forgetError(surface);
   }
 

@@ -105,8 +105,8 @@ export class TimelineEditing {
   #imports: Promise<void> = Promise.resolve();
   /**
    * What the files imported refused said, joined into one message, until a
-   * new import or a Merge: it's reported as the Timeline's error, whole,
-   * each time one more is refused.
+   * new import or a Merge, or it's dismissed: it's reported as the
+   * Timeline's error, whole, each time one more is refused.
    */
   #refused: string | null = null;
   /**
@@ -379,23 +379,30 @@ export class TimelineEditing {
    * from Import audio… or dropped, once the imports asked for before are
    * done; refused while frozen. Each one refused says why in the
    * Timeline's error as it's refused, joined to what the ones before it
-   * said, and a new import takes back what the last ones said, unless one
-   * is still under way. Resolves once they're done.
+   * said, which the files imported meanwhile landing leave standing. A new
+   * import takes back what the last ones said, unless one is still under
+   * way. Resolves once they're done.
    */
   importFiles = (files: File[], trackId: number): Promise<void> => {
     if (this.frozen) return Promise.resolve();
     if (this.#importing === null) this.#startOver();
+    // The files imported landing leave what the others refused standing.
+    const release = this.#saves.holdOnTimeline();
     const done = this.#imports.then(async () => {
       await importEach(
         files,
         (file) => this.#importSound(file, trackId),
         (message) => {
-          this.#refused = this.#refused ? `${this.#refused} ${message}` : message;
+          // Joined on only while it's still what the Timeline shows: once
+          // dismissed or replaced, what's refused next starts over.
+          const shown = this.#refused !== null && this.#saves.errorOn('timeline') === this.#refused;
+          this.#refused = shown ? `${this.#refused} ${message}` : message;
           this.#saves.reportOnTimeline(this.#refused);
         },
       );
       this.#importing = null;
     });
+    void done.finally(release);
     this.#imports = done;
     return done;
   };
