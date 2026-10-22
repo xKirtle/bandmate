@@ -17,17 +17,22 @@ For each PR merged since the tag, note its label and the issue it closes, and ro
 
 Compare what the image bundles and what Bandmate is built with against each one's newest release:
 
-| What | Pinned in | Newest release |
-|---|---|---|
-| yt-dlp | `Dockerfile`'s `YT_DLP_VERSION` | `gh api repos/yt-dlp/yt-dlp/releases/latest --jq .tag_name` |
-| ffmpeg | `Dockerfile`'s `FFMPEG_VERSION` | the newest `ffmpeg-*.tar.xz` on https://ffmpeg.org/releases/ |
-| QuickJS | `Dockerfile`'s `QUICKJS_VERSION` | the newest `quickjs-*.tar.xz` on https://bellard.org/quickjs/ |
-| Go | `go.mod`'s `go` line | `curl -fsSL 'https://go.dev/dl/?mode=json'` |
-| SQLite | `go.mod`'s `modernc.org/sqlite` | `go list -m -u modernc.org/sqlite` |
+| What | Pinned in | Newest release | Changelog |
+|---|---|---|---|
+| yt-dlp | `Dockerfile`'s `YT_DLP_VERSION` | `gh api repos/yt-dlp/yt-dlp/releases/latest --jq .tag_name` | each release's notes on https://github.com/yt-dlp/yt-dlp/releases |
+| ffmpeg | `Dockerfile`'s `FFMPEG_VERSION` | the newest `ffmpeg-*.tar.xz` on https://ffmpeg.org/releases/ | `Changelog` on FFmpeg's `release/X.Y` branch |
+| QuickJS | `Dockerfile`'s `QUICKJS_VERSION` | the newest `quickjs-*.tar.xz` on https://bellard.org/quickjs/ | https://bellard.org/quickjs/Changelog |
+| Go | `go.mod`'s `go` line | `curl -fsSL 'https://go.dev/dl/?mode=json'` | https://go.dev/doc/devel/release |
+| SQLite | `go.mod`'s `modernc.org/sqlite` | `go list -m -u modernc.org/sqlite` | `CHANGELOG.md` in https://gitlab.com/cznic/sqlite, and https://sqlite.org/changes.html for the SQLite it moves to |
 
 CI and the binaries build with exactly the `go.mod` Go version, while the image's `golang` base takes the newest patch, so a `go.mod` behind the newest patch means the image and the binaries report different Go versions in About.
 
-Each one that's behind goes in the recommendation, with the bump proposed for it. Bumping is the user's choice: one left out doesn't hold the release back. A new major version (ffmpeg 8 to 9, say) isn't bumped in a release: file a `needs-grilling` issue for it instead, and say so.
+For each one that's behind, read every changelog entry between the pinned version and the newest, and weigh the bump for Bandmate:
+
+- **What it earns**: fixes and features Bandmate would notice, above all security fixes, and for yt-dlp the sites it reads that it fixes. Say "nothing Bandmate uses" when that's so.
+- **What it costs**: breaking or removed behaviour Bandmate relies on, and the work the bump brings with it, such as a module that must be pinned alongside it, a new build flag, or a bigger image.
+
+Each one that's behind goes in the recommendation, with the changelog links, what it earns, what it costs, and the bump proposed for it. Bumping is the user's choice: one left out doesn't hold the release back. A new major version (ffmpeg 8 to 9, say) isn't bumped in a release: file a `needs-grilling` issue for it instead, with its earn and cost, and say so.
 
 ## 4. Pick the version
 
@@ -53,7 +58,7 @@ Every self-hoster reads them in About, in Settings. Check each line reads as a c
 
 ## 7. Recommend, then stop
 
-Give the verdict (release now or wait, and why), the version, a table of what ships grouped by feature, each flagged line with the title or label proposed for it, and each bump proposed in step 3. Wait for the go-ahead, and for which bumps to take: a tag publishes an image every self-hoster's About tab offers as an update.
+Give the verdict (release now or wait, and why), the version, a table of what ships grouped by feature, each flagged line with the title or label proposed for it, and a table of the bumps proposed in step 3 (pinned and newest version, changelog links, what each earns and costs). Wait for the go-ahead, and for which bumps to take: a tag publishes an image every self-hoster's About tab offers as an update.
 
 ## 8. Cut it
 
