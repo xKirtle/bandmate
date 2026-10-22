@@ -539,6 +539,23 @@ async function number(page, places, { first = 1, into } = {}) {
   await page.context().close();
 }
 
+// The Chords page's Look up, with Cmaj7 typed: its first page of Voicings,
+// best first, in standard tuning.
+{
+  const page = await open(`${base}/chords`);
+  const lookUp = page.getByRole("tabpanel", { name: "Look up" });
+  const chord = lookUp.getByLabel("Chord", { exact: true });
+  await chord.fill("Cmaj7");
+  await lookUp.getByRole("list", { name: /^Voicings of Cmaj7/ }).waitFor();
+  // Without the focus ring typing leaves on the field.
+  await chord.blur();
+  await page.mouse.move(0, 0);
+  await save(page, "chords-look-up", {
+    clip: await page.getByRole("main").boundingBox(),
+  });
+  await page.context().close();
+}
+
 // A phone, held upright.
 const phone = {
   colorScheme: "dark",
