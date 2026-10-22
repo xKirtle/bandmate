@@ -531,6 +531,8 @@ test('a Take whose save fails is offered back, and kept after a reload', async (
   await fault.spent;
   const offer = page.getByRole('status').filter({ hasText: 'Recovered 1 unsaved Take.' });
   await expect(offer).toBeVisible();
+  // In the toast stack, labelled with the surface the Take was made on.
+  await expect(page.getByRole('alert')).toContainText('Timeline');
   await expect(page.getByRole('alert')).toContainText('Injected failure');
   await expect(clip(page, 'Take 1')).toHaveCount(0);
   expect(await clipsOn(bandmate, song.id, 'Track 1')).toEqual([]);

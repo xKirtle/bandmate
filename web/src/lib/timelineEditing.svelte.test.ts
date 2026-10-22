@@ -520,7 +520,7 @@ describe('Timeline editing, Track and Clip names typed', () => {
     await answered();
     expect(server.sent).toBe(sent);
     expect(server.timeline.tracks.map((t) => t.id)).toEqual([1, 2]);
-    expect(saves.saveError).toBeNull();
+    expect(saves.errors).toEqual([]);
     expect(saves.unsaved).toBe(false);
   });
 
@@ -536,7 +536,7 @@ describe('Timeline editing, Track and Clip names typed', () => {
     name.destroy();
     await answered();
     expect(server.sent).toBe(sent);
-    expect(saves.saveError).toBeNull();
+    expect(saves.errors).toEqual([]);
     expect(saves.unsaved).toBe(false);
   });
 
@@ -989,7 +989,7 @@ describe('Timeline editing, a Merge', () => {
     selection.selectEdited([1, 3]);
     audio.renderFailure = new Error('the Beat could not be loaded');
     expect(await editing.merge()).toBe(false);
-    expect(saves.saveError).toBe("Couldn't merge the Clips (the Beat could not be loaded).");
+    expect(saves.errorOn('timeline')).toBe("Couldn't merge the Clips (the Beat could not be loaded).");
     expect(server.landed).toBe(0);
     expect(clipIdsByTrack(server)).toEqual([[1, 2], [3]]);
     expect([...selection.ids]).toEqual([1, 3]);
@@ -1005,7 +1005,7 @@ describe('Timeline editing, a Merge', () => {
     selection.selectEdited([1, 3]);
     server.failNext(1);
     expect(await editing.merge()).toBe(false);
-    expect(saves.saveError).toBe("Can't reach Bandmate. Check your connection.");
+    expect(saves.errorOn('timeline')).toBe("Can't reach Bandmate. Check your connection.");
     expect(clipIdsByTrack(server)).toEqual([[1, 2], [3]]);
     expect([...selection.ids]).toEqual([1, 3]);
     expect(state.chosen).toEqual([]);
@@ -1022,7 +1022,7 @@ describe('Timeline editing, a Merge', () => {
     const merging = editing.merge();
     await deleting;
     expect(await merging).toBe(false);
-    expect(saves.saveError).toBe("The Clips to merge aren't all on the Timeline any more.");
+    expect(saves.errorOn('timeline')).toBe("The Clips to merge aren't all on the Timeline any more.");
     expect(audio.rendered).toBe(0);
     expect(clipIdsByTrack(server)).toEqual([[1, 2], []]);
   });
@@ -1174,7 +1174,7 @@ describe('Timeline editing, a Sound import', () => {
     const { saves, editing } = await editingFor(server);
     server.failNext(1);
     await editing.importFiles([audioFile('night drive.wav')], 2);
-    expect(saves.saveError).toBe("Can't reach Bandmate. Check your connection.");
+    expect(saves.errorOn('timeline')).toBe("Can't reach Bandmate. Check your connection.");
     expect(editing.error).toBeNull();
     expect(server.timeline.tracks[1].clips).toEqual([]);
   });

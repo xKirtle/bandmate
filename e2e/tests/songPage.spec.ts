@@ -59,8 +59,13 @@ async function altDragClip(page: Page, target: Locator, by: number) {
   await page.keyboard.up('Alt');
 }
 
-/** The page's save error, under the Details. */
-const saveError = (page: Page) => page.getByRole('main').getByRole('alert');
+/** A refused save's toast in the stack, labelled with the surface its edit was made on. */
+const saveError = (page: Page, surface = 'Details') =>
+  page.getByRole('alert').filter({ has: dismissButton(page, surface) });
+
+/** The dismiss button on a surface's toast. */
+const dismissButton = (page: Page, surface = 'Details') =>
+  page.getByRole('button', { name: `Dismiss the ${surface} error` });
 
 test('a Clip moved, trimmed and deleted is undone and redone a step at a time', async ({ page, bandmate }) => {
   const song = await heroSong(bandmate);
@@ -1017,7 +1022,7 @@ test('a Cue save failing every retry is taken back, its error kept by a save alr
   await page.keyboard.press('Alt+ArrowUp');
   expect(fault.count).toBeLessThan(4);
 
-  await expect(saveError(page)).toHaveText(
+  await expect(saveError(page, 'Cues')).toContainText(
     "Couldn't save the Cue of Line 1 of Verse 1, so it was taken back. Disk full",
   );
   await expect(cueOf(page, 'Line 1 of Verse 1')).toHaveAccessibleName(cueName('Line 1 of Verse 1', '0:05.0'));
@@ -1026,7 +1031,7 @@ test('a Cue save failing every retry is taken back, its error kept by a save alr
   await expect.poll(() => serverCues(bandmate, song.id, 'Verse 1')).toEqual([5, 10.1, 15, 20]);
   await expect(page.getByRole('status').filter({ hasText: 'Edited' })).toBeVisible();
   await expect(cueOf(page, 'Line 2 of Verse 1')).toHaveAccessibleName(cueName('Line 2 of Verse 1', '0:10.1'));
-  await expect(saveError(page)).toHaveText(
+  await expect(saveError(page, 'Cues')).toContainText(
     "Couldn't save the Cue of Line 1 of Verse 1, so it was taken back. Disk full",
   );
 
@@ -1034,7 +1039,7 @@ test('a Cue save failing every retry is taken back, its error kept by a save alr
   await cueOf(page, 'Line 3 of Verse 1').focus();
   await page.keyboard.press('Alt+ArrowUp');
   await expect.poll(() => serverCues(bandmate, song.id, 'Verse 1')).toEqual([5, 10.1, 15.1, 20]);
-  await expect(saveError(page)).toHaveCount(0);
+  await expect(saveError(page, 'Cues')).toHaveCount(0);
 });
 
 test('a Cue save whose answer is lost, but which landed, is kept', async ({ page, bandmate }) => {
@@ -1165,7 +1170,7 @@ test("an Alternate's text box closed while its save fails leaves nothing unsaved
 
   await lines.fill('First line');
   await lines.blur();
-  await expect(saveError(page)).toHaveText('Disk full');
+  await expect(saveError(page, 'Lyric Sheet')).toContainText('Disk full');
 
   // Opening Alternates mode closes the text box, which saves it again.
   const hold = await holdRequests(page, textSave);
@@ -1178,7 +1183,7 @@ test("an Alternate's text box closed while its save fails leaves nothing unsaved
   await fault.spent;
 
   // It failed, and says so, but the text box is gone, and nothing is unsaved.
-  await expect(saveError(page)).toHaveText('Disk full');
+  await expect(saveError(page, 'Lyric Sheet')).toContainText('Disk full');
   await expect.poll(() => warnsOnLeaving(page)).toBe(false);
   // So coming back to the tab shows a change made elsewhere.
   await bandmate.retitle(song.id, 'Ballad');
@@ -1270,7 +1275,9 @@ test('a failed Details save puts the field back, and the next change clears its 
   await title.fill('Ballad');
   await title.press('Enter');
 
-  await expect(saveError(page)).toHaveText('Disk full');
+  await expect(saveError(page)).toContainText('Disk full');
+  // Nothing reports a refusal in the page itself any more, beneath Tags or elsewhere.
+  await expect(page.getByRole('main').getByRole('alert')).toHaveCount(0);
   await expect(title).toHaveValue('Anthem');
   await fault.spent;
   expect((await bandmate.getSong(song.id)).title).toBe('Anthem');
@@ -1280,6 +1287,25 @@ test('a failed Details save puts the field back, and the next change clears its 
   await expect.poll(async () => (await bandmate.getSong(song.id)).bpm).toBe(100);
   await expect(saveError(page)).toHaveCount(0);
   await expect(title).toHaveValue('Anthem');
+});
+
+test('a refused save stays in its toast until its dismiss is pressed', async ({ page, bandmate }) => {
+  const song = await bandmate.song({ title: 'Anthem' });
+  await page.goto(`/songs/${song.id}`);
+  const title = page.getByRole('textbox', { name: 'Title' });
+  await expect(title).toHaveValue('Anthem');
+  const fault = await failRequests(page, { method: 'PATCH', url: `**/api/songs/${song.id}` }, { error: 'Disk full' });
+
+  await title.fill('Ballad');
+  await title.press('Enter');
+  await fault.spent;
+  await expect(saveError(page)).toContainText('Disk full');
+
+  // On no timer: still there a while later, until it's dismissed.
+  await page.waitForTimeout(1000);
+  await expect(saveError(page)).toContainText('Disk full');
+  await dismissButton(page).click();
+  await expect(saveError(page)).toHaveCount(0);
 });
 
 test('a Track’s fader let go where it started sends nothing, so an undo of its volume shows at once, and let go elsewhere sends its level', async ({
@@ -1455,7 +1481,7 @@ test('custom tuning notes that can’t be read are dropped for another tuning pi
   await page.goto(`/songs/${song.id}`);
   await (await pickCustomTuning(page)).fill('C G D');
   await page.getByRole('combobox', { name: 'Tuning' }).click();
-  await expect(saveError(page)).toHaveText('A custom tuning is six notes, low string to high, like D A D G B E');
+  await expect(saveError(page)).toContainText('A custom tuning is six notes, low string to high, like D A D G B E');
   await page.getByRole('option', { name: 'Drop D' }).click();
   await expect(customTuningNotes(page)).toHaveCount(0);
   await expect.poll(async () => (await bandmate.getSong(song.id)).tuning).toBe('Drop D');
@@ -1489,7 +1515,7 @@ test('custom tuning notes that can’t be read are dropped as they’re left beh
   await page.goto(`/songs/${song.id}`);
   await (await pickCustomTuning(page)).fill('C G D');
   await page.getByRole('radio', { name: 'Read' }).check();
-  await expect(saveError(page)).toHaveText('A custom tuning is six notes, low string to high, like D A D G B E');
+  await expect(saveError(page)).toContainText('A custom tuning is six notes, low string to high, like D A D G B E');
   expect(await warnsOnLeaving(page)).toBe(false);
   expect((await bandmate.getSong(song.id)).tuning).toBe('');
 });
