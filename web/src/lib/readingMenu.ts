@@ -1,6 +1,6 @@
-// The Reading menu, in Read mode's header: the Lyric Size, Auto-scroll's
-// speed, Transpose, whether the Chords show, the Chord Chart and its Chart
-// Size, gathered behind one button. Its rows stay in place for every Song,
+// The Reading menu, in Read mode's header: the Lyric Size, Transpose,
+// whether the Chords show, the Chord Chart and its Chart Size, and
+// Auto-scroll's speed, gathered behind one button. Its rows stay in place for every Song,
 // a Chord row disabled where it can't apply.
 
 import type { ChordsInRead } from './chordChart';
