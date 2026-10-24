@@ -34,6 +34,8 @@ And this is Read mode, here on a phone: the chords over the words, and how to pl
 
 Hover or tap a chord, or tap its shape at the top, to step through the other ways to play it, and prefer one. Press the speaker to hear the shape strummed, in the song's tuning. It plays the shape as you'd finger it, so the capo doesn't change it, and it plays over the song if that's playing.
 
+To play a song through from a music stand without line timings, press **Auto-scroll**, beside the reading options, or **A**: the lyrics scroll on their own at a steady pace, and keep the same pace whatever the text size. Scroll by hand to skip ahead or go back, and it carries on from there. Pause it from the button that floats at the bottom while it runs, or press **A** again. It stops at the end of the song, and starts from the top again if you press it there. While the timeline plays, the line playing leads instead, so Auto-scroll stops. Where the browser allows, and Bandmate is served over HTTPS, the screen stays on while it runs.
+
 ### Rhymes
 
 Turn **Rhymes** on as you write. It's there on a wide window, like a desktop's, and can't be on while you [sync](#sync).

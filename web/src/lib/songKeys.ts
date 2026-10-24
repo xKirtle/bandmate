@@ -55,3 +55,12 @@ export function undoKey(e: ShortcutPress): 'undo' | 'redo' | null {
 export function opensShortcuts(e: ShortcutPress): boolean {
   return pressedOnPage(e)?.id === 'showShortcuts';
 }
+
+/**
+ * Whether a key press starts or pauses Auto-scroll: its key, A unless
+ * rebound. Whether it can now, in Read mode while the Timeline isn't
+ * playing, is Auto-scroll's to say (see autoScroll.svelte.ts).
+ */
+export function togglesAutoScroll(e: ShortcutPress): boolean {
+  return pressedOnPage(e)?.id === 'autoScroll';
+}
