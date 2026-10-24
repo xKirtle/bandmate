@@ -1,31 +1,40 @@
 <script lang="ts">
   // Auto-scroll's button, in the Lyric Sheet's header in Read mode beside
   // Reading, and its pill, floating at the foot of the window while it runs,
-  // with a pause button, as the header has scrolled away by then. Its key,
-  // A unless rebound, starts and pauses it too. It's made with Read mode, so
-  // leaving Read mode or the Song stops it.
+  // with its speed and a pause button, as the header has scrolled away by
+  // then. Its key, A unless rebound, starts and pauses it too, and [ and ]
+  // slow it down and speed it up. It's made with Read mode, so leaving Read
+  // mode or the Song stops it.
   import ChevronsDown from '@lucide/svelte/icons/chevrons-down';
+  import Minus from '@lucide/svelte/icons/minus';
   import Pause from '@lucide/svelte/icons/pause';
+  import Plus from '@lucide/svelte/icons/plus';
   import { MediaQuery } from 'svelte/reactivity';
-  import { AutoScroll, autoScrollPace, startingLevel, type AutoScrollPage } from './autoScroll.svelte';
+  import { AutoScroll, autoScrollPace, type AutoScrollPage } from './autoScroll.svelte';
+  import { fastestAutoScrollSpeed, slowestAutoScrollSpeed } from './autoScrollSpeed';
   import { keyHints } from './keyHints';
   import { keepScreenAwake } from './screenAwake';
+  import { songAutoScrollSpeed } from './sharedAutoScrollSpeed.svelte';
   import { lyricSize } from './sharedLyricSize.svelte';
   import { rebound } from './shortcutKeys';
-  import { togglesAutoScroll } from './songKeys';
+  import { autoScrollSpeedStep, togglesAutoScroll } from './songKeys';
 
   let {
+    songId,
     sheet,
     playing,
   }: {
+    /** The Song open, whose Auto-scroll speed it reads and sets. */
+    songId: number;
     /** The Lyric Sheet, whose end Auto-scroll stops at. */
     sheet: HTMLElement | undefined;
     /** Whether the Timeline is playing, whose cued Lines lead instead. */
     playing: boolean;
   } = $props();
 
-  // The speed level: the one it starts at, until it can be set.
-  const level = startingLevel;
+  // The speed level, which the Reading menu sets too: a change takes effect
+  // from the next frame.
+  const level = $derived(songAutoScrollSpeed.of(songId));
 
   // The foot of the window, above the docked Timeline and the tab bar: the
   // pill floats over it, and the Lyric Sheet's end is in view once it's
@@ -62,11 +71,18 @@
   const wide = new MediaQuery('min-width: 40.0625rem');
   const hints = keyHints();
   const keys = $derived(rebound().autoScroll.keys);
+  const speedKeys = $derived(rebound().autoScrollSpeed);
 
   function onKey(event: KeyboardEvent) {
-    if (!togglesAutoScroll(event)) return;
+    if (togglesAutoScroll(event)) {
+      event.preventDefault();
+      autoScroll.toggle();
+      return;
+    }
+    const by = autoScrollSpeedStep(event);
+    if (by === null) return;
     event.preventDefault();
-    autoScroll.toggle();
+    songAutoScrollSpeed.step(songId, by);
   }
 </script>
 
@@ -92,6 +108,25 @@
 <div class="foot" bind:this={foot}>
   {#if autoScroll.running}
     <div class="pill" role="group" aria-label="Auto-scroll">
+      <button
+        type="button"
+        class="icon"
+        disabled={level <= slowestAutoScrollSpeed}
+        aria-label="Slow Auto-scroll down"
+        aria-keyshortcuts={hints.aria(speedKeys.back)}
+        title={hints.withKeys('Slow Auto-scroll down', speedKeys.back)}
+        onclick={() => songAutoScrollSpeed.step(songId, -1)}><Minus /></button
+      >
+      <span class="level tabular" title="Auto-scroll speed"><span class="visually-hidden">Speed</span> {level}</span>
+      <button
+        type="button"
+        class="icon"
+        disabled={level >= fastestAutoScrollSpeed}
+        aria-label="Speed Auto-scroll up"
+        aria-keyshortcuts={hints.aria(speedKeys.forward)}
+        title={hints.withKeys('Speed Auto-scroll up', speedKeys.forward)}
+        onclick={() => songAutoScrollSpeed.step(songId, 1)}><Plus /></button
+      >
       <button
         type="button"
         class="icon"
@@ -137,11 +172,16 @@
     box-shadow: var(--shadow-float);
     pointer-events: auto;
   }
-  /* The one thing to press while it runs, so it reads as a control at a
+  /* The controls to press while it runs, so they read as controls at a
      glance rather than muted. */
   .pill .icon {
     border-radius: var(--radius-full);
     color: var(--text);
+  }
+  /* Wide enough for "10", so the steps don't move as the level changes. */
+  .level {
+    min-width: 1.5rem;
+    text-align: center;
   }
   :global(:root[data-theme='dark']) .pill {
     background: var(--surface-1);
