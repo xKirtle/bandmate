@@ -28,6 +28,8 @@ export interface AutoScrollPage {
   sheetEnd(): number;
   /** Scrolls the page straight to `top`, in px. */
   scrollTo(top: number): void;
+  /** Whether a finger is on the page, which may be about to scroll it. */
+  heldByHand(): boolean;
 }
 
 export interface AutoScrollOptions {
@@ -43,12 +45,6 @@ export interface AutoScrollOptions {
   /** The time, in ms; the page's clock by default. */
   now?: () => number;
 }
-
-/**
- * How far, in px, the page may be from where it was scrolled to before
- * that's taken for a scroll by hand: a browser may round where it scrolls to.
- */
-const handSlack = 2;
 
 /**
  * The longest a frame moves the page for, in seconds, so it carries on
@@ -69,9 +65,12 @@ export class AutoScroll {
   #options: AutoScrollOptions;
   #frames: Frames;
   #now: () => number;
-  /** Where it has scrolled the page to, unrounded. */
-  #at = 0;
-  #last = 0;
+  /** Where it's taking the page, unrounded, as a browser may round where it scrolls to. */
+  #target = 0;
+  /** Where the page was left last frame, as the page said: anywhere else, it's been scrolled by hand. */
+  #left = 0;
+  /** When the last frame ran, in ms. */
+  #lastFrame = 0;
   #frame = 0;
   /** Lets the screen sleep again. */
   #sleep = () => {};
@@ -89,14 +88,17 @@ export class AutoScroll {
 
   /**
    * Starts scrolling from where the page is, or from the top once at the end
-   * of the Lyric Sheet. It can't while the Timeline plays.
+   * of the Lyric Sheet. It can't while the Timeline plays, nor where the
+   * whole Lyric Sheet is in view from the top, with nowhere to scroll to.
    */
   start = () => {
     const { page, timelinePlaying } = this.#options;
     if (this.#running || timelinePlaying()) return;
-    if (atEnd(page.scrolled(), page.sheetEnd())) page.scrollTo(0);
-    this.#at = page.scrolled();
-    this.#last = this.#now();
+    const end = page.sheetEnd();
+    if (atEnd(0, end)) return;
+    if (atEnd(page.scrolled(), end)) page.scrollTo(0);
+    this.#target = this.#left = page.scrolled();
+    this.#lastFrame = this.#now();
     this.#running = true;
     this.#sleep = this.#options.keepAwake();
     this.#frame = this.#frames.request(this.#tick);
@@ -122,21 +124,23 @@ export class AutoScroll {
       return;
     }
     const now = this.#now();
-    const seconds = Math.min(longestFrame, (now - this.#last) / 1000);
-    this.#last = now;
+    const seconds = Math.min(longestFrame, (now - this.#lastFrame) / 1000);
+    this.#lastFrame = now;
     const { page } = this.#options;
     const end = page.sheetEnd();
     const scrolled = page.scrolled();
-    if (Math.abs(scrolled - this.#at) > handSlack) {
-      // Scrolled by hand (a wheel, a swipe, the scroll bar): it carries on
-      // from there, but only once the page stops moving, so a smooth scroll
-      // or a swipe's glide finishes first.
-      this.#at = scrolled;
+    if (page.heldByHand() || scrolled !== this.#left) {
+      // Held, or scrolled by hand (a wheel, a swipe, the scroll bar), however
+      // little: it carries on from there, but only once the page is let go
+      // and stops moving, so a drag isn't fought and a smooth scroll or a
+      // swipe's glide finishes first.
+      this.#target = this.#left = scrolled;
     } else {
-      this.#at = Math.min(end, this.#at + this.#options.pace() * seconds);
-      page.scrollTo(this.#at);
+      this.#target = Math.min(end, this.#target + this.#options.pace() * seconds);
+      page.scrollTo(this.#target);
+      this.#left = page.scrolled();
     }
-    if (atEnd(this.#at, end)) this.stop();
+    if (atEnd(this.#target, end)) this.stop();
     else this.#frame = this.#frames.request(this.#tick);
   };
 }

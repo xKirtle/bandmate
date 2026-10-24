@@ -16,11 +16,18 @@
   let {
     saves,
     dock = 0,
+    height = $bindable(0),
   }: {
     saves: Saves;
     /** How much of the foot of the window the docked Timeline takes, which the stack stays clear of. */
     dock?: number;
+    /** How tall the stack is, 0 while it's empty, for what floats above it to stay clear of, as Auto-scroll's pill does. */
+    height?: number;
   } = $props();
+
+  $effect(() => {
+    if (saves.errors.length === 0) height = 0;
+  });
 
   /**
    * Keeps the end of the stack in view as an error comes or goes: the
@@ -34,7 +41,7 @@
 </script>
 
 {#if saves.errors.length > 0}
-  <div class="stack" style:--dock="{dock}px" {@attach showingLatest}>
+  <div class="stack" style:--dock="{dock}px" bind:offsetHeight={height} {@attach showingLatest}>
     <!-- The surface refused latest is last, so it's nearest the corner. -->
     {#each saves.errors as { surface, message } (surface)}
       <div class="toast" role="alert">

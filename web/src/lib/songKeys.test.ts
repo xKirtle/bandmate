@@ -3,7 +3,7 @@
 // the page's elements.
 import { describe as group, expect, it } from 'vitest';
 import type { ShortcutPress } from './shortcutPress';
-import { autoScrollKey, opensShortcuts, songKey, undoKey, type SongKeyContext } from './songKeys';
+import { togglesAutoScroll, opensShortcuts, songKey, undoKey, type SongKeyContext } from './songKeys';
 
 // Which Shortcut a press is, where it was pressed and the repeat rule are
 // shortcutPress.ts's, and tested there: these are the rules about what each
@@ -136,22 +136,22 @@ group('?', () => {
 
 group('A', () => {
   it('starts or pauses Auto-scroll', () => {
-    expect(autoScrollKey(press('a'))).toBe(true);
+    expect(togglesAutoScroll(press('a'))).toBe(true);
     // Caps Lock on.
-    expect(autoScrollKey(press('A'))).toBe(true);
+    expect(togglesAutoScroll(press('A'))).toBe(true);
   });
 
   it("isn't Ctrl+A, which selects every Clip, nor Space, which stays the Timeline's", () => {
-    expect(autoScrollKey(press('a', { ctrlKey: true }))).toBe(false);
-    expect(autoScrollKey(press(' '))).toBe(false);
+    expect(togglesAutoScroll(press('a', { ctrlKey: true }))).toBe(false);
+    expect(togglesAutoScroll(press(' '))).toBe(false);
     expect(songKey(press('a'), idle)).toBeNull();
   });
 
   it('is left to a text field or a dialog it was pressed in', () => {
     const field = document.createElement('input');
-    expect(autoScrollKey(press('a', { target: field }))).toBe(false);
+    expect(togglesAutoScroll(press('a', { target: field }))).toBe(false);
     const dialog = document.createElement('dialog');
     const button = dialog.appendChild(document.createElement('button'));
-    expect(autoScrollKey(press('a', { target: button }))).toBe(false);
+    expect(togglesAutoScroll(press('a', { target: button }))).toBe(false);
   });
 });

@@ -19,13 +19,13 @@ const page = (): ScreenAwakeBrowser => ({ navigator, document });
  * the page shows again, since the browser lets go of the lock while it's
  * hidden. Hands back what lets the screen sleep again.
  */
-export function keepScreenAwake(on: ScreenAwakeBrowser = page()): () => void {
+export function keepScreenAwake(browser: ScreenAwakeBrowser = page()): () => void {
   let held: Lock | null = null;
   let lettingGo = false;
 
   const ask = async () => {
     try {
-      const lock = await on.navigator.wakeLock?.request('screen');
+      const lock = await browser.navigator.wakeLock?.request('screen');
       if (!lock) return;
       if (lettingGo) {
         await lock.release();
@@ -39,14 +39,14 @@ export function keepScreenAwake(on: ScreenAwakeBrowser = page()): () => void {
     }
   };
   const shown = () => {
-    if (on.document.visibilityState === 'visible') void ask();
+    if (browser.document.visibilityState === 'visible') void ask();
   };
 
-  on.document.addEventListener('visibilitychange', shown);
+  browser.document.addEventListener('visibilitychange', shown);
   void ask();
   return () => {
     lettingGo = true;
-    on.document.removeEventListener('visibilitychange', shown);
+    browser.document.removeEventListener('visibilitychange', shown);
     held?.release().catch(() => {});
     held = null;
   };

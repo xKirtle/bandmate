@@ -61,6 +61,6 @@ export function opensShortcuts(e: ShortcutPress): boolean {
  * rebound. Whether it can now, in Read mode while the Timeline isn't
  * playing, is Auto-scroll's to say (see autoScroll.svelte.ts).
  */
-export function autoScrollKey(e: ShortcutPress): boolean {
+export function togglesAutoScroll(e: ShortcutPress): boolean {
   return pressedOnPage(e)?.id === 'autoScroll';
 }

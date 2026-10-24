@@ -12,7 +12,7 @@
   import { keepScreenAwake } from './screenAwake';
   import { lyricSize } from './sharedLyricSize.svelte';
   import { rebound } from './shortcutKeys';
-  import { autoScrollKey } from './songKeys';
+  import { togglesAutoScroll } from './songKeys';
 
   let {
     sheet,
@@ -31,6 +31,9 @@
   // pill floats over it, and the Lyric Sheet's end is in view once it's
   // scrolled above it.
   let foot = $state<HTMLElement>();
+  // How many fingers are on the page, which may be about to scroll it.
+  let fingers = 0;
+  const countFingers = (e: TouchEvent) => (fingers = e.touches.length);
 
   const page: AutoScrollPage = {
     scrolled: () => scrollY,
@@ -44,6 +47,7 @@
     // Straight there every frame, under reduced motion too: it's movement
     // the reader asked for, and it tracks time, like the playhead.
     scrollTo: (top) => scrollTo({ top, behavior: 'instant' }),
+    heldByHand: () => fingers > 0,
   };
 
   const autoScroll = new AutoScroll({
@@ -60,13 +64,13 @@
   const keys = $derived(rebound().autoScroll.keys);
 
   function onKey(event: KeyboardEvent) {
-    if (!autoScrollKey(event)) return;
+    if (!togglesAutoScroll(event)) return;
     event.preventDefault();
     autoScroll.toggle();
   }
 </script>
 
-<svelte:window onkeydown={onKey} />
+<svelte:window onkeydown={onKey} ontouchstart={countFingers} ontouchend={countFingers} ontouchcancel={countFingers} />
 
 <!-- Clicked, it keeps focus where it was, so Space then plays rather than pressing it again. -->
 <button
@@ -106,21 +110,23 @@
     gap: var(--space-2);
   }
   /* No height and nothing to press: only where the foot of the window is,
-     clear of the docked Timeline and the tab bar, as the toasts are. */
+     clear of the docked Timeline and the tab bar, as the toasts are. Over
+     the toasts, so the pill is never under one. */
   .foot {
     position: fixed;
     right: 0;
     bottom: calc(var(--nav-bottom-space) + var(--timeline-height, 0px));
     left: 0;
-    z-index: 2;
+    z-index: 3;
     height: 0;
     pointer-events: none;
   }
-  /* A floating bar, in the corner the toasts keep. */
+  /* A floating bar in the bottom corner, above the toasts there, if any,
+     --space-2 clear of them as they're clear of each other. */
   .pill {
     position: absolute;
     right: max(var(--gutter), env(safe-area-inset-right));
-    bottom: var(--space-4);
+    bottom: calc(var(--space-4) + var(--toasts-height, 0px) + min(var(--toasts-height, 0px), var(--space-2)));
     display: flex;
     align-items: center;
     gap: var(--space-1);

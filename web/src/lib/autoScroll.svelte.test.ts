@@ -6,7 +6,12 @@ import { FakeFrames } from './transportFakes';
 class FakePage implements AutoScrollPage {
   top = 0;
   end = 1000;
+  /** Whether a finger is on the page. */
+  held = false;
   scrolledTo: number[] = [];
+  heldByHand() {
+    return this.held;
+  }
   scrolled() {
     return this.top;
   }
@@ -118,6 +123,34 @@ group('AutoScroll', () => {
     expect(autoScroll.running).toBe(true);
   });
 
+  it('carries on from a scroll by hand of a pixel, however slow', () => {
+    const { page, autoScroll, frame, after } = setUp({ pace: 40 });
+    autoScroll.start();
+    after(500);
+    page.top = 21;
+    frame(50);
+    expect(page.top).toBe(21);
+    frame(50);
+    expect(page.top).toBe(23);
+  });
+
+  it("doesn't scroll while a finger is on the page, and carries on from where it's left", () => {
+    const { page, autoScroll, frame, after } = setUp({ pace: 40 });
+    autoScroll.start();
+    after(500);
+    page.held = true;
+    after(500);
+    expect(page.top).toBe(20);
+    page.top = 200;
+    after(500);
+    expect(page.top).toBe(200);
+
+    page.held = false;
+    frame(50);
+    expect(page.top).toBe(202);
+    expect(autoScroll.running).toBe(true);
+  });
+
   it('carries on from the top of the page when scrolled back up by hand', () => {
     const { page, autoScroll, frame, after } = setUp({ pace: 40 });
     page.top = 500;
@@ -146,6 +179,15 @@ group('AutoScroll', () => {
     autoScroll.start();
     after(1000);
     expect(page.top).toBe(3);
+  });
+
+  it("doesn't start where the whole Lyric Sheet is in view", () => {
+    const { page, frames, autoScroll, awake } = setUp();
+    page.end = 0;
+    autoScroll.start();
+    expect(autoScroll.running).toBe(false);
+    expect(frames.waiting).toBe(0);
+    expect(awake.held).toBe(0);
   });
 
   it("can't start while the Timeline plays", () => {
