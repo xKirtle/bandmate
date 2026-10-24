@@ -47,9 +47,3 @@ Each feature gets a spec, as an issue, before it's built. Using a new feature fo
 - Every pack has the same shape: its pronunciations, one word a line with its phonemes and stress, as the CMU Pronouncing Dictionary has English's, and credits for where each part came from. Everything else is optional: the ranking of common words, synonyms, antonyms, and whatever comes later. Bandmate offers what a Language's pack has, so a Language can start with pronunciations alone and grow.
 - Synonyms would pair with Rhymes in Rhyme mode, for a word that has to mean one thing and rhyme with another. In Portuguese, they need a word's forms too, so "corri" finds the synonyms of "correr", in the same form.
 - Whether Bandmate takes the packs when it's built, keeping Rhymes worked out in the browser (ADR 0018), or asks a service running beside it; how a pack lists its parts and which parts need which; which alphabet the phonemes are written in; how a Language is tested before it ships, and who looks after one once its contributor moves on; and whether the user downloads only some of a pack's parts, are for the spec.
-
-## Auto-scroll in Read mode
-
-- The Lyric Sheet scrolls on its own at a steady pace, for playing a Song through from a music stand without Cues or a Timeline to follow.
-- Today the Lyric Sheet only follows the Line playing, which needs the Song's Lines cued. Auto-scroll needs neither.
-- Whether the pace is set by hand or worked out from the Song's BPM or length, and how it's kept; how it starts, pauses and stops; and what it does in a Song that has Cues while the Timeline plays, are for the spec.
