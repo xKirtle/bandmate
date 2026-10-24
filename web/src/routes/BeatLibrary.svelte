@@ -141,7 +141,7 @@
 
   const playingNow = (beat: Beat) => isPreviewing({ beatId: beat.id }) && previewPlaying;
   // What the bar holds, playing or paused, is marked in its list.
-  const previewedBeat = $derived(preview && 'beat' in preview ? preview.beat.id : null);
+  const previewedBeatId = $derived(preview && 'beat' in preview ? preview.beat.id : null);
   const previewedRow = $derived(preview && 'row' in preview ? preview.row.key : null);
   const playingRow = $derived(previewPlaying ? previewedRow : null);
 
@@ -277,7 +277,7 @@
   <BeatPreviewButton
     name={beat.title}
     playing={playingNow(beat)}
-    previewed={beat.id === previewedBeat}
+    previewed={beat.id === previewedBeatId}
     onclick={() => togglePreview({ beatId: beat.id })}
   />
 {/snippet}
@@ -373,7 +373,7 @@
       lead={{ label: 'Preview', cell: previewCell }}
       trail={{ label: 'Edit', cell: editCell }}
       openId={editingBeat?.id ?? null}
-      previewedId={previewedBeat}
+      previewedId={previewedBeatId}
     >
       {#snippet title(beat)}
         {beat.title}
