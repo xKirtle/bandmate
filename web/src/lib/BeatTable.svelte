@@ -16,6 +16,7 @@
     lead,
     trail,
     openId = null,
+    previewedId = null,
     onRowClick,
   }: {
     /** Already filtered and sorted. */
@@ -29,6 +30,8 @@
     trail?: { label: string; cell: Snippet<[Beat]> };
     /** The Beat whose row shows as open. */
     openId?: number | null;
+    /** The Beat previewed, playing or paused, whose row is marked current. */
+    previewedId?: number | null;
     onRowClick?: (event: MouseEvent, beat: Beat) => void;
   } = $props();
 
@@ -72,6 +75,7 @@
       {@const usedBy = beat.songs.map((s) => s.title).join(', ')}
       <tr
         class:open={beat.id === openId}
+        aria-current={beat.id === previewedId ? 'true' : undefined}
         class:clickable={onRowClick}
         onclick={onRowClick && ((event) => onRowClick(event, beat))}
       >

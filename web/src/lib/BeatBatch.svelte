@@ -1,6 +1,4 @@
 <script lang="ts">
-  import Pause from '@lucide/svelte/icons/pause';
-  import Play from '@lucide/svelte/icons/play';
   import X from '@lucide/svelte/icons/x';
   import { onDestroy } from 'svelte';
   import { api, commonKeys, type Beat, type BeatDetails } from './api';
@@ -18,6 +16,7 @@
     type SharedField,
   } from './beatBatch';
   import { fromDraft, invalidFields, invalidValue, toDraft, type InvalidField } from './beatDraft';
+  import BeatPreviewButton from './BeatPreviewButton.svelte';
   import { suggestForFile } from './beatTags';
   import Combobox from './Combobox.svelte';
   import { guardLeaving } from './router.svelte';
@@ -30,6 +29,7 @@
     library,
     maxUploadBytes,
     uploading = $bindable(false),
+    previewedRow = null,
     playingRow = null,
     onPreview,
     onLeave,
@@ -41,6 +41,8 @@
     maxUploadBytes: number;
     /** Whether Beats are being uploaded, when no more files can be picked. */
     uploading?: boolean;
+    /** The key of the row whose file the preview player bar holds, playing or paused, if any. */
+    previewedRow?: number | null;
     /** The key of the row whose file the preview player bar is playing now, if any. */
     playingRow?: number | null;
     /**
@@ -322,7 +324,10 @@
             {@const name = row.file.name}
             {@const editable = row.status === 'ready'}
             {@const where = already.get(row.key)}
-            <tr class:unreadable={row.status === 'unreadable'}>
+            <tr
+              class:unreadable={row.status === 'unreadable'}
+              aria-current={previewedRow === row.key ? 'true' : undefined}
+            >
               <td class="tick">
                 <input
                   type="checkbox"
@@ -335,15 +340,12 @@
               {#if onPreview}
                 <td class="preview">
                   {#if row.status === 'ready'}
-                    {@const playing = playingRow === row.key}
-                    <button
-                      type="button"
-                      class="icon"
-                      aria-label="{playing ? 'Pause' : 'Preview'} “{name}”"
+                    <BeatPreviewButton
+                      name="“{name}”"
+                      playing={playingRow === row.key}
+                      previewed={previewedRow === row.key}
                       onclick={() => onPreview(row)}
-                    >
-                      {#if playing}<Pause />{:else}<Play />{/if}
-                    </button>
+                    />
                   {/if}
                 </td>
               {/if}
