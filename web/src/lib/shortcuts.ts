@@ -211,6 +211,14 @@ export const shortcuts = {
     worksIn: "Read mode, in any part of the Song page but a text field or a dialog, while the Timeline isn't playing.",
     keys: [{ key: 'a' }],
   },
+  autoScrollSpeed: {
+    name: 'Slow down or speed up Auto-scroll',
+    group: 'Read mode',
+    description: "Slows Auto-scroll down or speeds it up a level, whether it's running or not.",
+    worksIn: 'Read mode, in any part of the Song page but a text field or a dialog.',
+    back: [{ key: '[' }],
+    forward: [{ key: ']' }],
+  },
   toggleClip: {
     name: 'Add or remove a Clip',
     group: 'Mouse',

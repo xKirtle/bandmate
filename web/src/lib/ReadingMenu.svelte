@@ -13,18 +13,22 @@
   import { largestChartSize, smallestChartSize, stepChartSize, usualChartSize } from './chartSize';
   import { songChordsShown } from './chordsShown';
   import { largestLyricSize, smallestLyricSize, stepLyricSize, usualLyricSize } from './lyricSize';
+  import { fastestSpeed, slowestSpeed, startingSpeed, stepAutoScrollSpeed } from './autoScrollSpeed';
+  import { keyHints } from './keyHints';
   import { following, placeBeside } from './popover';
   import { blockedRows, readingBadge } from './readingMenu';
   import { chartSize } from './sharedChartSize.svelte';
   import { chordChartState } from './sharedChordChartState.svelte';
   import { lyricSize } from './sharedLyricSize.svelte';
+  import { songAutoScrollSpeed } from './sharedAutoScrollSpeed.svelte';
+  import { rebound } from './shortcutKeys';
   import { songTranspose } from './sharedTranspose.svelte';
   import { stepTranspose, transposeLimit, transposeText } from './transposeAmount';
 
   // Read mode's choices about how the Song reads, behind one button in the
-  // Lyric Sheet's header, in this order: the Lyric Size, Transpose, whether
-  // the Chords show, the Chord Chart's eye and pin, and its Chart Size. Each
-  // is kept on this device, as before.
+  // Lyric Sheet's header, in this order: the Lyric Size, Auto-scroll's
+  // speed, Transpose, whether the Chords show, the Chord Chart's eye and pin,
+  // and its Chart Size. Each is kept on this device, as before.
   // It stays open while they change, and every Song has the same rows, a
   // Chord row disabled, saying why, where it can't apply.
 
@@ -38,6 +42,9 @@
   } = $props();
 
   const lyricPercent = $derived(lyricSize.value);
+  const speed = $derived(songAutoScrollSpeed.of(songId));
+  const hints = keyHints();
+  const speedKeys = $derived(rebound().autoScrollSpeed);
   const chordsShown = $derived(songChordsShown.of(songId));
   const transpose = $derived(songTranspose.of(songId));
   const transposeShown = $derived(transposeText(transpose));
@@ -159,6 +166,40 @@
           onclick={() => lyricSize.set(stepLyricSize(lyricPercent, 1))}
           aria-label="Make the lyrics larger"
           title="Make the lyrics larger"><AArrowUp /></button
+        >
+      </div>
+
+      <span id="reading-speed" class="name">Auto-scroll speed</span>
+      <div class="controls" role="group" aria-labelledby="reading-speed">
+        <button
+          type="button"
+          class="button step"
+          disabled={speed <= slowestSpeed}
+          onclick={() => songAutoScrollSpeed.set(songId, stepAutoScrollSpeed(speed, -1))}
+          aria-label="Slow Auto-scroll down"
+          aria-keyshortcuts={hints.aria(speedKeys.back)}
+          title={hints.withKeys('Slow Auto-scroll down', speedKeys.back)}><Minus /></button
+        >
+        <button
+          type="button"
+          class="button amount"
+          disabled={speed === startingSpeed}
+          onclick={() => songAutoScrollSpeed.set(songId, startingSpeed)}
+          aria-label={speed === startingSpeed
+            ? `Auto-scroll at its starting speed, ${startingSpeed}`
+            : `Auto-scroll at speed ${speed}; set it back to ${startingSpeed}`}
+          title={speed === startingSpeed
+            ? 'Auto-scroll goes at its starting speed'
+            : `Set Auto-scroll back to its starting speed, ${startingSpeed}`}>{speed}</button
+        >
+        <button
+          type="button"
+          class="button step"
+          disabled={speed >= fastestSpeed}
+          onclick={() => songAutoScrollSpeed.set(songId, stepAutoScrollSpeed(speed, 1))}
+          aria-label="Speed Auto-scroll up"
+          aria-keyshortcuts={hints.aria(speedKeys.forward)}
+          title={hints.withKeys('Speed Auto-scroll up', speedKeys.forward)}><Plus /></button
         >
       </div>
 

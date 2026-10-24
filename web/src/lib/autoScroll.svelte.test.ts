@@ -1,5 +1,5 @@
 import { describe as group, expect, it } from 'vitest';
-import { AutoScroll, autoScrollPace, startingLevel, type AutoScrollPage } from './autoScroll.svelte';
+import { AutoScroll, autoScrollPace, type AutoScrollPage } from './autoScroll.svelte';
 import { FakeFrames } from './transportFakes';
 
 /** A page that scrolls as it's told, and as a reader scrolls it by hand, with the Lyric Sheet ending at `end`. */
@@ -29,12 +29,14 @@ function setUp({ pace = 40, playing = false } = {}) {
   const frames = new FakeFrames();
   const clock = { now: 0 };
   const timeline = { playing };
+  // The pace as it is now, which the reader may change while it runs.
+  const speed = { pace };
   const awake = { held: 0, released: 0 };
   const autoScroll = new AutoScroll({
     page,
     frames,
     now: () => clock.now,
-    pace: () => pace,
+    pace: () => speed.pace,
     timelinePlaying: () => timeline.playing,
     keepAwake: () => {
       awake.held++;
@@ -50,7 +52,7 @@ function setUp({ pace = 40, playing = false } = {}) {
   const after = (ms: number) => {
     for (let t = 0; t < ms; t += 50) frame(50);
   };
-  return { page, frames, autoScroll, frame, after, timeline, awake };
+  return { page, frames, autoScroll, frame, after, timeline, awake, speed };
 }
 
 group('AutoScroll', () => {
@@ -64,6 +66,18 @@ group('AutoScroll', () => {
     expect(page.top).toBe(120);
     after(250);
     expect(page.top).toBe(130);
+  });
+
+  it('goes at its new pace from the next frame once the speed changes while it runs', () => {
+    const { page, autoScroll, after, speed } = setUp({ pace: 40 });
+    autoScroll.start();
+    after(500);
+    expect(page.top).toBe(20);
+
+    speed.pace = 80;
+    after(500);
+    expect(page.top).toBe(60);
+    expect(autoScroll.running).toBe(true);
   });
 
   it('pauses where it is, and starts again from there', () => {
@@ -232,10 +246,6 @@ group('AutoScroll', () => {
 });
 
 group('autoScrollPace', () => {
-  it('starts at level 4', () => {
-    expect(startingLevel).toBe(4);
-  });
-
   it('goes from slow to fast through the levels, at a Lyric Size of 100%', () => {
     expect(autoScrollPace(1, 100)).toBe(6);
     expect(autoScrollPace(4, 100)).toBe(21);

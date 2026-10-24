@@ -31,7 +31,7 @@ group('listGroups', () => {
         'Split at the playhead',
       ],
       ['Cue the next Line'],
-      ['Start or pause Auto-scroll'],
+      ['Start or pause Auto-scroll', 'Slow down or speed up Auto-scroll'],
       [
         'Add or remove a Clip',
         'Select Clips with a box',

@@ -315,7 +315,7 @@
     <h2 id="sheet-heading" class:visually-hidden={mode === 'read'}>Lyric Sheet</h2>
     <span class="spacer"></span>
     {#if mode === 'read'}
-      <AutoScrollButton {sheet} playing={playhead !== null} />
+      <AutoScrollButton {songId} {sheet} playing={playhead !== null} />
       <ReadingMenu {songId} {chords} />
     {/if}
     {#if rhymeMode.canBeOn}

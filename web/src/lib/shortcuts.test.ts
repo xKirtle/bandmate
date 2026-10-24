@@ -180,6 +180,7 @@ group('The list', () => {
       { name: 'Split at the playhead', group: 'Timeline editing', keys: 'S' },
       { name: 'Cue the next Line', group: 'Sync mode', keys: 'Enter' },
       { name: 'Start or pause Auto-scroll', group: 'Read mode', keys: 'A' },
+      { name: 'Slow down or speed up Auto-scroll', group: 'Read mode', keys: '[ / ]' },
       { name: 'Add or remove a Clip', group: 'Mouse', keys: 'Ctrl+click' },
       { name: 'Select Clips with a box', group: 'Mouse', keys: 'drag' },
       { name: 'Add Clips with a box', group: 'Mouse', keys: 'Ctrl+drag' },
