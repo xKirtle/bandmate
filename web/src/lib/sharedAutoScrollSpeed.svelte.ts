@@ -1,5 +1,5 @@
 import { SvelteMap } from 'svelte/reactivity';
-import { readAutoScrollSpeed, storeAutoScrollSpeed } from './autoScrollSpeed';
+import { readAutoScrollSpeed, stepAutoScrollSpeed, storeAutoScrollSpeed } from './autoScrollSpeed';
 import { deviceStorage } from './deviceStorage';
 
 // Each Song's Auto-scroll speed on this device, shared between the Reading
@@ -14,5 +14,9 @@ export const songAutoScrollSpeed = {
   set(songId: number, level: number) {
     changed.set(songId, level);
     storeAutoScrollSpeed(deviceStorage(), songId, level);
+  },
+  /** Slows a Song's Auto-scroll down or speeds it up by `by` levels, held from 1 to 10. */
+  step(songId: number, by: number) {
+    songAutoScrollSpeed.set(songId, stepAutoScrollSpeed(songAutoScrollSpeed.of(songId), by));
   },
 };

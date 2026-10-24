@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
   autoScrollSpeedKey,
-  fastestSpeed,
+  fastestAutoScrollSpeed,
   readAutoScrollSpeed,
-  slowestSpeed,
-  startingSpeed,
+  slowestAutoScrollSpeed,
+  startingAutoScrollSpeed,
   stepAutoScrollSpeed,
   storeAutoScrollSpeed,
 } from './autoScrollSpeed';
@@ -12,7 +12,7 @@ import { storage } from './storageFake';
 
 describe('readAutoScrollSpeed', () => {
   it('is 4 until set on this device', () => {
-    expect(startingSpeed).toBe(4);
+    expect(startingAutoScrollSpeed).toBe(4);
     expect(readAutoScrollSpeed(storage(), 1)).toBe(4);
   });
 
@@ -58,7 +58,7 @@ describe('storeAutoScrollSpeed', () => {
 
 describe('stepAutoScrollSpeed', () => {
   it('steps a level at a time, held from 1 to 10', () => {
-    expect([slowestSpeed, fastestSpeed]).toEqual([1, 10]);
+    expect([slowestAutoScrollSpeed, fastestAutoScrollSpeed]).toEqual([1, 10]);
     expect(stepAutoScrollSpeed(4, 1)).toBe(5);
     expect(stepAutoScrollSpeed(4, -1)).toBe(3);
     expect(stepAutoScrollSpeed(10, 1)).toBe(10);

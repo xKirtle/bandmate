@@ -1,5 +1,6 @@
 import { describe as group, expect, it } from 'vitest';
 import { AutoScroll, autoScrollPace, type AutoScrollPage } from './autoScroll.svelte';
+import { fastestAutoScrollSpeed, slowestAutoScrollSpeed } from './autoScrollSpeed';
 import { FakeFrames } from './transportFakes';
 
 /** A page that scrolls as it's told, and as a reader scrolls it by hand, with the Lyric Sheet ending at `end`. */
@@ -246,6 +247,13 @@ group('AutoScroll', () => {
 });
 
 group('autoScrollPace', () => {
+  it('has a pace for every speed level, and none past them', () => {
+    for (let level = slowestAutoScrollSpeed; level <= fastestAutoScrollSpeed; level++) {
+      expect(autoScrollPace(level, 100)).toBeGreaterThan(0);
+    }
+    expect(autoScrollPace(fastestAutoScrollSpeed + 1, 100)).toBeNaN();
+  });
+
   it('goes from slow to fast through the levels, at a Lyric Size of 100%', () => {
     expect(autoScrollPace(1, 100)).toBe(6);
     expect(autoScrollPace(4, 100)).toBe(21);

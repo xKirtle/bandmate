@@ -3,8 +3,8 @@
 import { browserFrames, type Frames } from './transport.svelte';
 
 /**
- * The pace of each speed level, 1 to 10 (see autoScrollSpeed.ts), in px a second at a Lyric Size of
- * 100%: from a slow ballad's to a fast song's.
+ * The pace of each speed level, 1 to 10 (see autoScrollSpeed.ts), in px a
+ * second at a Lyric Size of 100%: from a slow ballad's to a fast song's.
  */
 const paces = [6, 10, 15, 21, 28, 36, 46, 58, 72, 90];
 

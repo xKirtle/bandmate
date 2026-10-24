@@ -3,15 +3,15 @@
   // Reading, and its pill, floating at the foot of the window while it runs,
   // with its speed and a pause button, as the header has scrolled away by
   // then. Its key, A unless rebound, starts and pauses it too, and [ and ]
-  // slow it down and speed it up. It's made with Read mode, so
-  // leaving Read mode or the Song stops it.
+  // slow it down and speed it up. It's made with Read mode, so leaving Read
+  // mode or the Song stops it.
   import ChevronsDown from '@lucide/svelte/icons/chevrons-down';
   import Minus from '@lucide/svelte/icons/minus';
   import Pause from '@lucide/svelte/icons/pause';
   import Plus from '@lucide/svelte/icons/plus';
   import { MediaQuery } from 'svelte/reactivity';
   import { AutoScroll, autoScrollPace, type AutoScrollPage } from './autoScroll.svelte';
-  import { fastestSpeed, slowestSpeed, stepAutoScrollSpeed } from './autoScrollSpeed';
+  import { fastestAutoScrollSpeed, slowestAutoScrollSpeed } from './autoScrollSpeed';
   import { keyHints } from './keyHints';
   import { keepScreenAwake } from './screenAwake';
   import { songAutoScrollSpeed } from './sharedAutoScrollSpeed.svelte';
@@ -24,6 +24,7 @@
     sheet,
     playing,
   }: {
+    /** The Song open, whose Auto-scroll speed it reads and sets. */
     songId: number;
     /** The Lyric Sheet, whose end Auto-scroll stops at. */
     sheet: HTMLElement | undefined;
@@ -34,8 +35,6 @@
   // The speed level, which the Reading menu sets too: a change takes effect
   // from the next frame.
   const level = $derived(songAutoScrollSpeed.of(songId));
-  const slower = () => songAutoScrollSpeed.set(songId, stepAutoScrollSpeed(level, -1));
-  const faster = () => songAutoScrollSpeed.set(songId, stepAutoScrollSpeed(level, 1));
 
   // The foot of the window, above the docked Timeline and the tab bar: the
   // pill floats over it, and the Lyric Sheet's end is in view once it's
@@ -83,7 +82,7 @@
     const by = autoScrollSpeedStep(event);
     if (by === null) return;
     event.preventDefault();
-    songAutoScrollSpeed.set(songId, stepAutoScrollSpeed(level, by));
+    songAutoScrollSpeed.step(songId, by);
   }
 </script>
 
@@ -112,21 +111,21 @@
       <button
         type="button"
         class="icon"
-        disabled={level <= slowestSpeed}
+        disabled={level <= slowestAutoScrollSpeed}
         aria-label="Slow Auto-scroll down"
         aria-keyshortcuts={hints.aria(speedKeys.back)}
         title={hints.withKeys('Slow Auto-scroll down', speedKeys.back)}
-        onclick={slower}><Minus /></button
+        onclick={() => songAutoScrollSpeed.step(songId, -1)}><Minus /></button
       >
       <span class="level tabular" title="Auto-scroll speed"><span class="visually-hidden">Speed</span> {level}</span>
       <button
         type="button"
         class="icon"
-        disabled={level >= fastestSpeed}
+        disabled={level >= fastestAutoScrollSpeed}
         aria-label="Speed Auto-scroll up"
         aria-keyshortcuts={hints.aria(speedKeys.forward)}
         title={hints.withKeys('Speed Auto-scroll up', speedKeys.forward)}
-        onclick={faster}><Plus /></button
+        onclick={() => songAutoScrollSpeed.step(songId, 1)}><Plus /></button
       >
       <button
         type="button"
