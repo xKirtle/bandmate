@@ -23,6 +23,7 @@
   import CuesMenu from './CuesMenu.svelte';
   import type { MenuAction } from './menu';
   import ReadingMenu from './ReadingMenu.svelte';
+  import AutoScrollPrototype from './AutoScrollPrototype.svelte';
   import type { LyricSheetEditing } from './lyricSheetEditing.svelte';
   import SectionEditor from './SectionEditor.svelte';
   import type { Drop } from './sectionDrag';
@@ -311,6 +312,7 @@
     <h2 id="sheet-heading" class:visually-hidden={mode === 'read'}>Lyric Sheet</h2>
     <span class="spacer"></span>
     {#if mode === 'read'}
+      <AutoScrollPrototype playing={playhead != null} />
       <ReadingMenu {songId} {chords} />
     {/if}
     {#if rhymeMode.canBeOn}
