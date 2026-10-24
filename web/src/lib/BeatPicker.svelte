@@ -1,12 +1,11 @@
 <script lang="ts">
-  import Pause from '@lucide/svelte/icons/pause';
-  import Play from '@lucide/svelte/icons/play';
   import { onDestroy, tick } from 'svelte';
   import { MediaQuery } from 'svelte/reactivity';
   import AddBeatForm from './AddBeatForm.svelte';
   import AddFromLink from './AddFromLink.svelte';
   import { api, type Beat, type Song } from './api';
   import BeatFilters from './BeatFilters.svelte';
+  import BeatPreviewButton from './BeatPreviewButton.svelte';
   import BeatTable from './BeatTable.svelte';
   import { BeatToAdd, fileReader } from './beatToAdd.svelte';
   import Dialog from './Dialog.svelte';
@@ -129,14 +128,13 @@
 </script>
 
 {#snippet previewButton(beat: Beat)}
-  <button
-    type="button"
-    class="icon preview"
-    aria-label="{playingNow(beat) ? 'Pause' : 'Preview'} {beat.title}"
+  <BeatPreviewButton
+    name={beat.title}
+    playing={playingNow(beat)}
+    previewed={beat.id === previewId}
+    accent
     onclick={() => togglePreview(beat)}
-  >
-    {#if playingNow(beat)}<Pause />{:else}<Play />{/if}
-  </button>
+  />
 {/snippet}
 
 <!-- A click outside closes it while browsing, but never loses a new Beat's file and details.
@@ -200,6 +198,7 @@
         beats={shown}
         bind:sort={view.sort}
         lead={{ label: 'Preview', cell: previewButton }}
+        previewedId={previewId}
         onRowClick={pickRow}
       >
         {#snippet title(beat)}
@@ -209,7 +208,7 @@
     {:else}
       <ul class="beats">
         {#each shown as beat (beat.id)}
-          <li>
+          <li aria-current={beat.id === previewId ? 'true' : undefined}>
             {@render previewButton(beat)}
             <button type="button" class="pick" onclick={() => onPick(beat)}>
               <span class="title">{beat.title}</span>
@@ -261,13 +260,6 @@
     align-items: center;
     gap: var(--space-1);
     border-bottom: 1px solid var(--border);
-  }
-  .preview {
-    flex-shrink: 0;
-    color: var(--accent);
-  }
-  .preview:hover:not(:disabled) {
-    color: var(--accent);
   }
   .beats .pick {
     display: flex;

@@ -48,12 +48,6 @@ Each feature gets a spec, as an issue, before it's built. Using a new feature fo
 - Synonyms would pair with Rhymes in Rhyme mode, for a word that has to mean one thing and rhyme with another. In Portuguese, they need a word's forms too, so "corri" finds the synonyms of "correr", in the same form.
 - Whether Bandmate takes the packs when it's built, keeping Rhymes worked out in the browser (ADR 0018), or asks a service running beside it; how a pack lists its parts and which parts need which; which alphabet the phonemes are written in; how a Language is tested before it ships, and who looks after one once its contributor moves on; and whether the user downloads only some of a pack's parts, are for the spec.
 
-## Marking the Beat playing
-
-- In the Beat Library, the Beat preview's play icon on the row that's playing gets the accent colour behind it, so which Beat is playing can be spotted at a glance.
-- Only in wider windows, where the rows show no waveform to tell it by.
-- Whether the Beat Picker's list gets it too is for the spec.
-
 ## Auto-scroll in Read mode
 
 - The Lyric Sheet scrolls on its own at a steady pace, for playing a Song through from a music stand without Cues or a Timeline to follow.

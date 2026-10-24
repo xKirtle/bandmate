@@ -1,7 +1,5 @@
 <script lang="ts">
-  import Pause from '@lucide/svelte/icons/pause';
   import Pencil from '@lucide/svelte/icons/pencil';
-  import Play from '@lucide/svelte/icons/play';
   import { onDestroy, tick } from 'svelte';
   import AddBeatForm from '../lib/AddBeatForm.svelte';
   import AddFromLink from '../lib/AddFromLink.svelte';
@@ -14,6 +12,7 @@
   import BeatEditDialog from '../lib/BeatEditDialog.svelte';
   import BeatItem from '../lib/BeatItem.svelte';
   import BeatPlayerBar from '../lib/BeatPlayerBar.svelte';
+  import BeatPreviewButton from '../lib/BeatPreviewButton.svelte';
   import BeatTable from '../lib/BeatTable.svelte';
   import { BeatToAdd, fileReader } from '../lib/beatToAdd.svelte';
   import {
@@ -141,8 +140,10 @@
   });
 
   const playingNow = (beat: Beat) => isPreviewing({ beatId: beat.id }) && previewPlaying;
-  const previewingRow = $derived(previewing && 'row' in previewing ? previewing.row.key : null);
-  const playingRow = $derived(previewPlaying && desktop.current ? previewingRow : null);
+  // What the bar holds, playing or paused, is marked in its list.
+  const previewedBeatId = $derived(preview && 'beat' in preview ? preview.beat.id : null);
+  const previewedRow = $derived(preview && 'row' in preview ? preview.row.key : null);
+  const playingRow = $derived(previewPlaying ? previewedRow : null);
 
   function closePreview() {
     previewing = null;
@@ -151,7 +152,7 @@
 
   // A row leaving the batch, removed, added or cancelled, takes its preview with it.
   function dropStaged(key: number) {
-    if (previewingRow === key) closePreview();
+    if (previewedRow === key) closePreview();
   }
 
   // Several files picked at once, on desktop, open a review table instead of
@@ -273,14 +274,12 @@
 {/snippet}
 
 {#snippet previewCell(beat: Beat)}
-  <button
-    type="button"
-    class="icon"
-    aria-label="{playingNow(beat) ? 'Pause' : 'Preview'} {beat.title}"
+  <BeatPreviewButton
+    name={beat.title}
+    playing={playingNow(beat)}
+    previewed={beat.id === previewedBeatId}
     onclick={() => togglePreview({ beatId: beat.id })}
-  >
-    {#if playingNow(beat)}<Pause />{:else}<Play />{/if}
-  </button>
+  />
 {/snippet}
 
 <FileDrop takes={takesFiles} label="Drop audio files or folders to add them as Beats" onDrop={filesDrop} />
@@ -305,6 +304,7 @@
       bind:uploading={batchUploading}
       library={beats}
       {maxUploadBytes}
+      {previewedRow}
       {playingRow}
       onPreview={desktop.current ? (row) => togglePreview({ row }) : null}
       onLeave={dropStaged}
@@ -373,6 +373,7 @@
       lead={{ label: 'Preview', cell: previewCell }}
       trail={{ label: 'Edit', cell: editCell }}
       openId={editingBeat?.id ?? null}
+      previewedId={previewedBeatId}
     >
       {#snippet title(beat)}
         {beat.title}

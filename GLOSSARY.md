@@ -168,7 +168,7 @@ Where a Beat is chosen from the Beat Library, or uploaded or added from a link i
 _Avoid_: Beat dialog, Beat modal
 
 **Beat preview**:
-Listening to a Beat from the Beat Library, outside any Song's Timeline.
+Listening to a Beat from the Beat Library, outside any Song's Timeline. One Beat at a time is previewed, and pausing doesn't end its preview: it stays the previewed Beat until another is previewed or it's put away.
 
 **Sound**:
 An audio file imported into one Song, or made there by a Merge, placed on the Timeline in Clips like a Beat, but without a credit or a library: it belongs to that Song alone, and several of its Clips can use it. It takes its name from the file when imported, or is called "Merged Clip", and keeps it; only its Clips are renamed. Once no Clip has used it for a day (long enough for undo to bring a Clip back), it's gone, and deleting its Song deletes it at once.
