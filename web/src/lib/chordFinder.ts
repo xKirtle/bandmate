@@ -1,9 +1,10 @@
 // The Chord Finder: a built-in reference for Chords. This module is its one
 // seam: the instrument-agnostic Chord theory (chordTheory.ts) and the
-// Instruments (instrument.ts), so far the guitar (guitar.ts, and its tunings
-// in guitarTuning.ts), sit behind it (ADR 0012) and can be reorganised
-// freely. Look up, Name it, Suggest and hearing a Voicing go through the
-// Instrument the Finder's context names, never its strings and frets.
+// Instruments (instrument.ts), the guitar (guitar.ts, and its tunings in
+// guitarTuning.ts) and the piano (piano.ts), sit behind it (ADR 0012) and
+// can be reorganised freely. Look up, Name it, Suggest and hearing a Voicing
+// go through the Instrument the Finder's context names, never its strings
+// and frets or its keys.
 
 import {
   nameNotes,
@@ -26,6 +27,7 @@ import {
   standardTuning,
 } from './guitarTuning';
 import type { Instrument, Pluck } from './instrument';
+import { piano, type Keys, type PianoVoicing } from './piano';
 import { keys } from './transpose';
 
 export { qualities, roots, type Quality, type Suggestion } from './chordTheory';
@@ -33,6 +35,7 @@ export { qualities, roots, type Quality, type Suggestion } from './chordTheory';
 export { keys };
 export type { Frets, GuitarVoicing } from './guitar';
 export type { Pluck } from './instrument';
+export type { Keys, PianoVoicing } from './piano';
 
 /** Standard tuning, its strings' pitches low to high, as MIDI note numbers (E2 A2 D3 G3 B3 E4). */
 export const standard: readonly number[] = standardTuning;
@@ -63,24 +66,35 @@ export function tuningNotes(text: string): string | null {
   return guitarTuningNotes(text);
 }
 
-/** One way to play a Chord on the Finder's Instrument: on the guitar, the one so far, its frets. */
-export type Voicing = GuitarVoicing;
+/** The Instruments the Chord Finder offers, in the order its Instrument field lists them. */
+export const instruments = ['guitar', 'piano'] as const;
+export type InstrumentName = (typeof instruments)[number];
 
-/** The notes placed on the Finder's Instrument to play or name a Chord: on the guitar, frets. */
-export type Placement = Frets;
+/** One way to play a Chord on the Finder's Instrument: on the guitar its frets, on the piano its keys. */
+export type Voicing = GuitarVoicing | PianoVoicing;
 
-/** What's kept on this device of a Voicing the user prefers on the Finder's Instrument: on the guitar, its frets. */
-export type Preference = Frets;
+/** The notes placed on the Finder's Instrument to play or name a Chord: on the guitar frets, on the piano keys. */
+export type Placement = Frets | Keys;
 
-/** What the Chord Finder plays on: its Instrument, so far only the guitar, with its tuning. */
-export type FinderContext = GuitarContext;
+/** What's kept on this device of a Voicing the user prefers on the Finder's Instrument: on the guitar its frets, on the piano its inversion. */
+export type Preference = Frets | number;
+
+/** What the Chord Finder plays on: its Instrument, the guitar with its tuning, or the piano. */
+export type FinderContext = GuitarContext | PianoContext;
+
+/** The Voicings a Finder's context plays: the guitar's or the piano's. */
+export type VoicingOn<C extends FinderContext> = C extends PianoContext ? PianoVoicing : GuitarVoicing;
+
+/** Whether a Voicing is the piano's, so it's drawn on a keyboard, not a fretboard. */
+export function isPianoVoicing(voicing: Voicing): voicing is PianoVoicing {
+  return 'keys' in voicing;
+}
 
 /** The Chord Finder on the guitar, in a tuning. */
 export interface GuitarContext {
   /**
-   * The Instrument: the guitar, the only one so far. Left out, it's the
-   * guitar too, as the Chord Chart's context leaves it, since the Chart
-   * only draws the guitar.
+   * The Instrument: the guitar. Left out, it's the guitar too, as the Chord
+   * Chart's context leaves it, since the Chart only draws the guitar.
    */
   instrument?: 'guitar';
   /** The strings' pitches, low to high, as MIDI note numbers. */
@@ -90,15 +104,25 @@ export interface GuitarContext {
    * Chord's name in the one spelling (see oneSpellingOf), as the Instrument
    * keeps one: on the guitar, its frets low string to high, per tuning.
    */
-  preferred?: Readonly<Record<string, Preference>>;
+  preferred?: Readonly<Record<string, Frets>>;
+}
+
+/** The Chord Finder on the piano, which has no tuning. */
+export interface PianoContext {
+  instrument: 'piano';
+  /** The user's preferred Voicing of each Chord on the piano, by the Chord's name in the one spelling, as its inversion. */
+  preferred?: Readonly<Record<string, number>>;
 }
 
 /** The Instrument a Finder's context plays on. */
+export function finderInstrument(context: GuitarContext): Instrument<GuitarVoicing, Frets, Frets>;
+export function finderInstrument(context: PianoContext): Instrument<PianoVoicing, Keys, number>;
+export function finderInstrument(context: FinderContext): Instrument<Voicing, Placement, Preference>;
 export function finderInstrument(context: FinderContext): Instrument<Voicing, Placement, Preference> {
-  return guitar(context.tuning);
+  return context.instrument === 'piano' ? piano() : guitar(context.tuning);
 }
 
-export type LookUp =
+export type LookUp<V = Voicing> =
   | {
       kind: 'chord';
       /** The name as read, tidied: CMaj7 reads as Cmaj7, F♯- as F#m. */
@@ -109,7 +133,7 @@ export type LookUp =
       bass: string | null;
       notes: string[];
       /** Every Voicing, best first: the preferred one, then the rest as ranked. */
-      voicings: Voicing[];
+      voicings: V[];
       /** Whether the first Voicing is the user's preferred one, not just the best-ranked. */
       preferred: boolean;
     }
@@ -120,10 +144,11 @@ export type LookUp =
  * that it can't be read. The user's preferred Voicing of it comes first, if
  * it's still one of its Voicings.
  */
-export function lookUp(name: string, context: FinderContext): LookUp {
+export function lookUp<C extends FinderContext>(name: string, context: C): LookUp<VoicingOn<C>> {
   const chord = readChord(name);
   if (!chord) return { kind: 'unreadable', name };
-  const { voicings, preferredAt } = ranked(chord, finderInstrument(context), context.preferred);
+  const instrument = finderInstrument(context as FinderContext) as Instrument<VoicingOn<C>, unknown, unknown>;
+  const { voicings, preferredAt } = ranked(chord, instrument, context.preferred);
   return {
     kind: 'chord',
     name: chord.name,
@@ -138,10 +163,11 @@ export function lookUp(name: string, context: FinderContext): LookUp {
 
 /**
  * The Voicing Look up shows first for a Chord name, and Suggest draws for a
- * Chord it suggests: the user's preferred one in the tuning, else the
- * best-ranked. Null when it has no Voicing up to the 12th fret, or can't be read.
+ * Chord it suggests: the user's preferred one on the Instrument (on the
+ * guitar, in the tuning), else the best-ranked. Null when it has none (on
+ * the guitar, up to the 12th fret), or can't be read.
  */
-export function firstVoicing(name: string, context: FinderContext): Voicing | null {
+export function firstVoicing<C extends FinderContext>(name: string, context: C): VoicingOn<C> | null {
   const found = lookUp(name, context);
   return found.kind === 'chord' ? (found.voicings[0] ?? null) : null;
 }
@@ -191,10 +217,16 @@ export function nameIt(placement: Placement, context: FinderContext): NameIt {
  * What hearing the notes placed on the Finder's Instrument plays, low to
  * high: each note's pitch, and how bright it sounds. On the guitar, its
  * strings in the tuning, muted strings skipped, each as bright as the string
- * and fret it's played on. What a strum plays.
+ * and fret it's played on: what a strum plays. On the piano, its keys,
+ * which Hear sounds together.
  */
 export function plucks(placement: Placement, context: FinderContext): Pluck[] {
   return finderInstrument(context).plucks(placement);
+}
+
+/** Whether Hear strums a Voicing on the Finder's Instrument, as on the guitar, or sounds its notes together, as on the piano. */
+export function strummed(context: FinderContext): boolean {
+  return finderInstrument(context).strummed;
 }
 
 /** What hearing a Voicing on the Finder's Instrument plays: the notes it places, as plucks plays them. */

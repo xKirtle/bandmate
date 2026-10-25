@@ -1,0 +1,87 @@
+<script lang="ts">
+  // A piano Voicing drawn on a keyboard from C3 to C5, the same two octaves
+  // on every diagram so they compare at a glance: the keys pressed in the
+  // accent, each C named, middle C among them. A white key is 1 wide to 4.5
+  // tall whatever the room, so the height follows the width, which grows
+  // with the room up to the widest key; where the room is narrower than the
+  // keyboard at its narrowest key (a phone under about 340px), it shrinks to
+  // fit. Unlike a Chord diagram, it's never mirrored for a left-handed
+  // player: a piano's low notes are on the left either way. The Chord Finder
+  // draws with it.
+  import type { PianoVoicing } from './chordFinder';
+  import { highestKey, isBlackKey, lowestKey } from './piano';
+
+  let { voicing, name }: { voicing: PianoVoicing; name: string } = $props();
+
+  const keys = Array.from({ length: highestKey - lowestKey + 1 }, (_, i) => lowestKey + i);
+  const whites = keys.filter((k) => !isBlackKey(k));
+  const blacks = keys.filter(isBlackKey);
+  /** A black key's centre, on the line between the white keys either side, as a share of the keyboard's width. */
+  const blackAt = (key: number) => ((whites.indexOf(key - 1) + 1) / whites.length) * 100;
+  /** A C's name, with its octave: C4 is middle C. */
+  const cName = (key: number) => 'C' + (Math.floor(key / 12) - 1);
+
+  const pressed = $derived(new Set(voicing.keys));
+  /** Read out low to high, e.g. "B7 on the piano: B3 D#4 F#4 A4". */
+  const label = $derived(`${name} on the piano: ${voicing.notes.join(' ')}`);
+</script>
+
+<div class="piano" role="img" aria-label={label} style:--whites={whites.length}>
+  {#each whites as key (key)}
+    <span class="white" class:pressed={pressed.has(key)}>
+      {#if key % 12 === 0}<span class="c">{cName(key)}</span>{/if}
+    </span>
+  {/each}
+  {#each blacks as key (key)}
+    <span class="black" class:pressed={pressed.has(key)} style:left="{blackAt(key)}%"></span>
+  {/each}
+</div>
+
+<style>
+  /* Fifteen white keys, each 1 wide to 4.5 tall: 15 to 4.5, or 10 to 3. */
+  .piano {
+    position: relative;
+    display: flex;
+    width: min(100%, calc(var(--whites) * var(--piano-key-widest)));
+    aspect-ratio: 10 / 3;
+    margin-inline: auto;
+  }
+  .white,
+  .black {
+    border: 1px solid var(--piano-black);
+    border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+  }
+  .white {
+    display: flex;
+    flex: 1;
+    align-items: flex-end;
+    justify-content: center;
+    min-width: 0;
+    margin-left: -1px;
+    padding-bottom: var(--space-1);
+    background: var(--piano-white);
+  }
+  .white:first-child {
+    margin-left: 0;
+  }
+  /* A black key sits over the line between two white keys, 0.6 as wide as one and 0.6 as tall. */
+  .black {
+    position: absolute;
+    top: 0;
+    width: calc(100% / var(--whites) * 0.6);
+    height: 60%;
+    background: var(--piano-black);
+    transform: translateX(-50%);
+  }
+  .pressed {
+    background: var(--accent);
+  }
+  .c {
+    color: var(--piano-black);
+    font-size: var(--text-xs);
+    line-height: 1;
+  }
+  .pressed .c {
+    color: var(--accent-text);
+  }
+</style>

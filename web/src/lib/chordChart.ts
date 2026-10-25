@@ -10,7 +10,7 @@ import {
   lookUp,
   readTuning,
   standard,
-  type FinderContext,
+  type GuitarContext,
   type GuitarVoicing,
 } from './chordFinder';
 import { activeAlternate, sectionsInArrangement } from './sections';
@@ -81,7 +81,7 @@ export type ChartVoicing =
 export function chartVoicing(
   name: string,
   tuning: readonly number[] | null,
-  preferred?: FinderContext['preferred'],
+  preferred?: GuitarContext['preferred'],
 ): ChartVoicing {
   const found = chartVoicings(name, tuning, preferred);
   if (found.kind !== 'voicings') return found;
@@ -104,7 +104,7 @@ export type ChartVoicings =
 export function chartVoicings(
   name: string,
   tuning: readonly number[] | null,
-  preferred?: FinderContext['preferred'],
+  preferred?: GuitarContext['preferred'],
 ): ChartVoicings {
   if (!tuning) return { kind: 'unreadable-tuning' };
   const found = lookUp(name, { tuning, preferred });

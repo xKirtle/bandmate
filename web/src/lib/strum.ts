@@ -40,6 +40,14 @@ export function strum(plucks: readonly Pluck[]): void {
 }
 
 /**
+ * Sounds every pluck at once, as a Chord's keys pressed together on a
+ * piano. Cuts off whatever still rings.
+ */
+export function together(plucks: readonly Pluck[]): void {
+  play(plucks, 0);
+}
+
+/**
  * Arpeggiates: plucks each string once, lowest first, as the Chord Finder's
  * plucks lists them, far enough apart to hear each note, each left ringing.
  * Cuts off whatever still rings.

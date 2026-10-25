@@ -183,6 +183,7 @@ export function guitar(tuning: readonly number[]): Instrument<GuitarVoicing, Fre
     voicings: (chord) => guitarVoicings(chord, tuning),
     placement: (voicing) => voicing.frets,
     plucks: (frets) => guitarPlucks(frets, tuning),
+    strummed: true,
     preferredStorageKey: `bandmate.preferredVoicings.guitar.${tuning.join('-')}`,
     preference: (voicing) => voicing.frets,
     prefers: (voicing, frets) => voicing.frets.length === frets.length && voicing.frets.every((f, i) => f === frets[i]),

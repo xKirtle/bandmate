@@ -35,6 +35,11 @@
   --cue-button: 1.25rem;
   /* The height of calibration's metronome. */
   --metronome: 12rem;
+  /* A piano's white key in a keyboard drawing, as wide as it grows with the
+     room, from the narrowest a phone still reads to the widest. Its black
+     keys, and its height, follow from it. */
+  --piano-key-narrowest: 1.125rem;
+  --piano-key-widest: 1.5rem;
 
   /* Type sizes, named by size. Tools stay at the small end; content takes
      the larger sizes. */
