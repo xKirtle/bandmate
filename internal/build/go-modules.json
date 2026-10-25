@@ -1,7 +1,7 @@
 [
   {
     "name": "github.com/dustin/go-humanize",
-    "version": "v1.0.1",
+    "version": "v1.1.0",
     "license": "MIT"
   },
   {
@@ -16,12 +16,12 @@
   },
   {
     "name": "golang.org/x/sys",
-    "version": "v0.47.0",
+    "version": "v0.49.0",
     "license": "BSD-3-Clause"
   },
   {
     "name": "modernc.org/libc",
-    "version": "v1.75.7",
+    "version": "v1.79.0",
     "license": "BSD-3-Clause"
   },
   {
@@ -36,7 +36,7 @@
   },
   {
     "name": "modernc.org/sqlite",
-    "version": "v1.59.0",
+    "version": "v1.61.0",
     "license": "BSD-3-Clause"
   }
 ]
