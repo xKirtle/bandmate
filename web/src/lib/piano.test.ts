@@ -96,9 +96,59 @@ describe("Look up's piano Voicings", () => {
   });
 });
 
+describe('a preferred piano Voicing', () => {
+  /** Look up on the piano, with these inversions preferred, by Chord. */
+  const lookUpWith = (name: string, preferred: Record<string, number>) =>
+    lookUp(name, { instrument: 'piano', preferred });
+
+  it('comes first in Look up, kept by its inversion, the rest as ranked after it', () => {
+    const found = lookUpWith('C', { C: 2 });
+    expect(found.kind === 'chord' && found.voicings.map((v) => v.inversion)).toEqual([2, 0, 1]);
+    expect(found.kind === 'chord' && found.preferred).toBe(true);
+  });
+
+  it('says so even when it is root position, already first', () => {
+    const found = lookUpWith('C', { C: 0 });
+    expect(found.kind === 'chord' && found.voicings[0].inversion).toBe(0);
+    expect(found.kind === 'chord' && found.preferred).toBe(true);
+  });
+
+  it('applies to its Chord under either spelling, and to no other Chord', () => {
+    for (const name of ['C#maj7', 'Dbmaj7']) {
+      const found = lookUpWith(name, { 'C#maj7': 3 });
+      expect(found.kind === 'chord' && found.voicings[0].inversion, name).toBe(3);
+    }
+    expect(lookUpWith('C#7', { 'C#maj7': 3 })).toMatchObject({ preferred: false });
+  });
+
+  it("is a slash Chord's own, apart from the Chord without its bass", () => {
+    const found = lookUpWith('C/G', { C: 1 });
+    expect(found.kind === 'chord' && found.voicings.map((v) => v.inversion)).toEqual([2, 0, 1]);
+    const slash = lookUpWith('C/G', { 'C/G': 1 });
+    expect(slash.kind === 'chord' && slash.voicings.map((v) => v.inversion)).toEqual([1, 2, 0]);
+  });
+
+  it('is ignored when it matches none of its Chord’s Voicings, as best-ranked first', () => {
+    // A triad has no 3rd inversion; G/A's root position can't fit C3 to C5 with its bass.
+    for (const [name, inversion] of [
+      ['C', 3],
+      ['G/A', 0],
+    ] as const) {
+      const found = lookUpWith(name, { [name]: inversion });
+      expect(found.kind === 'chord' && found.voicings, name).toEqual(voicings(name));
+      expect(found.kind === 'chord' && found.preferred, name).toBe(false);
+    }
+  });
+});
+
 describe("Suggest's piano Voicing", () => {
   it("is the Chord's first: root position", () => {
     expect(firstVoicing('G', piano)?.keys).toEqual([55, 59, 62]);
+  });
+
+  it('is the preferred one, if any, else the first', () => {
+    expect(firstVoicing('G', { instrument: 'piano', preferred: { G: 1 } })?.keys).toEqual([59, 62, 67]);
+    expect(firstVoicing('G', { instrument: 'piano', preferred: { G: 5 } })?.keys).toEqual([55, 59, 62]);
   });
 });
 

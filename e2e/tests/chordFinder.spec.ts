@@ -135,3 +135,46 @@ test('Name it on the piano reads the keys pressed, the lowest as the bass, and s
   await expect(piano.getByRole('button', { pressed: true })).toHaveCount(0);
   await expect(nameIt.getByText('Press the keys of a Chord.')).toBeVisible();
 });
+
+test('a piano Voicing preferred comes first in Look up and is the one Suggest draws, apart from the guitar’s', async ({
+  page,
+}) => {
+  await page.goto('/chords');
+  await pickInstrument(page, 'Piano');
+  const lookUp = page.getByRole('tabpanel', { name: 'Look up' });
+  const cards = lookUp.getByRole('list', { name: 'Voicings of C, best first' }).getByRole('listitem');
+  const prefer = lookUp.getByRole('button', { name: 'Prefer' });
+  const clear = lookUp.getByRole('button', { name: 'Clear' });
+  await expect(cards).toHaveCount(3);
+  await expect(prefer).toHaveCount(3);
+  await expect(clear).toHaveCount(0);
+
+  // Preferring the 2nd inversion moves it first, and focus follows it to its Clear.
+  await cards.nth(2).getByRole('button', { name: 'Prefer' }).click();
+  await expect(cards.first()).toContainText('2nd inversion');
+  await expect(cards.first()).toContainText('Preferred');
+  await expect(cards.first().getByRole('button', { name: 'Clear' })).toBeFocused();
+  await expect(prefer).toHaveCount(2);
+
+  // Suggest draws it, and it's kept after a reload.
+  await page.getByRole('tab', { name: 'Suggest' }).click();
+  await expect(page.getByRole('img', { name: 'C on the piano: G3 C4 E4' })).toBeVisible();
+  await page.reload();
+  await expect(cards.first()).toContainText('2nd inversion');
+
+  // The guitar's preferences are its own: none there, and preferring one leaves the piano's be.
+  await pickInstrument(page, 'Guitar');
+  await expect(clear).toHaveCount(0);
+  await lookUp.getByRole('listitem').nth(1).getByRole('button', { name: 'Prefer' }).click();
+  await pickInstrument(page, 'Piano');
+  await expect(cards.first()).toContainText('2nd inversion');
+
+  // Clearing puts root position first again, focus on its Prefer, and leaves the guitar's be.
+  await clear.click();
+  await expect(cards.first()).toContainText('Root position');
+  await expect(cards.first()).not.toContainText('Preferred');
+  await expect(cards.first().getByRole('button', { name: 'Prefer' })).toBeFocused();
+  await expect(clear).toHaveCount(0);
+  await pickInstrument(page, 'Guitar');
+  await expect(clear).toHaveCount(1);
+});

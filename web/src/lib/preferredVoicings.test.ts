@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { readTuning, standard } from './chordFinder';
+import { finderInstrument, readTuning, standard } from './chordFinder';
 import { preferredVoicingsKey, readPreferredVoicings, storePreferredVoicing } from './preferredVoicings';
 import { storage } from './storageFake';
 
@@ -130,5 +130,35 @@ describe('kept preferences that have gone wrong', () => {
     };
     const values = { [preferredVoicingsKey(standard)]: JSON.stringify(kept) };
     expect(readPreferredVoicings(storage(values), standard)).toEqual({ G: barreG, C: openC });
+  });
+});
+
+describe('preferred piano Voicings', () => {
+  const piano = finderInstrument({ instrument: 'piano' });
+
+  it('are kept by inversion, per Chord in the one spelling, to read back after a reload', () => {
+    const s = storage();
+    storePreferredVoicing(s, piano, 'C', 2);
+    storePreferredVoicing(s, piano, 'Dbmaj7', 3);
+    expect(readPreferredVoicings(s, piano)).toEqual({ C: 2, 'C#maj7': 3 });
+    storePreferredVoicing(s, piano, 'C#maj7', null);
+    expect(readPreferredVoicings(s, piano)).toEqual({ C: 2 });
+  });
+
+  it("are kept apart from the guitar's, so preferring on one never changes the other", () => {
+    const s = storage();
+    storePreferredVoicing(s, piano, 'G', 1);
+    expect(readPreferredVoicings(s, standard)).toEqual({});
+    storePreferredVoicing(s, standard, 'G', barreG);
+    storePreferredVoicing(s, standard, 'C', openC);
+    expect(readPreferredVoicings(s, piano)).toEqual({ G: 1 });
+    storePreferredVoicing(s, piano, 'G', null);
+    expect(readPreferredVoicings(s, standard)).toEqual({ G: barreG, C: openC });
+  });
+
+  it('drop a kept value that is no inversion, keeping the rest', () => {
+    const kept = { C: 0, G: 2, D: -1, E: 1.5, F: '1', A: [0], B: null };
+    const values = { [preferredVoicingsKey(piano)]: JSON.stringify(kept) };
+    expect(readPreferredVoicings(storage(values), piano)).toEqual({ C: 0, G: 2 });
   });
 });
