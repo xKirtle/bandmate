@@ -35,7 +35,7 @@ export { qualities, roots, type Quality, type Suggestion } from './chordTheory';
 export { keys };
 export type { Frets, GuitarVoicing } from './guitar';
 export type { Pluck } from './instrument';
-export type { PianoKeys, PianoVoicing } from './piano';
+export { pianoKeyName, type PianoKeys, type PianoVoicing } from './piano';
 
 /** Standard tuning, its strings' pitches low to high, as MIDI note numbers (E2 A2 D3 G3 B3 E4). */
 export const standard: readonly number[] = standardTuning;
