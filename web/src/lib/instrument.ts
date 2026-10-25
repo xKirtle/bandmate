@@ -26,6 +26,8 @@ export interface Instrument<Voicing, Placement, Preference> {
   placement(voicing: Voicing): Placement;
   /** What the notes placed on it sound, low to high: what hearing them plays. */
   plucks(placement: Placement): Pluck[];
+  /** Whether Hear strums its notes, low to high, as a guitar's strings are; else it sounds them together, as a piano's keys are. */
+  strummed: boolean;
   /** Where its preferred Voicings are kept on this device. */
   preferredStorageKey: string;
   /** What's kept of a Voicing when the user prefers it. */

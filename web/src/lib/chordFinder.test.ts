@@ -20,7 +20,7 @@ import {
   tuningNotes,
   tunings,
   tuningText,
-  type FinderContext,
+  type GuitarContext,
   type Frets,
   type Suggestion,
 } from './chordFinder';
@@ -351,7 +351,7 @@ describe('a preferred Voicing', () => {
 });
 
 describe('the Voicing a suggestion draws', () => {
-  const drawn = (chord: string, ctx: FinderContext) => {
+  const drawn = (chord: string, ctx: GuitarContext) => {
     const v = firstVoicing(chord, ctx);
     return v && written(v.frets);
   };
@@ -528,7 +528,7 @@ function shape(written: string): Frets {
 }
 
 /** The readings of a shape, best first, or null when no reading fits. */
-function readings(written: string, ctx: FinderContext = context): string[] | null {
+function readings(written: string, ctx: GuitarContext = context): string[] | null {
   const named = nameIt(shape(written), ctx);
   return named.kind === 'chord' ? named.readings : null;
 }
@@ -599,7 +599,7 @@ function palette(key: string): string[] | null {
 }
 
 /** The pitches hearing a shape plucks, low string to high. */
-const pitches = (written: string, ctx: FinderContext = context) => plucks(shape(written), ctx).map((p) => p.pitch);
+const pitches = (written: string, ctx: GuitarContext = context) => plucks(shape(written), ctx).map((p) => p.pitch);
 
 /** How bright each string hearing a shape plucks sounds, low string to high. */
 const brightness = (written: string) => plucks(shape(written), context).map((p) => p.brightness);
