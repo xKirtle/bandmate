@@ -18,20 +18,23 @@ import type { Instrument } from './instrument';
  */
 export type PreferredVoicings<Kept = Frets> = Readonly<Record<string, Kept>>;
 
-/** What an Instrument keeps its preferences by. */
-type Keeper<Kept> = Pick<Instrument<never, never, Kept>, 'preferredKey' | 'isPreference'>;
+/** What an Instrument keeps its preferences by: where, and which kept values are its own. */
+type Preferring<Kept> = Pick<Instrument<never, never, Kept>, 'preferredStorageKey' | 'isPreference'>;
 
-/** Whose preferences: an Instrument's, or a tuning's, for the guitar in it, as the Chord Chart names one. */
-export type KeptOn<Kept> = Keeper<Kept> | readonly number[];
+/**
+ * Whose preferences: an Instrument's, or a tuning's, for the guitar in it,
+ * as preferences were named before the Chord Finder had Instruments.
+ */
+export type PreferredOn<Kept> = Preferring<Kept> | readonly number[];
 
-function keeper<Kept>(on: KeptOn<Kept>): Keeper<Kept> {
+function preferring<Kept>(on: PreferredOn<Kept>): Preferring<Kept> {
   // A tuning is the guitar's, which keeps its frets.
-  return 'preferredKey' in on ? on : (guitar(on) as unknown as Keeper<Kept>);
+  return 'preferredStorageKey' in on ? on : (guitar(on) as unknown as Preferring<Kept>);
 }
 
 /** Where an Instrument's preferred Voicings are kept on this device: the guitar's per tuning, by its strings' pitches. */
-export function preferredVoicingsKey(on: KeptOn<unknown>): string {
-  return keeper(on).preferredKey;
+export function preferredVoicingsKey(on: PreferredOn<unknown>): string {
+  return preferring(on).preferredStorageKey;
 }
 
 /**
@@ -43,11 +46,11 @@ export function preferredVoicingsKey(on: KeptOn<unknown>): string {
  */
 export function readPreferredVoicings<Kept = Frets>(
   storage: Storage | undefined,
-  on: KeptOn<Kept>,
+  on: PreferredOn<Kept>,
 ): PreferredVoicings<Kept> {
-  const instrument = keeper(on);
+  const instrument = preferring(on);
   try {
-    const kept: unknown = JSON.parse(storage?.getItem(instrument.preferredKey) ?? '{}');
+    const kept: unknown = JSON.parse(storage?.getItem(instrument.preferredStorageKey) ?? '{}');
     if (typeof kept !== 'object' || kept === null || Array.isArray(kept)) return {};
     return Object.fromEntries(
       Object.entries(kept)
@@ -66,7 +69,7 @@ export function readPreferredVoicings<Kept = Frets>(
  */
 export function storePreferredVoicing<Kept = Frets>(
   storage: Storage | undefined,
-  on: KeptOn<Kept>,
+  on: PreferredOn<Kept>,
   chord: string,
   preference: Kept | null,
 ) {

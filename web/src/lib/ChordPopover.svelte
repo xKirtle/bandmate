@@ -31,7 +31,7 @@
   import { tick } from 'svelte';
   import type { Song } from './api';
   import ChordDiagram from './ChordDiagram.svelte';
-  import { chartTuning, chartVoicings } from './chordChart';
+  import { chartInstrument, chartTuning, chartVoicings } from './chordChart';
   import { voicingPlucks } from './chordFinder';
   import HearButton from './HearButton.svelte';
   import { following, popoverLeft, popoverTop } from './popover';
@@ -58,7 +58,7 @@
 
   const tuning = $derived(chartTuning(song.tuning));
   const found = $derived(
-    opened && chartVoicings(opened.name, tuning, tuning ? preferredVoicings.of(tuning) : undefined),
+    opened && chartVoicings(opened.name, tuning, tuning ? preferredVoicings.of(chartInstrument(tuning)) : undefined),
   );
   const voicings = $derived(found?.kind === 'voicings' ? found.voicings : []);
   // Which of them shows: 0, the preferred or top-ranked one, when it opens.
@@ -77,7 +77,8 @@
   // clearing the preference shows the top-ranked one.
   function prefer() {
     if (found?.kind !== 'voicings' || !tuning || !voicing) return;
-    preferredVoicings.set(tuning, found.chord, isPreferred ? null : voicing.frets);
+    const instrument = chartInstrument(tuning);
+    preferredVoicings.set(instrument, found.chord, isPreferred ? null : instrument.preference(voicing));
     at = 0;
   }
 

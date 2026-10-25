@@ -6,7 +6,7 @@
 import type { Chord } from './chordTheory';
 import type { Instrument, Pluck } from './instrument';
 
-/** A guitar shape's frets, low string to high: 0 for open, null for muted. */
+/** The frets placed on a guitar, low string to high: 0 for open, null for muted. */
 export type Frets = readonly (number | null)[];
 
 /** A barre: one finger flat across strings at a fret. Strings count from the lowest, 0. */
@@ -173,7 +173,7 @@ function guitarPlucks(frets: Frets, tuning: readonly number[]): Pluck[] {
 
 /**
  * The guitar in a tuning, its strings' pitches low to high as MIDI note
- * numbers. A shape placed on it is its frets, and a preferred Voicing is
+ * numbers. The notes placed on it are its frets, and a preferred Voicing is
  * kept by its frets, per tuning: a Voicing preferred in standard tuning
  * doesn't pick a wrong one in Drop D. The tuning is kept by its pitches, so
  * "Drop D" and "D A D G B E" share.
@@ -181,11 +181,11 @@ function guitarPlucks(frets: Frets, tuning: readonly number[]): Pluck[] {
 export function guitar(tuning: readonly number[]): Instrument<GuitarVoicing, Frets, Frets> {
   return {
     voicings: (chord) => guitarVoicings(chord, tuning),
-    shape: (voicing) => voicing.frets,
+    placement: (voicing) => voicing.frets,
     plucks: (frets) => guitarPlucks(frets, tuning),
-    preferredKey: `bandmate.preferredVoicings.guitar.${tuning.join('-')}`,
+    preferredStorageKey: `bandmate.preferredVoicings.guitar.${tuning.join('-')}`,
     preference: (voicing) => voicing.frets,
-    prefers: (voicing, kept) => voicing.frets.length === kept.length && voicing.frets.every((f, i) => f === kept[i]),
+    prefers: (voicing, frets) => voicing.frets.length === frets.length && voicing.frets.every((f, i) => f === frets[i]),
     isPreference: (kept): kept is Frets =>
       Array.isArray(kept) &&
       kept.length === tuning.length &&

@@ -6,7 +6,7 @@ import {
   readPreferredVoicings,
   storePreferredVoicing,
   withPreference,
-  type KeptOn,
+  type PreferredOn,
   type PreferredVoicings,
 } from './preferredVoicings';
 
@@ -18,11 +18,11 @@ const changed = new SvelteMap<string, PreferredVoicings<unknown>>();
 
 export const preferredVoicings = {
   /** Each Chord's preferred Voicing on an Instrument, or the guitar in a tuning, on this device. */
-  of: <Kept = Frets>(on: KeptOn<Kept>): PreferredVoicings<Kept> =>
+  of: <Kept = Frets>(on: PreferredOn<Kept>): PreferredVoicings<Kept> =>
     (changed.get(preferredVoicingsKey(on)) as PreferredVoicings<Kept> | undefined) ??
     readPreferredVoicings(deviceStorage(), on),
   /** Prefers a Voicing of a Chord on an Instrument on this device, as it keeps one, or clears the preference with null. */
-  set<Kept = Frets>(on: KeptOn<Kept>, chord: string, preference: Kept | null) {
+  set<Kept = Frets>(on: PreferredOn<Kept>, chord: string, preference: Kept | null) {
     changed.set(preferredVoicingsKey(on), withPreference(preferredVoicings.of(on), chord, preference));
     storePreferredVoicing(deviceStorage(), on, chord, preference);
   },

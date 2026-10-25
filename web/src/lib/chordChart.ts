@@ -4,7 +4,15 @@
 
 import type { Song } from './api';
 import { hasChords } from './chords';
-import { chordName, lookUp, readTuning, standard, type FinderContext, type GuitarVoicing } from './chordFinder';
+import {
+  chordName,
+  finderInstrument,
+  lookUp,
+  readTuning,
+  standard,
+  type FinderContext,
+  type GuitarVoicing,
+} from './chordFinder';
 import { activeAlternate, sectionsInArrangement } from './sections';
 import { transposeChord } from './transpose';
 
@@ -48,6 +56,14 @@ export function chordsInRead(song: Song): ChordsInRead {
  */
 export function chartTuning(text: string): readonly number[] | null {
   return text.trim() === '' ? standard : readTuning(text);
+}
+
+/**
+ * The Instrument the Chord Chart draws: the guitar, in the tuning it draws
+ * for (from chartTuning). Its preferred Voicings are the Chord Finder's.
+ */
+export function chartInstrument(tuning: readonly number[]) {
+  return finderInstrument({ instrument: 'guitar', tuning });
 }
 
 /**

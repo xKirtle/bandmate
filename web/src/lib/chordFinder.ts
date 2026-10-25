@@ -66,14 +66,17 @@ export function tuningNotes(text: string): string | null {
 /** One way to play a Chord on the Finder's Instrument: on the guitar, the one so far, its frets. */
 export type Voicing = GuitarVoicing;
 
-/** What's placed on the Finder's Instrument to play or name a Chord: on the guitar, frets. */
-export type Shape = Frets;
+/** The notes placed on the Finder's Instrument to play or name a Chord: on the guitar, frets. */
+export type Placement = Frets;
 
 /** What's kept on this device of a Voicing the user prefers on the Finder's Instrument: on the guitar, its frets. */
 export type Preference = Frets;
 
-/** What the Chord Finder plays on: its Instrument, the guitar in a tuning. */
-export interface FinderContext {
+/** What the Chord Finder plays on: its Instrument, so far only the guitar, with its tuning. */
+export type FinderContext = GuitarContext;
+
+/** The Chord Finder on the guitar, in a tuning. */
+export interface GuitarContext {
   /**
    * The Instrument: the guitar, the only one so far. Left out, it's the
    * guitar too, as the Chord Chart's context leaves it, since the Chart
@@ -91,7 +94,7 @@ export interface FinderContext {
 }
 
 /** The Instrument a Finder's context plays on. */
-export function finderInstrument(context: FinderContext): Instrument<Voicing, Shape, Preference> {
+export function finderInstrument(context: FinderContext): Instrument<Voicing, Placement, Preference> {
   return guitar(context.tuning);
 }
 
@@ -173,31 +176,30 @@ export type NameIt =
     };
 
 /**
- * Names a shape placed on the Finder's Instrument: every reading of it, best
- * first, and the notes sounding. Readings with the root as the lowest note
- * come first, then the simpler names.
+ * Names the notes placed on the Finder's Instrument: every reading of them,
+ * best first, and the notes sounding. Readings with the root as the lowest
+ * note come first, then the simpler names.
  */
-export function nameIt(shape: Shape, context: FinderContext): NameIt {
-  const sounding = plucks(shape, context).map((p) => p.pitch % 12);
+export function nameIt(placement: Placement, context: FinderContext): NameIt {
+  const sounding = plucks(placement, context).map((p) => p.pitch % 12);
   const chords = nameNotes(sounding);
   const notes = spellNotes(sounding, chords[0] ?? null);
   return chords.length ? { kind: 'chord', readings: chords.map((c) => c.name), notes } : { kind: 'none', notes };
 }
 
 /**
- * What hearing a shape placed on the Finder's Instrument plays, low note to
+ * What hearing the notes placed on the Finder's Instrument plays, low to
  * high: each note's pitch, and how bright it sounds. On the guitar, its
  * strings in the tuning, muted strings skipped, each as bright as the string
  * and fret it's played on. What a strum plays.
  */
-export function plucks(shape: Shape, context: FinderContext): Pluck[] {
-  return finderInstrument(context).plucks(shape);
+export function plucks(placement: Placement, context: FinderContext): Pluck[] {
+  return finderInstrument(context).plucks(placement);
 }
 
-/** What hearing a Voicing on the Finder's Instrument plays, as plucks does its shape. */
+/** What hearing a Voicing on the Finder's Instrument plays: the notes it places, as plucks plays them. */
 export function voicingPlucks(voicing: Voicing, context: FinderContext): Pluck[] {
-  const instrument = finderInstrument(context);
-  return instrument.plucks(instrument.shape(voicing));
+  return plucks(finderInstrument(context).placement(voicing), context);
 }
 
 /**
