@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { firstVoicing, lookUp, strummed, voicingPlucks, type PianoVoicing } from './chordFinder';
+import { firstVoicing, lookUp, qualities, roots, strummed, voicingPlucks, type PianoVoicing } from './chordFinder';
 
 // The piano in the Chord Finder (ADR 0012), through its seam: one hand's
 // Voicings, each inversion in close position, round middle C, drawn on a
@@ -60,17 +60,22 @@ describe("Look up's piano Voicings", () => {
     ]);
   });
 
-  it('all fit the keyboard drawn, C3 to C5, a slash bass too', () => {
-    const misplaced: string[] = [];
-    for (const root of ['C', 'C#', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B'])
-      for (const quality of ['', 'm', '7', 'maj7', 'm7b5', 'dim7', 'sus4', '9', '13', '7#9'])
-        for (const bass of ['', '/C', '/E', '/G', '/A', '/Bb', '/F#']) {
-          const name = root + quality + bass;
-          for (const v of voicings(name))
-            if (v.keys.some((k) => k < 48 || k > 72)) misplaced.push(`${name}: ${v.keys.join(' ')}`);
-          if (voicings(name).length === 0) misplaced.push(`${name}: none`);
+  it('all fit the piano drawn, C3 to C5, a slash bass too, and every Chord keeps at least one', () => {
+    const wrong: string[] = [];
+    for (const root of roots)
+      for (const { suffix } of qualities)
+        for (const bass of ['', ...roots.map((r) => '/' + r)]) {
+          const name = root + suffix + bass;
+          const found = voicings(name);
+          if (found.length === 0) wrong.push(`${name}: none`);
+          for (const v of found) if (v.keys.some((k) => k < 48 || k > 72)) wrong.push(`${name}: ${v.keys.join(' ')}`);
         }
-    expect(misplaced).toEqual([]);
+    expect(wrong).toEqual([]);
+  });
+
+  it("leave out a slash Chord's inversion that can't fit C3 to C5 with its bass under it", () => {
+    // G B D over A would reach D5 from A3, and A2 is below C3.
+    expect(voicings('G/A').map((v) => v.inversion)).toEqual([1, 2]);
   });
 
   it('spell their notes as the Chord spells them, octave by letter', () => {

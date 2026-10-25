@@ -100,7 +100,10 @@ function spelledKey(key: number, note: string): string {
  * A Chord's piano Voicings, one hand's, best first: root position, then each
  * inversion in turn. A slash Chord's inversion with its bass lowest comes
  * first, then the rest, each with the bass under it in the left hand. An
- * inversion that can't fit between C3 and C5 with its bass is left out.
+ * inversion that can't fit between C3 and C5 with its bass is left out, but
+ * every Chord keeps one: an inversion alone spans under an octave, and so
+ * does a bass under the inversion that starts on the next tone above it,
+ * and two octaves always hold a span of an octave.
  */
 function pianoVoicings(chord: Chord): PianoVoicing[] {
   const tones = handTones(chord).map((t) => pitchClass(chord.root + t.semitones));

@@ -42,7 +42,7 @@ The user picks a Palette, and System, Light or Dark, in Settings, kept per devic
 | `--danger`, `--warning`        | Destructive actions and errors; warnings                                |
 | `--drafting-*`, `--finished-*` | The drafting and finished Status badges (`-bg` and `-fg`)               |
 | `--shelved-*`                  | The shelved Status badge (`-bg` and `-fg`)                              |
-| `--piano-white`, `--piano-black` | A piano's white and black keys in a keyboard drawing, the black also edging every key; a key pressed takes the accent |
+| `--piano-white`, `--piano-black` | A piano's white and black keys in a keyboard drawing, the black also edging every key                           |
 
 Shared by every Palette, the scrim and the only shadows there are:
 
@@ -60,7 +60,7 @@ A literal colour is written only in `palettes.css`, and a `box-shadow` is always
 
 In the light theme a popover is on `--bg`, lifted by `--shadow-float`. In the dark theme, where a shadow barely shows, it's raised onto `--surface-1`, a step lighter than the page, and `--shadow-float` is black there: tinted like the text, it would glow.
 
-**Contrast floor**, in both themes of every Palette: 4.5:1 for all text, 3:1 for controls and anything else that carries meaning, and 7:1 for Lines in Read mode. Chords in Read mode are held to 4.5:1, since Terracotta's accent misses 7:1 and that was accepted. A piano's white and black keys are held to 3:1 against each other. `palettes.test.ts` checks every meaningful pair, so a Palette that breaks the floor fails CI.
+**Contrast floor**, in both themes of every Palette: 4.5:1 for all text, 3:1 for controls and anything else that carries meaning, and 7:1 for Lines in Read mode. Chords in Read mode are held to 4.5:1, since Terracotta's accent misses 7:1 and that was accepted. A piano's keys are drawn as a piano's are in every Palette: in the light theme the white keys a step brighter than the page, towards white, and the black keys near the Palette's text; in the dark theme the white keys a light grey, so they don't glare, and the black keys darker than the page. They're held to 3:1 against each other, and not against the accent: no accent reaches 3:1 against both key colours in every Palette (Ink's and Olive's light accents miss 3:1 even against pure black). So a pressed key is filled with the accent and also marked with a dot in `--accent-text`, held to 4.5:1 against the accent, and is told by its mark, not by colour alone. `palettes.test.ts` checks every meaningful pair, so a Palette that breaks the floor fails CI.
 
 ### Type
 
@@ -192,7 +192,7 @@ One icon, one meaning, across the app. Every icon in use is here: a new one is a
 | `corner-down-left`                                            | The Enter key, beside Sync mode's Now while Enter cues                                                                                                                                                     |
 | `folder`, `folder-plus`, `folder-input`                       | A Folder, where a Song's Cover would be; New folder; Move to folder                                                                                                                         |
 | `tag`                                                         | A Song's Tags                                                                                                                                                                               |
-| `music`, `disc-3`, `guitar`                                   | The navigation: Songs, Beats, the Chord Finder                                                                                                                                              |
+| `music`, `disc-3`, `music-4`                                  | The navigation: Songs, Beats, the Chord Finder                                                                                                                                              |
 | `settings`                                                    | The navigation, pinned apart: Settings                                                                                                                                                      |
 
 ### Brand marks
@@ -275,4 +275,4 @@ A disabled button fades; a disabled quiet one turns muted instead. Under a point
 | `--mark-rail`, `--mark-large`          | Bandmate's mark: atop the nav rail, and in About                         |
 | `--cue-slot`, `--cue-button`           | A Cue's slot in the gutter, wide enough for "⚠ 12:34.5"; its ▶ or ✕      |
 | `--metronome`                          | The height of calibration's metronome                                    |
-| `--piano-key-narrowest`, `--piano-key-widest` | A white key in a keyboard drawing, 1 wide to 4.5 tall: it grows with the room up to the widest, and the Chord Finder fits as many piano cards a row as a keyboard at the narrowest allows |
+| `--piano-key-narrowest`, `--piano-key-widest`, `--piano-white-keys` | A white key in a keyboard drawing, 1 wide to 4.5 tall: it grows with the room up to the widest, and the Chord Finder fits as many piano cards a row as a keyboard at the narrowest allows; and how many white keys a drawing has, 15 from C3 to C5 |
