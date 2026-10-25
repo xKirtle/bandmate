@@ -65,7 +65,7 @@ Give the verdict (release now or wait, and why), the version, a table of what sh
 Land the bumps the go-ahead took first, each merged before the tag so the release carries it:
 
 - **yt-dlp**: start the weekly workflow by hand (`gh workflow run yt-dlp.yml`), so its pull request comes out as the weekly one does, and merge it once CI passes. It's labelled `enhancement`, so it bumps the minor version.
-- **The rest**: each gets an issue and a pull request of its own, labelled as CONTRIBUTING's "Label it" says.
+- **The rest**: each gets an issue and a pull request of its own, labelled `no-release-notes`: a dependency bump isn't a fix or a feature, whatever its changelog fixes.
 
 Preview the notes again for the bumps' lines, and pick the version again if a bump's label changed it.
 
