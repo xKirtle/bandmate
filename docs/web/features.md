@@ -74,7 +74,7 @@ The **Chords** page, in the side bar, helps with chords away from any song, on g
 - The rising bars arpeggiate the shape: they play it one string at a time, low to high, so you can hear each note.
 - Left-handed? Turn it on in Settings, under **This device**, and every diagram flips, the fretboard too.
 
-On piano, each way to play a chord is a keyboard from C3 to C5, the keys to press in colour: root position and each inversion, for one hand, around middle C. A slash chord like C/G starts with the inversion that has its bass lowest, then plays the bass under the others with your left hand. The speaker plays the keys together. Name it is guitar only for now, and the piano doesn't flip for left-handed playing.
+On piano, each way to play a chord is drawn as the keys from C3 to C5, the ones to press in colour: root position and each inversion, for one hand, around middle C. A slash chord like C/G starts with the inversion that has its bass lowest, then plays the bass under the others with your left hand. The speaker plays the keys together. Name it is guitar only for now, and the piano doesn't flip for left-handed playing.
 
 ## Beats
 

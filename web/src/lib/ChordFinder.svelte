@@ -78,7 +78,9 @@
   let name = $state('C');
   let picked = $state<{ root: string; quality: string; bass: string | null }>({ root: 'C', quality: '', bass: null });
   // The Finder's context with the user's preferred Voicings on its
-  // Instrument: what Look up lists first, and what Suggest draws.
+  // Instrument: what Look up lists first, and what Suggest draws. The two
+  // branches read alike, but each narrows the context to one Instrument, so
+  // its preferences are that Instrument's kind.
   const piano = $derived(context.instrument === 'piano');
   const finderContext = $derived.by((): FinderContext =>
     context.instrument === 'piano'
@@ -126,7 +128,7 @@
   }
 
   /** What a piano Voicing's card calls its inversion: which of the Chord's tones is lowest in the right hand. */
-  const inversions = ['Root position', '1st inversion', '2nd inversion', '3rd inversion'];
+  const inversionNames = ['Root position', '1st inversion', '2nd inversion', '3rd inversion'];
 
   const qualityLabel = (suffix: string) => qualities.find((q) => q.suffix === suffix)?.label ?? suffix;
 
@@ -144,11 +146,10 @@
   // Switching Instruments starts Look up's Voicings on their first page, and
   // empties Name it.
   // svelte-ignore state_referenced_locally
-  let instrumentShown = $state(context.instrument ?? 'guitar');
+  let pianoShown = $state(context.instrument === 'piano');
   $effect.pre(() => {
-    const now = context.instrument ?? 'guitar';
-    if (now === instrumentShown) return;
-    instrumentShown = now;
+    if (piano === pianoShown) return;
+    pianoShown = piano;
     page = 0;
     placed = nothingPlaced();
   });
@@ -361,7 +362,7 @@
           {#if voicings.length === 0}
             <p class="muted">
               {piano
-                ? `No Voicing of ${found.name} fits the keyboard from C3 to C5.`
+                ? `No Voicing of ${found.name} fits the piano from C3 to C5.`
                 : `No Voicing of ${found.name} fits a hand up to the 12th fret.`}
             </p>
           {:else}
@@ -374,11 +375,11 @@
                   <li>
                     <PianoDiagram {voicing} name={found.name} />
                     <span class="inversion">
-                      {inversions[voicing.inversion]}{voicing.left.length ? ' over ' + found.bass : ''}
+                      {inversionNames[voicing.inversion]}{voicing.left.length ? ' over ' + found.bass : ''}
                     </span>
                     <span class="keys muted">{voicing.notes.join(' ')}</span>
                     <div class="voicing-actions">
-                      <HearButton chord={found.name} plucks={heard} strummed={false} />
+                      <HearButton chord={found.name} plucks={heard} strummed={hearStrummed} />
                       <ArpeggiateButton chord={found.name} plucks={heard} />
                     </div>
                   </li>
@@ -628,14 +629,14 @@
     max-width: 9rem;
   }
   /*
-   * Piano cards: as many a row as fit a keyboard at its narrowest keys (15
-   * white keys) between the card's sides, so one a row on a phone and more
-   * where they fit.
+   * Piano cards: as many a row as fit a piano drawing at its narrowest keys
+   * between the card's sides, so one a row on a phone and more where they
+   * fit.
    */
   .voicings.piano {
     grid-template-columns: repeat(
       auto-fill,
-      minmax(min(100%, calc(15 * var(--piano-key-narrowest) + 2 * var(--space-2))), 1fr)
+      minmax(min(100%, calc(var(--piano-white-keys) * var(--piano-key-narrowest) + 2 * var(--space-2))), 1fr)
     );
   }
   .inversion {

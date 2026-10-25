@@ -27,7 +27,7 @@ import {
   standardTuning,
 } from './guitarTuning';
 import type { Instrument, Pluck } from './instrument';
-import { piano, type Keys, type PianoVoicing } from './piano';
+import { piano, type PianoKeys, type PianoVoicing } from './piano';
 import { keys } from './transpose';
 
 export { qualities, roots, type Quality, type Suggestion } from './chordTheory';
@@ -35,7 +35,7 @@ export { qualities, roots, type Quality, type Suggestion } from './chordTheory';
 export { keys };
 export type { Frets, GuitarVoicing } from './guitar';
 export type { Pluck } from './instrument';
-export type { Keys, PianoVoicing } from './piano';
+export type { PianoKeys, PianoVoicing } from './piano';
 
 /** Standard tuning, its strings' pitches low to high, as MIDI note numbers (E2 A2 D3 G3 B3 E4). */
 export const standard: readonly number[] = standardTuning;
@@ -74,7 +74,7 @@ export type InstrumentName = (typeof instruments)[number];
 export type Voicing = GuitarVoicing | PianoVoicing;
 
 /** The notes placed on the Finder's Instrument to play or name a Chord: on the guitar frets, on the piano keys. */
-export type Placement = Frets | Keys;
+export type Placement = Frets | PianoKeys;
 
 /** What's kept on this device of a Voicing the user prefers on the Finder's Instrument: on the guitar its frets, on the piano its inversion. */
 export type Preference = Frets | number;
@@ -116,7 +116,7 @@ export interface PianoContext {
 
 /** The Instrument a Finder's context plays on. */
 export function finderInstrument(context: GuitarContext): Instrument<GuitarVoicing, Frets, Frets>;
-export function finderInstrument(context: PianoContext): Instrument<PianoVoicing, Keys, number>;
+export function finderInstrument(context: PianoContext): Instrument<PianoVoicing, PianoKeys, number>;
 export function finderInstrument(context: FinderContext): Instrument<Voicing, Placement, Preference>;
 export function finderInstrument(context: FinderContext): Instrument<Voicing, Placement, Preference> {
   return context.instrument === 'piano' ? piano() : guitar(context.tuning);

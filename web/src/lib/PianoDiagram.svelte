@@ -26,7 +26,7 @@
   const label = $derived(`${name} on the piano: ${voicing.notes.join(' ')}`);
 </script>
 
-<div class="piano" role="img" aria-label={label} style:--whites={whites.length}>
+<div class="piano" role="img" aria-label={label}>
   {#each whites as key (key)}
     <span class="white" class:pressed={pressed.has(key)}>
       {#if key % 12 === 0}<span class="c">{cName(key)}</span>{/if}
@@ -38,12 +38,12 @@
 </div>
 
 <style>
-  /* Fifteen white keys, each 1 wide to 4.5 tall: 15 to 4.5, or 10 to 3. */
+  /* Its white keys, each 1 wide to 4.5 tall. */
   .piano {
     position: relative;
     display: flex;
-    width: min(100%, calc(var(--whites) * var(--piano-key-widest)));
-    aspect-ratio: 10 / 3;
+    width: min(100%, calc(var(--piano-white-keys) * var(--piano-key-widest)));
+    aspect-ratio: calc(var(--piano-white-keys) / 4.5);
     margin-inline: auto;
   }
   .white,
@@ -68,7 +68,7 @@
   .black {
     position: absolute;
     top: 0;
-    width: calc(100% / var(--whites) * 0.6);
+    width: calc(100% / var(--piano-white-keys) * 0.6);
     height: 60%;
     background: var(--piano-black);
     transform: translateX(-50%);

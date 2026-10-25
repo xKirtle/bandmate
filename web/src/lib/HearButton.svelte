@@ -12,7 +12,7 @@
   }: {
     /** The Chord's name, for the button's label, or "this Chord shape" for one placed in Name it that reads as none. */
     chord: string;
-    /** What to strum, low string to high: the Chord Finder's plucks. With none, as in Name it with nothing placed, it's disabled. */
+    /** What to hear, low to high: the Chord Finder's plucks. With none, as in Name it with nothing placed, it's disabled. */
     plucks: readonly Pluck[];
     /** Whether to strum them, low to high, as on the guitar, or sound them together, as on the piano. */
     strummed?: boolean;

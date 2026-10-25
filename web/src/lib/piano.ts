@@ -28,13 +28,18 @@ export interface PianoVoicing {
 const pitchClass = (key: number) => ((key % 12) + 12) % 12;
 
 /** The keys pressed on a piano, as MIDI note numbers. */
-export type Keys = readonly number[];
+export type PianoKeys = readonly number[];
 
 /** Whether a key is a black one. */
 export const isBlackKey = (key: number) => [1, 3, 6, 8, 10].includes(pitchClass(key));
 
-/** Where a key sits round middle C: the lowest key of the right hand is placed as near this as fits. */
-const middle = 60.5;
+/** Middle C, C4. */
+const middleC = 60;
+/**
+ * Where the right hand's lowest key is placed as near as fits: between
+ * middle C and the C# above, so it lands from G3 to F#4, round middle C.
+ */
+const middle = middleC + 0.5;
 
 /**
  * The tones one hand plays: every tone, unless there are more than four,
@@ -65,7 +70,8 @@ function stack(pitchClasses: number[], from: number): number[] {
 function place(pitchClasses: number[], bass: number | null): number[] | null {
   const placements = [-2, -1, 0, 1, 2]
     .map((octave) => {
-      const from = 60 + 12 * octave + pitchClass(pitchClasses[0] - 60);
+      // The right hand's lowest key in each octave, from two below middle C's to two above.
+      const from = middleC + 12 * octave + pitchClass(pitchClasses[0] - middleC);
       const right = stack(pitchClasses, from);
       return bass === null ? right : [from - 1 - pitchClass(from - 1 - bass), ...right];
     })
@@ -125,7 +131,7 @@ const brightness = (key: number) => Math.min(1, Math.max(0, (key - lowestKey) / 
  * together, not strummed. A preferred Voicing is kept by its inversion,
  * which of the Chord's tones is lowest, not by its keys.
  */
-export function piano(): Instrument<PianoVoicing, Keys, number> {
+export function piano(): Instrument<PianoVoicing, PianoKeys, number> {
   return {
     voicings: pianoVoicings,
     placement: (voicing) => voicing.keys,

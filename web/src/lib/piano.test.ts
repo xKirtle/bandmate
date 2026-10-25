@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { firstVoicing, lookUp, type PianoVoicing } from './chordFinder';
+import { firstVoicing, lookUp, strummed, voicingPlucks, type PianoVoicing } from './chordFinder';
 
 // The piano in the Chord Finder (ADR 0012), through its seam: one hand's
 // Voicings, each inversion in close position, round middle C, drawn on a
@@ -84,5 +84,16 @@ describe("Look up's piano Voicings", () => {
 describe("Suggest's piano Voicing", () => {
   it("is the Chord's first: root position", () => {
     expect(firstVoicing('G', piano)?.keys).toEqual([55, 59, 62]);
+  });
+});
+
+describe('hearing a piano Voicing', () => {
+  it('sounds its keys together, not strummed, as the guitar is', () => {
+    expect(strummed(piano)).toBe(false);
+    expect(strummed({ instrument: 'guitar', tuning: [40, 45, 50, 55, 59, 64] })).toBe(true);
+  });
+
+  it("plays its keys' pitches low to high, a slash bass first", () => {
+    expect(voicingPlucks(voicings('Am/G')[0], piano).map((p) => p.pitch)).toEqual([55, 57, 60, 64]);
   });
 });
