@@ -1,6 +1,6 @@
 module github.com/xKirtle/bandmate
 
-go 1.27.0
+go 1.27.3
 
 require modernc.org/sqlite v1.59.0
 
