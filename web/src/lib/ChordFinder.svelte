@@ -140,9 +140,11 @@
   const nothingPlaced = (): Frets => guitarContext.tuning.map(() => null);
   let placed = $state(nothingPlaced());
   let pressed = $state<PianoKeys>([]);
-  const named = $derived(piano ? nameIt(pressed, context) : nameIt(placed, guitarContext));
+  // What's placed on the Instrument, and the context it's read in.
+  const nameItOn = $derived(piano ? { placement: pressed, context } : { placement: placed, context: guitarContext });
+  const named = $derived(nameIt(nameItOn.placement, nameItOn.context));
   // Hearing or arpeggiating it plays it even when it reads as no Chord.
-  const placedPlucks = $derived(piano ? plucks(pressed, context) : plucks(placed, guitarContext));
+  const placedPlucks = $derived(plucks(nameItOn.placement, nameItOn.context));
   const placedName = $derived(named.kind === 'chord' ? named.readings[0] : piano ? 'these keys' : 'this Chord shape');
 
   /** A key tapped on Name it's piano: pressed, or let go if it was pressed. */
@@ -462,7 +464,7 @@
           </div>
           <div class="board" class:piano>
             {#if piano}
-              <PianoDiagram {pressed} label="Piano" ontoggle={toggleKey} />
+              <PianoDiagram {pressed} ontoggle={toggleKey} />
             {:else}
               <Fretboard bind:frets={placed} />
             {/if}

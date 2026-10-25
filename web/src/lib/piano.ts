@@ -37,7 +37,7 @@ export const isBlackKey = (key: number) => [1, 3, 6, 8, 10].includes(pitchClass(
 export const pianoKeyName = (key: number) => commonNote(key) + (Math.floor(key / 12) - 1);
 
 /** Middle C, C4. */
-const middleC = 60;
+export const middleC = 60;
 /**
  * Where the right hand's lowest key is placed as near as fits: between
  * middle C and the C# above, so it lands from G3 to F#4, round middle C.

@@ -10,10 +10,10 @@
   // Chord diagram, it's never mirrored for a left-handed player: a piano's
   // low notes are on the left either way. The Chord Finder draws a piano
   // Voicing with it, and Name it plays it: given ontoggle, tapping a key
-  // presses it or lets it go, and the keyboard is one tab stop, ← and →
-  // moving a semitone, Home and End to the ends.
+  // presses it or lets it go, and it's one tab stop, ← and → moving a
+  // semitone, Home and End to the ends.
   import { tick } from 'svelte';
-  import { highestKey, isBlackKey, lowestKey, pianoKeyName, type PianoKeys } from './piano';
+  import { highestKey, isBlackKey, lowestKey, middleC, pianoKeyName, type PianoKeys } from './piano';
 
   let {
     pressed,
@@ -22,8 +22,8 @@
   }: {
     /** The keys pressed, as MIDI note numbers. */
     pressed: PianoKeys;
-    /** What a drawing is read out as, e.g. "B7 on the piano: B3 D#4 F#4 A4"; a played keyboard reads out each key instead. */
-    label: string;
+    /** What a drawing is read out as, e.g. "B7 on the piano: B3 D#4 F#4 A4". Played, it's a group called Piano, each key read out by its name and whether it's pressed. */
+    label?: string;
     /** Makes it playable: a key tapped is pressed, or let go if it was pressed. */
     ontoggle?: (key: number) => void;
   } = $props();
@@ -34,11 +34,11 @@
   /** A black key's centre, on the line between the white keys either side, as a share of the keyboard's width. */
   const blackAt = (key: number) => ((whites.indexOf(key - 1) + 1) / whites.length) * 100;
 
-  const down = $derived(new Set(pressed));
+  const isPressed = $derived(new Set(pressed));
 
   // Played, the one key in the tab order: where focus last was, middle C at first.
-  let focused = $state(60);
-  let keyboard: HTMLDivElement;
+  let focused = $state(middleC);
+  let drawn: HTMLDivElement;
 
   async function move(e: KeyboardEvent, key: number) {
     const moves: Record<string, number> = {
@@ -52,27 +52,28 @@
     e.preventDefault();
     focused = Math.max(lowestKey, Math.min(highestKey, to));
     await tick();
-    keyboard.querySelector<HTMLButtonElement>('[tabindex="0"]')?.focus();
+    drawn.querySelector<HTMLButtonElement>('[tabindex="0"]')?.focus();
   }
 </script>
 
 {#snippet face(key: number)}
-  {#if down.has(key)}<span class="dot"></span>{/if}
+  {#if isPressed.has(key)}<span class="dot"></span>{/if}
   <!-- Every white key keeps a line for a C's name, so pressed keys' dots line up. -->
   {#if !isBlackKey(key)}<span class="c">{key % 12 === 0 ? pianoKeyName(key) : ''}</span>{/if}
 {/snippet}
 
-{#snippet keyOf(key: number)}
-  {@const style = isBlackKey(key) ? `left: ${blackAt(key)}%` : undefined}
+{#snippet pianoKey(key: number)}
+  {@const black = isBlackKey(key)}
+  {@const style = black ? `left: ${blackAt(key)}%` : undefined}
   {#if ontoggle}
     <button
       type="button"
-      class={isBlackKey(key) ? 'black' : 'white'}
-      class:pressed={down.has(key)}
+      class={black ? 'black' : 'white'}
+      class:pressed={isPressed.has(key)}
       {style}
       tabindex={focused === key ? 0 : -1}
       aria-label={pianoKeyName(key)}
-      aria-pressed={down.has(key)}
+      aria-pressed={isPressed.has(key)}
       onclick={() => ontoggle(key)}
       onkeydown={(e) => move(e, key)}
       onfocus={() => (focused = key)}
@@ -80,15 +81,15 @@
       {@render face(key)}
     </button>
   {:else}
-    <span class={isBlackKey(key) ? 'black' : 'white'} class:pressed={down.has(key)} {style}>
+    <span class={black ? 'black' : 'white'} class:pressed={isPressed.has(key)} {style}>
       {@render face(key)}
     </span>
   {/if}
 {/snippet}
 
-<div bind:this={keyboard} class="piano" role={ontoggle ? 'group' : 'img'} aria-label={ontoggle ? 'Piano' : label}>
-  {#each whites as key (key)}{@render keyOf(key)}{/each}
-  {#each blacks as key (key)}{@render keyOf(key)}{/each}
+<div bind:this={drawn} class="piano" role={ontoggle ? 'group' : 'img'} aria-label={ontoggle ? 'Piano' : label}>
+  {#each whites as key (key)}{@render pianoKey(key)}{/each}
+  {#each blacks as key (key)}{@render pianoKey(key)}{/each}
 </div>
 
 <style>
@@ -162,7 +163,7 @@
   button.pressed:focus-visible {
     outline-color: var(--accent-text);
   }
-  /* Under a pointer, a key not pressed shows a faint dot where tapping it puts one, as a fret does. */
+  /* Under a pointer, a key not pressed shows a faint accent dot where tapping it puts one. */
   @media (hover: hover) {
     button:not(.pressed):hover::before {
       content: '';

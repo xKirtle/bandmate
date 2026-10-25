@@ -101,8 +101,10 @@ test('Name it on the piano reads the keys pressed, the lowest as the bass, and s
   await expect(best).toHaveText('C/E');
   await expect(nameIt.getByText('Notes E C G')).toBeVisible();
   await key('E3').click();
+  await key('E4').click();
   await expect(key('E3')).toHaveAttribute('aria-pressed', 'false');
   await expect(best).toHaveText('C');
+  await expect(nameIt.getByText('Notes C E G')).toBeVisible();
 
   // From a computer keyboard it's one tab stop: arrows move a semitone, Home and End go to the ends.
   await key('G4').focus();
@@ -126,7 +128,7 @@ test('Name it on the piano reads the keys pressed, the lowest as the bass, and s
   await expect(page.getByRole('tab', { name: 'Look up' })).toHaveAttribute('aria-selected', 'true');
   await expect(page.getByRole('heading', { name: 'C', exact: true })).toBeVisible();
 
-  // Switching Instruments empties Name it, its C4 and G4 still pressed.
+  // Switching Instruments empties Name it, its C4, E4 and G4 still pressed.
   await pickInstrument(page, 'Guitar');
   await pickInstrument(page, 'Piano');
   await page.getByRole('tab', { name: 'Name it' }).click();
