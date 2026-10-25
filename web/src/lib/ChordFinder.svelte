@@ -4,6 +4,7 @@
   import { tick } from 'svelte';
   import ChordDiagram from './ChordDiagram.svelte';
   import {
+    finderInstrument,
     firstVoicing,
     joinKey,
     keyText,
@@ -11,6 +12,7 @@
     nameIt,
     plucks,
     qualities,
+    voicingPlucks,
     roots,
     otherQuality,
     splitKey,
@@ -67,9 +69,10 @@
   // name that could be read.
   let name = $state('C');
   let picked = $state<{ root: string; quality: string; bass: string | null }>({ root: 'C', quality: '', bass: null });
-  // The Finder's context with the user's preferred Voicings in its tuning:
-  // what Look up lists first, and what Suggest draws.
-  const finderContext = $derived({ ...context, preferred: preferredVoicings.of(context.tuning) });
+  // The Finder's context with the user's preferred Voicings on its
+  // Instrument: what Look up lists first, and what Suggest draws.
+  const instrument = $derived(finderInstrument(context));
+  const finderContext = $derived({ ...context, preferred: preferredVoicings.of(instrument) });
   const found = $derived(lookUp(name, finderContext));
 
   /** How many Voicings show at once; the rest are a page away. */
@@ -101,7 +104,7 @@
 
   async function prefer(voicing: Voicing | null) {
     if (found.kind !== 'chord') return;
-    preferredVoicings.set(context.tuning, found.name, voicing?.frets ?? null);
+    preferredVoicings.set(instrument, found.name, voicing && instrument.preference(voicing));
     page = 0;
     await tick();
     list?.querySelector<HTMLButtonElement>('.prefer')?.focus();
@@ -198,11 +201,11 @@
         </p>
         <p class="reason muted">{s.reason}</p>
         {#if voicing}
-          {@const voicingPlucks = plucks(voicing.frets, finderContext)}
+          {@const heard = voicingPlucks(voicing, finderContext)}
           <ChordDiagram {voicing} name={s.chord} />
           <div class="voicing-actions">
-            <HearButton chord={s.chord} plucks={voicingPlucks} />
-            <ArpeggiateButton chord={s.chord} plucks={voicingPlucks} />
+            <HearButton chord={s.chord} plucks={heard} />
+            <ArpeggiateButton chord={s.chord} plucks={heard} />
             <button
               type="button"
               class="button quiet more"
@@ -321,13 +324,13 @@
               {#each shown as voicing, i (page * pageSize + i)}
                 {@const rank = page * pageSize + i}
                 {@const preferred = found.preferred && rank === 0}
-                {@const voicingPlucks = plucks(voicing.frets, finderContext)}
+                {@const heard = voicingPlucks(voicing, finderContext)}
                 <li class:preferred>
                   <ChordDiagram {voicing} name={found.name} />
                   <span class="rank muted">{preferred ? 'Preferred' : rank + 1}</span>
                   <div class="voicing-actions">
-                    <HearButton chord={found.name} plucks={voicingPlucks} />
-                    <ArpeggiateButton chord={found.name} plucks={voicingPlucks} />
+                    <HearButton chord={found.name} plucks={heard} />
+                    <ArpeggiateButton chord={found.name} plucks={heard} />
                     {#if preferred}
                       <button
                         type="button"

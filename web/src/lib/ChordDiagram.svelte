@@ -4,11 +4,11 @@
   // neck or at its barre) at the top. Above it, ○ marks a string that rings open and × one
   // that's muted. On a left-handed device it's mirrored, the low string on
   // the right. The Chord Finder and the Chord Chart both draw with it.
-  import type { Voicing } from './chordFinder';
+  import type { GuitarVoicing } from './chordFinder';
   import { diagramStartFret } from './guitar';
   import { leftHanded } from './sharedLeftHanded.svelte';
 
-  let { voicing, name }: { voicing: Voicing; name: string } = $props();
+  let { voicing, name }: { voicing: GuitarVoicing; name: string } = $props();
 
   /** How many frets the diagram shows. A Voicing spans four at most. */
   const rows = 5;

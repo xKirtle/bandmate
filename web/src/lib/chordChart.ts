@@ -4,7 +4,15 @@
 
 import type { Song } from './api';
 import { hasChords } from './chords';
-import { chordName, lookUp, readTuning, standard, type FinderContext, type Voicing } from './chordFinder';
+import {
+  chordName,
+  finderInstrument,
+  lookUp,
+  readTuning,
+  standard,
+  type FinderContext,
+  type GuitarVoicing,
+} from './chordFinder';
 import { activeAlternate, sectionsInArrangement } from './sections';
 import { transposeChord } from './transpose';
 
@@ -51,13 +59,21 @@ export function chartTuning(text: string): readonly number[] | null {
 }
 
 /**
+ * The Instrument the Chord Chart draws: the guitar, in the tuning it draws
+ * for (from chartTuning). Its preferred Voicings are the Chord Finder's.
+ */
+export function chartInstrument(tuning: readonly number[]) {
+  return finderInstrument({ instrument: 'guitar', tuning });
+}
+
+/**
  * What the Chord Chart draws for a Chord as shown: the preferred Voicing of
  * it in the tuning, else the top-ranked one, as the Chord Finder would, and
  * as a Chord's popover opens on. Or why it draws none: the Chord can't be read, it has no
  * Voicing in the tuning, or the tuning can't be read (null, from chartTuning).
  */
 export type ChartVoicing =
-  | { kind: 'voicing'; voicing: Voicing }
+  | { kind: 'voicing'; voicing: GuitarVoicing }
   | { kind: 'unreadable-chord' }
   | { kind: 'no-voicing' }
   | { kind: 'unreadable-tuning' };
@@ -81,7 +97,7 @@ export function chartVoicing(
  * why there are none to step through: the Chord or the tuning can't be read.
  */
 export type ChartVoicings =
-  | { kind: 'voicings'; chord: string; voicings: Voicing[]; preferred: boolean }
+  | { kind: 'voicings'; chord: string; voicings: GuitarVoicing[]; preferred: boolean }
   | { kind: 'unreadable-chord' }
   | { kind: 'unreadable-tuning' };
 

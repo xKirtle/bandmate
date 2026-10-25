@@ -3,7 +3,7 @@
   // the tuning, standard tuning until picked, and the Key Suggest suggests
   // from, C major until picked. The last ones picked are kept on this device.
   import ChordFinder from '../lib/ChordFinder.svelte';
-  import { readTuning, standard } from '../lib/chordFinder';
+  import { readTuning, standard, type FinderContext } from '../lib/chordFinder';
   import { deviceStorage } from '../lib/deviceStorage';
   import { readFinderKey, readFinderTuning, storeFinderKey, storeFinderTuning } from '../lib/finderSetup';
   import TuningField from '../lib/TuningField.svelte';
@@ -12,7 +12,7 @@
   let tuningError = $state('');
   let suggestKey = $state(readFinderKey(deviceStorage()));
 
-  const context = $derived({ tuning: readTuning(tuning) ?? standard });
+  const context = $derived<FinderContext>({ instrument: 'guitar', tuning: readTuning(tuning) ?? standard });
 
   function keep() {
     tuningError = '';

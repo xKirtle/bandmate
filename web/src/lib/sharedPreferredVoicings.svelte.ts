@@ -6,22 +6,24 @@ import {
   readPreferredVoicings,
   storePreferredVoicing,
   withPreference,
+  type PreferredOn,
   type PreferredVoicings,
 } from './preferredVoicings';
 
-// The preferred Voicings on this device, per tuning, shared by every Chord
-// Finder and the Chord Chart, so preferring one moves it first wherever that
-// Chord shows.
+// The preferred Voicings on this device, per Instrument (and on the guitar
+// per tuning), shared by every Chord Finder and the Chord Chart, so
+// preferring one moves it first wherever that Chord shows.
 
-const changed = new SvelteMap<string, PreferredVoicings>();
+const changed = new SvelteMap<string, PreferredVoicings<unknown>>();
 
 export const preferredVoicings = {
-  /** Each Chord's preferred Voicing in a tuning on this device. */
-  of: (tuning: readonly number[]): PreferredVoicings =>
-    changed.get(preferredVoicingsKey(tuning)) ?? readPreferredVoicings(deviceStorage(), tuning),
-  /** Prefers a Voicing of a Chord in a tuning on this device, or clears the preference with null. */
-  set(tuning: readonly number[], chord: string, frets: Frets | null) {
-    changed.set(preferredVoicingsKey(tuning), withPreference(preferredVoicings.of(tuning), chord, frets));
-    storePreferredVoicing(deviceStorage(), tuning, chord, frets);
+  /** Each Chord's preferred Voicing on an Instrument, or the guitar in a tuning, on this device. */
+  of: <Kept = Frets>(on: PreferredOn<Kept>): PreferredVoicings<Kept> =>
+    (changed.get(preferredVoicingsKey(on)) as PreferredVoicings<Kept> | undefined) ??
+    readPreferredVoicings(deviceStorage(), on),
+  /** Prefers a Voicing of a Chord on an Instrument on this device, as it keeps one, or clears the preference with null. */
+  set<Kept = Frets>(on: PreferredOn<Kept>, chord: string, preference: Kept | null) {
+    changed.set(preferredVoicingsKey(on), withPreference(preferredVoicings.of(on), chord, preference));
+    storePreferredVoicing(deviceStorage(), on, chord, preference);
   },
 };

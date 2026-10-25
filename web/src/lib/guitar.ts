@@ -4,6 +4,10 @@
 // players use come first. So any tuning works.
 
 import type { Chord } from './chordTheory';
+import type { Instrument, Pluck } from './instrument';
+
+/** The frets placed on a guitar, low string to high: 0 for open, null for muted. */
+export type Frets = readonly (number | null)[];
 
 /** A barre: one finger flat across strings at a fret. Strings count from the lowest, 0. */
 export interface Barre {
@@ -13,7 +17,7 @@ export interface Barre {
 }
 
 /** One way to play a Chord on the guitar. */
-export interface Voicing {
+export interface GuitarVoicing {
   /** Each string's fret, low string to high: 0 for open, null for muted. */
   frets: (number | null)[];
   /** The barre the Voicing needs, if it can't be played with four fingers otherwise. */
@@ -81,13 +85,13 @@ const height = (frets: (number | null)[]) => frets.reduce<number>((sum, f) => su
  * string (treble strings may be muted), and fits a hand: four frets, four
  * fingers, a barre counting as one. A slash Chord's bass is its lowest note.
  */
-export function guitarVoicings(chord: Chord, tuning: readonly number[]): Voicing[] {
+function guitarVoicings(chord: Chord, tuning: readonly number[]): GuitarVoicing[] {
   const pitchClass = (string: number, fret: number) => (tuning[string] + fret) % 12;
   const tones = new Set(chord.quality.tones.map((t) => (chord.root + t.semitones) % 12));
   const required = chord.quality.tones.filter((t) => !t.optional).map((t) => (chord.root + t.semitones) % 12);
   const lowest = chord.bass ?? chord.root;
 
-  const found: { voicing: Voicing; score: number; height: number }[] = [];
+  const found: { voicing: GuitarVoicing; score: number; height: number }[] = [];
   const frets: (number | null)[] = [];
 
   function finish() {
@@ -141,18 +145,10 @@ export function guitarVoicings(chord: Chord, tuning: readonly number[]): Voicing
  * a barre's fret, so the barre lies on the first row; else 1, under the nut,
  * for a Voicing that fits there; else the lowest fret the Voicing presses.
  */
-export function diagramStartFret(voicing: Voicing, rows: number): number {
+export function diagramStartFret(voicing: GuitarVoicing, rows: number): number {
   if (voicing.barre) return voicing.barre.fret;
   const fretted = voicing.frets.filter((f): f is number => f !== null && f > 0);
   return fretted.length === 0 || Math.max(...fretted) <= rows ? 1 : Math.min(...fretted);
-}
-
-/** One string plucked: its pitch, and how bright it sounds. */
-export interface Pluck {
-  /** As a MIDI note number. */
-  pitch: number;
-  /** From dark, near 0, to bright, 1: the open top string. */
-  brightness: number;
 }
 
 /** How much darker a string sounds an octave up the neck: a shorter length rings with fewer overtones. */
@@ -165,7 +161,7 @@ const octaveUpDarkens = 0.5;
  * the neck it's fretted, so the same note sounds warmer on a thicker string
  * up the neck than open on a thin one.
  */
-export function guitarPlucks(frets: readonly (number | null)[], tuning: readonly number[]): Pluck[] {
+function guitarPlucks(frets: Frets, tuning: readonly number[]): Pluck[] {
   const thinnest = Math.max(1, tuning.length - 1);
   return frets.flatMap((fret, string) => {
     if (fret === null) return [];
@@ -176,9 +172,23 @@ export function guitarPlucks(frets: readonly (number | null)[], tuning: readonly
 }
 
 /**
- * The notes a shape placed on a guitar sounds, as semitones from C, 0–11,
- * low string to high.
+ * The guitar in a tuning, its strings' pitches low to high as MIDI note
+ * numbers. The notes placed on it are its frets, and a preferred Voicing is
+ * kept by its frets, per tuning: a Voicing preferred in standard tuning
+ * doesn't pick a wrong one in Drop D. The tuning is kept by its pitches, so
+ * "Drop D" and "D A D G B E" share.
  */
-export function guitarNotes(frets: readonly (number | null)[], tuning: readonly number[]): number[] {
-  return guitarPlucks(frets, tuning).map((p) => p.pitch % 12);
+export function guitar(tuning: readonly number[]): Instrument<GuitarVoicing, Frets, Frets> {
+  return {
+    voicings: (chord) => guitarVoicings(chord, tuning),
+    placement: (voicing) => voicing.frets,
+    plucks: (frets) => guitarPlucks(frets, tuning),
+    preferredStorageKey: `bandmate.preferredVoicings.guitar.${tuning.join('-')}`,
+    preference: (voicing) => voicing.frets,
+    prefers: (voicing, frets) => voicing.frets.length === frets.length && voicing.frets.every((f, i) => f === frets[i]),
+    isPreference: (kept): kept is Frets =>
+      Array.isArray(kept) &&
+      kept.length === tuning.length &&
+      kept.every((f) => f === null || (Number.isInteger(f) && f >= 0)),
+  };
 }
