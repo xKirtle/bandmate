@@ -32,7 +32,7 @@
   import type { Song } from './api';
   import ChordDiagram from './ChordDiagram.svelte';
   import { chartTuning, chartVoicings } from './chordChart';
-  import { plucks } from './chordFinder';
+  import { voicingPlucks } from './chordFinder';
   import HearButton from './HearButton.svelte';
   import { following, popoverLeft, popoverTop } from './popover';
   import { preferredVoicings } from './sharedPreferredVoicings.svelte';
@@ -187,7 +187,7 @@
       </div>
       <div class="actions">
         {#if tuning}
-          <HearButton chord={opened.name} plucks={plucks(voicing.frets, { tuning })} />
+          <HearButton chord={opened.name} plucks={voicingPlucks(voicing, { tuning })} />
         {/if}
         <!-- One button, so focus stays on it as Prefer turns to Clear. -->
         <button

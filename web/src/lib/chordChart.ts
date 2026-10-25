@@ -4,7 +4,7 @@
 
 import type { Song } from './api';
 import { hasChords } from './chords';
-import { chordName, lookUp, readTuning, standard, type FinderContext, type Voicing } from './chordFinder';
+import { chordName, lookUp, readTuning, standard, type FinderContext, type GuitarVoicing } from './chordFinder';
 import { activeAlternate, sectionsInArrangement } from './sections';
 import { transposeChord } from './transpose';
 
@@ -57,7 +57,7 @@ export function chartTuning(text: string): readonly number[] | null {
  * Voicing in the tuning, or the tuning can't be read (null, from chartTuning).
  */
 export type ChartVoicing =
-  | { kind: 'voicing'; voicing: Voicing }
+  | { kind: 'voicing'; voicing: GuitarVoicing }
   | { kind: 'unreadable-chord' }
   | { kind: 'no-voicing' }
   | { kind: 'unreadable-tuning' };
@@ -81,7 +81,7 @@ export function chartVoicing(
  * why there are none to step through: the Chord or the tuning can't be read.
  */
 export type ChartVoicings =
-  | { kind: 'voicings'; chord: string; voicings: Voicing[]; preferred: boolean }
+  | { kind: 'voicings'; chord: string; voicings: GuitarVoicing[]; preferred: boolean }
   | { kind: 'unreadable-chord' }
   | { kind: 'unreadable-tuning' };
 
