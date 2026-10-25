@@ -25,7 +25,6 @@
     suggest,
     tonics,
     type FinderContext,
-    type GuitarVoicing,
     type Frets,
     type KeyParts,
     type PianoKeys,
@@ -116,13 +115,14 @@
 
   // Preferring a Voicing moves it first, so the first page shows it, and
   // focus follows it there; clearing one leaves focus on the first Voicing.
-  // Only on the guitar, so far.
+  // It's kept as the Instrument keeps one, apart from the other's: on the
+  // guitar its frets in the tuning, on the piano its inversion.
   let list: HTMLOListElement | undefined = $state();
 
-  async function prefer(voicing: GuitarVoicing | null) {
-    if (found.kind !== 'chord' || context.instrument === 'piano') return;
-    const guitar = finderInstrument(context);
-    preferredVoicings.set(guitar, found.name, voicing && guitar.preference(voicing));
+  async function prefer(voicing: Voicing | null) {
+    if (found.kind !== 'chord') return;
+    const instrument = finderInstrument(context);
+    preferredVoicings.set(instrument, found.name, voicing && instrument.preference(voicing));
     page = 0;
     await tick();
     list?.querySelector<HTMLButtonElement>('.prefer')?.focus();
@@ -243,6 +243,20 @@
     <PianoDiagram pressed={voicing.keys} label="{chord} on the piano: {voicing.notes.join(' ')}" />
   {:else}
     <ChordDiagram {voicing} name={chord} />
+  {/if}
+{/snippet}
+
+<!-- A Look up card's Prefer, titled to say where it's kept, or Clear on the preferred one. -->
+{#snippet preferButton(voicing: Voicing, preferred: boolean, title: string)}
+  {#if preferred}
+    <button
+      type="button"
+      class="button prefer"
+      title="Stop preferring this Voicing, putting the best-ranked one first again"
+      onclick={() => prefer(null)}>Clear</button
+    >
+  {:else}
+    <button type="button" class="button prefer" {title} onclick={() => prefer(voicing)}>Prefer</button>
   {/if}
 {/snippet}
 
@@ -386,15 +400,21 @@
                 {@const preferred = found.preferred && rank === 0}
                 {@const heard = voicingPlucks(voicing, finderContext)}
                 {#if isPianoVoicing(voicing)}
-                  <li>
+                  <li class:preferred>
                     {@render drawing(voicing, found.name)}
                     <span class="inversion">
                       {inversionNames[voicing.inversion]}{voicing.left.length ? ' over ' + found.bass : ''}
                     </span>
                     <span class="keys muted">{voicing.notes.join(' ')}</span>
+                    {#if preferred}<span class="rank">Preferred</span>{/if}
                     <div class="voicing-actions">
                       <HearButton chord={found.name} plucks={heard} strummed={hearStrummed} />
                       <ArpeggiateButton chord={found.name} plucks={heard} />
+                      {@render preferButton(
+                        voicing,
+                        preferred,
+                        `Show this Voicing of ${found.name} first on the piano`,
+                      )}
                     </div>
                   </li>
                 {:else}
@@ -404,21 +424,11 @@
                     <div class="voicing-actions">
                       <HearButton chord={found.name} plucks={heard} />
                       <ArpeggiateButton chord={found.name} plucks={heard} />
-                      {#if preferred}
-                        <button
-                          type="button"
-                          class="button prefer"
-                          title="Stop preferring this Voicing, putting the best-ranked one first again"
-                          onclick={() => prefer(null)}>Clear</button
-                        >
-                      {:else}
-                        <button
-                          type="button"
-                          class="button prefer"
-                          title="Show this Voicing of {found.name} first in this tuning"
-                          onclick={() => prefer(voicing)}>Prefer</button
-                        >
-                      {/if}
+                      {@render preferButton(
+                        voicing,
+                        preferred,
+                        `Show this Voicing of ${found.name} first in this tuning`,
+                      )}
                     </div>
                   </li>
                 {/if}
@@ -671,6 +681,10 @@
   .preferred .rank {
     color: var(--text);
     font-weight: 600;
+  }
+  /* A piano card's buttons at its foot, level with the rest of its row, though the preferred card says so on a line more. */
+  .voicings.piano .voicing-actions {
+    margin-top: auto;
   }
   /* A Voicing's buttons under its diagram, side by side, wrapping onto a second line where the card is narrow, as on a phone. */
   .voicing-actions {
