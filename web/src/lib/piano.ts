@@ -138,7 +138,9 @@ const brightness = (key: number) => Math.min(1, Math.max(0, (key - lowestKey) / 
 /**
  * The piano. The notes placed on it are its keys, and Hear sounds them
  * together, not strummed. A preferred Voicing is kept by its inversion,
- * which of the Chord's tones is lowest, not by its keys.
+ * which of the Chord's tones is lowest, not by its keys. It counts the
+ * hand's tones, so it survives the keys' placement being tuned, but not a
+ * change to which optional tones a Chord of more than four notes leaves out.
  */
 export function piano(): Instrument<PianoVoicing, PianoKeys, number> {
   return {

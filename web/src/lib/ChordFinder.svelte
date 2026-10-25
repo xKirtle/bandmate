@@ -682,7 +682,7 @@
     color: var(--text);
     font-weight: 600;
   }
-  /* A piano card's buttons at its foot, level with the rest of its row, though the preferred card says so on a line more. */
+  /* A piano card's buttons at its foot, level with the rest of its row, though the preferred card has a line more saying so. */
   .voicings.piano .voicing-actions {
     margin-top: auto;
   }

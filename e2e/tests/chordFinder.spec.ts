@@ -41,10 +41,7 @@ test('custom tuning notes that can’t be read say so, and are kept to fix', asy
 
 // The first string Name it's fretboard draws: the low one, or the high one mirrored.
 const firstString = (page: Page) =>
-  page
-    .getByRole('group', { name: 'Fretboard' })
-    .getByRole('button', { name: /string: / })
-    .first();
+  page.getByRole('group', { name: 'Fretboard' }).getByRole('button', { name: /string: / }).first();
 const leftHanded = (page: Page) => page.getByRole('switch', { name: 'Left-handed' });
 
 test('Left-handed, set in Settings, mirrors the fretboard: the Chord Finder has no switch of its own', async ({
@@ -65,7 +62,8 @@ test('Left-handed, set in Settings, mirrors the fretboard: the Chord Finder has 
 
 // Each line a row of things starts on, top to bottom.
 async function lines(boxes: Locator) {
-  return new Set(await Promise.all((await boxes.all()).map(async (b) => Math.round((await b.boundingBox())!.y)))).size;
+  return new Set(await Promise.all((await boxes.all()).map(async (b) => Math.round((await b.boundingBox())!.y))))
+    .size;
 }
 
 test('on a phone, the tabs keep one row and Look up’s fields fit on two', async ({ page }) => {
