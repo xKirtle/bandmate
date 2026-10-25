@@ -68,9 +68,10 @@ function stack(pitchClasses: number[], from: number): number[] {
  * the bass the nearest key under the right hand. Null if it can't fit.
  */
 function place(pitchClasses: number[], bass: number | null): number[] | null {
-  const placements = [-2, -1, 0, 1, 2]
+  const placements = [-1, 0]
     .map((octave) => {
-      // The right hand's lowest key in each octave, from two below middle C's to two above.
+      // The right hand's lowest key in the octave from middle C, or the one
+      // below it: an octave higher would start on C5 or above.
       const from = middleC + 12 * octave + pitchClass(pitchClasses[0] - middleC);
       const right = stack(pitchClasses, from);
       return bass === null ? right : [from - 1 - pitchClass(from - 1 - bass), ...right];
@@ -101,9 +102,11 @@ function spelledKey(key: number, note: string): string {
  * inversion in turn. A slash Chord's inversion with its bass lowest comes
  * first, then the rest, each with the bass under it in the left hand. An
  * inversion that can't fit between C3 and C5 with its bass is left out, but
- * every Chord keeps one: an inversion alone spans under an octave, and so
- * does a bass under the inversion that starts on the next tone above it,
- * and two octaves always hold a span of an octave.
+ * every Chord keeps one, as each of these spans under an octave, which two
+ * octaves always hold: a Chord's inversions without a bass; a slash Chord's
+ * inversion on its bass, when the bass is one of the hand's tones; and
+ * otherwise the inversion on the next tone above the bass, with the bass
+ * under it.
  */
 function pianoVoicings(chord: Chord): PianoVoicing[] {
   const tones = handTones(chord).map((t) => pitchClass(chord.root + t.semitones));

@@ -3,13 +3,13 @@
   // on every diagram so they compare at a glance: each key pressed filled
   // with the accent and marked with a dot, so it's told by its mark and not
   // by colour alone (no accent reaches 3:1 against both key colours in every
-  // Palette), and each C named, middle C among them. A white key is 1 wide to 4.5
-  // tall whatever the room, so the height follows the width, which grows
-  // with the room up to the widest key; where the room is narrower than the
-  // keyboard at its narrowest key (a phone under about 340px), it shrinks to
-  // fit. Unlike a Chord diagram, it's never mirrored for a left-handed
-  // player: a piano's low notes are on the left either way. The Chord Finder
-  // draws with it.
+  // Palette), and each C named, middle C among them. A white key is 1 wide
+  // to 4.5 tall whatever the room, so the height follows the width, which
+  // grows with the room up to the widest key; where the room is narrower
+  // than the keyboard at its narrowest key (a phone under about 340px), it
+  // shrinks to fit. Unlike a Chord diagram, it's never mirrored for a
+  // left-handed player: a piano's low notes are on the left either way. The
+  // Chord Finder draws with it.
   import type { PianoVoicing } from './chordFinder';
   import { highestKey, isBlackKey, lowestKey } from './piano';
 
@@ -30,14 +30,17 @@
 
 <div class="piano" role="img" aria-label={label}>
   {#each whites as key (key)}
-    <span class="white" class:pressed={pressed.has(key)}>
-      {#if pressed.has(key)}<span class="dot"></span>{/if}
-      {#if key % 12 === 0}<span class="c">{cName(key)}</span>{/if}
+    {@const down = pressed.has(key)}
+    <!-- Every white key keeps a line for a C's name, so pressed keys' dots line up. -->
+    <span class="white" class:pressed={down}>
+      {#if down}<span class="dot"></span>{/if}
+      <span class="c">{key % 12 === 0 ? cName(key) : ''}</span>
     </span>
   {/each}
   {#each blacks as key (key)}
-    <span class="black" class:pressed={pressed.has(key)} style:left="{blackAt(key)}%">
-      {#if pressed.has(key)}<span class="dot"></span>{/if}
+    {@const down = pressed.has(key)}
+    <span class="black" class:pressed={down} style:left="{blackAt(key)}%">
+      {#if down}<span class="dot"></span>{/if}
     </span>
   {/each}
 </div>
@@ -95,6 +98,7 @@
     color: var(--piano-black);
     font-size: var(--text-xs);
     line-height: 1;
+    min-height: 1lh;
   }
   .pressed .c {
     color: var(--accent-text);
