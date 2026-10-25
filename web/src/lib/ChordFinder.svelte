@@ -1,9 +1,14 @@
 <script lang="ts">
   // The Chord Finder's three tabs: Look up, Name it and Suggest, as its own
-  // page shows them. It lays itself out by its own width, not the window's.
+  // page shows them, on the Instrument picked there: a Voicing is drawn as a
+  // Chord diagram on the guitar and a keyboard on the piano. Switching
+  // Instruments keeps the Chord looked up and the Key suggested from. It
+  // lays itself out by its own width, not the window's.
   import { tick } from 'svelte';
   import ChordDiagram from './ChordDiagram.svelte';
   import {
+    finderInstrument,
+    isPianoVoicing,
     firstVoicing,
     joinKey,
     keyText,
@@ -11,14 +16,18 @@
     nameIt,
     plucks,
     qualities,
+    voicingPlucks,
     roots,
     otherQuality,
     splitKey,
+    standard,
+    strummed,
     suggest,
     tonics,
     type FinderContext,
     type Frets,
     type KeyParts,
+    type PianoKeys,
     type Suggestion,
     type Voicing,
   } from './chordFinder';
@@ -26,6 +35,7 @@
   import HearButton from './HearButton.svelte';
   import ArpeggiateButton from './ArpeggiateButton.svelte';
   import { preferredVoicings } from './sharedPreferredVoicings.svelte';
+  import PianoDiagram from './PianoDiagram.svelte';
   import Picker from './Picker.svelte';
 
   let {
@@ -67,10 +77,18 @@
   // name that could be read.
   let name = $state('C');
   let picked = $state<{ root: string; quality: string; bass: string | null }>({ root: 'C', quality: '', bass: null });
-  // The Finder's context with the user's preferred Voicings in its tuning:
-  // what Look up lists first, and what Suggest draws.
-  const finderContext = $derived({ ...context, preferred: preferredVoicings.of(context.tuning) });
+  // The Finder's context with the user's preferred Voicings on its
+  // Instrument: what Look up lists first, and what Suggest draws. The two
+  // branches read alike, but each narrows the context to one Instrument, so
+  // its preferences are that Instrument's kind.
+  const piano = $derived(context.instrument === 'piano');
+  const finderContext = $derived.by((): FinderContext =>
+    context.instrument === 'piano'
+      ? { ...context, preferred: preferredVoicings.of(finderInstrument(context)) }
+      : { ...context, preferred: preferredVoicings.of(finderInstrument(context)) },
+  );
   const found = $derived(lookUp(name, finderContext));
+  const hearStrummed = $derived(strummed(context));
 
   /** How many Voicings show at once; the rest are a page away. */
   const pageSize = 8;
@@ -97,26 +115,57 @@
 
   // Preferring a Voicing moves it first, so the first page shows it, and
   // focus follows it there; clearing one leaves focus on the first Voicing.
+  // It's kept as the Instrument keeps one, apart from the other's: on the
+  // guitar its frets in the tuning, on the piano its inversion.
   let list: HTMLOListElement | undefined = $state();
 
   async function prefer(voicing: Voicing | null) {
     if (found.kind !== 'chord') return;
-    preferredVoicings.set(context.tuning, found.name, voicing?.frets ?? null);
+    const instrument = finderInstrument(context);
+    preferredVoicings.set(instrument, found.name, voicing && instrument.preference(voicing));
     page = 0;
     await tick();
     list?.querySelector<HTMLButtonElement>('.prefer')?.focus();
   }
 
+  /** What a piano Voicing's card calls its inversion: which of the Chord's tones is lowest in the right hand. */
+  const inversionNames = ['Root position', '1st inversion', '2nd inversion', '3rd inversion'];
+
   const qualityLabel = (suffix: string) => qualities.find((q) => q.suffix === suffix)?.label ?? suffix;
 
-  // Name it: the shape placed on the fretboard, and what it reads as. It
-  // starts, and clears, with nothing placed: every string muted.
-  const nothingPlaced = (): Frets => context.tuning.map(() => null);
+  // Name it: the shape placed on the fretboard, or the keys pressed on the
+  // piano, and what it reads as. It starts, and clears, with nothing placed:
+  // every string muted, no key pressed. Switching Instruments empties it.
+  const guitarContext = $derived(context.instrument === 'piano' ? { tuning: standard } : context);
+  const nothingPlaced = (): Frets => guitarContext.tuning.map(() => null);
   let placed = $state(nothingPlaced());
-  const named = $derived(nameIt(placed, context));
+  let pressed = $state<PianoKeys>([]);
+  // What's placed on the Instrument, and the context it's read in.
+  const nameItOn = $derived(piano ? { placement: pressed, context } : { placement: placed, context: guitarContext });
+  const named = $derived(nameIt(nameItOn.placement, nameItOn.context));
   // Hearing or arpeggiating it plays it even when it reads as no Chord.
-  const placedPlucks = $derived(plucks(placed, context));
-  const placedName = $derived(named.kind === 'chord' ? named.readings[0] : 'this Chord shape');
+  const placedPlucks = $derived(plucks(nameItOn.placement, nameItOn.context));
+  const placedName = $derived(named.kind === 'chord' ? named.readings[0] : piano ? 'these keys' : 'this Chord shape');
+
+  /** A key tapped on Name it's piano: pressed, or let go if it was pressed. */
+  const toggleKey = (key: number) =>
+    (pressed = pressed.includes(key) ? pressed.filter((k) => k !== key) : [...pressed, key]);
+
+  function clearPlaced() {
+    placed = nothingPlaced();
+    pressed = [];
+  }
+
+  // Switching Instruments starts Look up's Voicings on their first page, and
+  // empties Name it.
+  // svelte-ignore state_referenced_locally
+  let pianoShown = $state(context.instrument === 'piano');
+  $effect.pre(() => {
+    if (piano === pianoShown) return;
+    pianoShown = piano;
+    page = 0;
+    clearPlaced();
+  });
 
   /** Opens a reading in Look up, with focus on its tab. */
   function openInLookUp(reading: string) {
@@ -187,8 +236,32 @@
   }
 </script>
 
+<!-- A Voicing drawn as its Instrument draws one: a keyboard, or a Chord diagram. -->
+{#snippet drawing(voicing: Voicing, chord: string)}
+  {#if isPianoVoicing(voicing)}
+    <!-- Read out low to high, e.g. "B7 on the piano: B3 D#4 F#4 A4". -->
+    <PianoDiagram pressed={voicing.keys} label="{chord} on the piano: {voicing.notes.join(' ')}" />
+  {:else}
+    <ChordDiagram {voicing} name={chord} />
+  {/if}
+{/snippet}
+
+<!-- A Look up card's Prefer, titled to say where it's kept, or Clear on the preferred one. -->
+{#snippet preferButton(voicing: Voicing, preferred: boolean, title: string)}
+  {#if preferred}
+    <button
+      type="button"
+      class="button prefer"
+      title="Stop preferring this Voicing, putting the best-ranked one first again"
+      onclick={() => prefer(null)}>Clear</button
+    >
+  {:else}
+    <button type="button" class="button prefer" {title} onclick={() => prefer(voicing)}>Prefer</button>
+  {/if}
+{/snippet}
+
 {#snippet suggestions(list: Suggestion[], label: string)}
-  <ul class="voicings suggestions" aria-label={label}>
+  <ul class="voicings suggestions" class:piano aria-label={label}>
     {#each list as s (s.numeral + s.chord)}
       {@const voicing = firstVoicing(s.chord, finderContext)}
       <li>
@@ -198,11 +271,11 @@
         </p>
         <p class="reason muted">{s.reason}</p>
         {#if voicing}
-          {@const voicingPlucks = plucks(voicing.frets, finderContext)}
-          <ChordDiagram {voicing} name={s.chord} />
+          {@const heard = voicingPlucks(voicing, finderContext)}
+          {@render drawing(voicing, s.chord)}
           <div class="voicing-actions">
-            <HearButton chord={s.chord} plucks={voicingPlucks} />
-            <ArpeggiateButton chord={s.chord} plucks={voicingPlucks} />
+            <HearButton chord={s.chord} plucks={heard} strummed={hearStrummed} />
+            <ArpeggiateButton chord={s.chord} plucks={heard} />
             <button
               type="button"
               class="button quiet more"
@@ -212,7 +285,7 @@
             >
           </div>
         {:else}
-          <p class="no-voicing muted">No Voicing up to the 12th fret</p>
+          <p class="no-voicing muted">{piano ? 'No Voicing from C3 to C5' : 'No Voicing up to the 12th fret'}</p>
           <button
             type="button"
             class="button quiet more"
@@ -315,45 +388,62 @@
             <p class="notes"><span class="muted">Notes</span> {found.notes.join(' ')}</p>
           </div>
           {#if voicings.length === 0}
-            <p class="muted">No Voicing of {found.name} fits a hand up to the 12th fret.</p>
+            <p class="muted">
+              {piano
+                ? `No Voicing of ${found.name} fits the piano from C3 to C5.`
+                : `No Voicing of ${found.name} fits a hand up to the 12th fret.`}
+            </p>
           {:else}
-            <ol bind:this={list} class="voicings" aria-label="Voicings of {found.name}, best first">
+            <ol bind:this={list} class="voicings" class:piano aria-label="Voicings of {found.name}, best first">
               {#each shown as voicing, i (page * pageSize + i)}
                 {@const rank = page * pageSize + i}
                 {@const preferred = found.preferred && rank === 0}
-                {@const voicingPlucks = plucks(voicing.frets, finderContext)}
-                <li class:preferred>
-                  <ChordDiagram {voicing} name={found.name} />
-                  <span class="rank muted">{preferred ? 'Preferred' : rank + 1}</span>
-                  <div class="voicing-actions">
-                    <HearButton chord={found.name} plucks={voicingPlucks} />
-                    <ArpeggiateButton chord={found.name} plucks={voicingPlucks} />
-                    {#if preferred}
-                      <button
-                        type="button"
-                        class="button prefer"
-                        title="Stop preferring this Voicing, putting the best-ranked one first again"
-                        onclick={() => prefer(null)}>Clear</button
-                      >
-                    {:else}
-                      <button
-                        type="button"
-                        class="button prefer"
-                        title="Show this Voicing of {found.name} first in this tuning"
-                        onclick={() => prefer(voicing)}>Prefer</button
-                      >
-                    {/if}
-                  </div>
-                </li>
+                {@const heard = voicingPlucks(voicing, finderContext)}
+                {#if isPianoVoicing(voicing)}
+                  <li class:preferred>
+                    {@render drawing(voicing, found.name)}
+                    <span class="inversion">
+                      {inversionNames[voicing.inversion]}{voicing.left.length ? ' over ' + found.bass : ''}
+                    </span>
+                    <span class="keys muted">{voicing.notes.join(' ')}</span>
+                    {#if preferred}<span class="rank">Preferred</span>{/if}
+                    <div class="voicing-actions">
+                      <HearButton chord={found.name} plucks={heard} strummed={hearStrummed} />
+                      <ArpeggiateButton chord={found.name} plucks={heard} />
+                      {@render preferButton(
+                        voicing,
+                        preferred,
+                        `Show this Voicing of ${found.name} first on the piano`,
+                      )}
+                    </div>
+                  </li>
+                {:else}
+                  <li class:preferred>
+                    <ChordDiagram {voicing} name={found.name} />
+                    <span class="rank muted">{preferred ? 'Preferred' : rank + 1}</span>
+                    <div class="voicing-actions">
+                      <HearButton chord={found.name} plucks={heard} />
+                      <ArpeggiateButton chord={found.name} plucks={heard} />
+                      {@render preferButton(
+                        voicing,
+                        preferred,
+                        `Show this Voicing of ${found.name} first in this tuning`,
+                      )}
+                    </div>
+                  </li>
+                {/if}
               {/each}
             </ol>
-            <div class="pager">
-              <button type="button" class="button" disabled={page === 0} onclick={() => page--}>Previous</button>
-              <span class="muted" aria-live="polite">
-                {page * pageSize + 1}–{page * pageSize + shown.length} of {voicings.length}
-              </span>
-              <button type="button" class="button" disabled={page >= pages - 1} onclick={() => page++}>Next</button>
-            </div>
+            <!-- A piano's few Voicings fit on one page, which needs no pager. -->
+            {#if !piano || pages > 1}
+              <div class="pager">
+                <button type="button" class="button" disabled={page === 0} onclick={() => page--}>Previous</button>
+                <span class="muted" aria-live="polite">
+                  {page * pageSize + 1}–{page * pageSize + shown.length} of {voicings.length}
+                </span>
+                <button type="button" class="button" disabled={page >= pages - 1} onclick={() => page++}>Next</button>
+              </div>
+            {/if}
           {/if}
         {/if}
       {:else if t.id === 'name-it'}
@@ -376,16 +466,22 @@
               <p class="notes"><span class="muted">Notes</span> {named.notes.join(' ')}</p>
             {:else if named.notes.length}
               <p class="unknown">No Chord I know: {named.notes.join(', ')}</p>
+            {:else if piano}
+              <p class="muted">Press the keys of a Chord.</p>
             {:else}
               <p class="muted">Place a finger, or ring a string open above the nut.</p>
             {/if}
           </div>
-          <div class="board">
-            <Fretboard bind:frets={placed} />
+          <div class="board" class:piano>
+            {#if piano}
+              <PianoDiagram {pressed} ontoggle={toggleKey} />
+            {:else}
+              <Fretboard bind:frets={placed} />
+            {/if}
             <div class="board-actions">
-              <HearButton chord={placedName} plucks={placedPlucks} />
+              <HearButton chord={placedName} plucks={placedPlucks} strummed={hearStrummed} />
               <ArpeggiateButton chord={placedName} plucks={placedPlucks} />
-              <button type="button" class="button clear" onclick={() => (placed = nothingPlaced())}>Clear</button>
+              <button type="button" class="button clear" onclick={clearPlaced}>Clear</button>
             </div>
           </div>
         </div>
@@ -558,6 +654,24 @@
   .voicings :global(.diagram) {
     max-width: 9rem;
   }
+  /*
+   * Piano cards: as many a row as fit a piano drawing at its narrowest keys
+   * between the card's sides, so one a row on a phone and more where they
+   * fit.
+   */
+  .voicings.piano {
+    grid-template-columns: repeat(
+      auto-fill,
+      minmax(min(100%, calc(var(--piano-white-keys) * var(--piano-key-narrowest) + 2 * var(--space-2))), 1fr)
+    );
+  }
+  .inversion {
+    font-weight: 600;
+  }
+  .keys {
+    font-size: var(--text-sm);
+    word-spacing: 0.25em;
+  }
   .rank {
     font-size: var(--text-sm);
   }
@@ -567,6 +681,10 @@
   .preferred .rank {
     color: var(--text);
     font-weight: 600;
+  }
+  /* A piano card's buttons at its foot, level with the rest of its row, though the preferred card has a line more saying so. */
+  .voicings.piano .voicing-actions {
+    margin-top: auto;
   }
   /* A Voicing's buttons under its diagram, side by side, wrapping onto a second line where the card is narrow, as on a phone. */
   .voicing-actions {
@@ -651,6 +769,15 @@
     .board {
       flex: 0 0 22rem;
       align-self: flex-start;
+    }
+  }
+  /* The piano's keys as wide as a drawing's at their widest, from C3 to C5. */
+  .board.piano {
+    max-width: calc(var(--piano-white-keys) * var(--piano-key-widest));
+  }
+  @container finder (min-width: 40rem) {
+    .board.piano {
+      flex-basis: calc(var(--piano-white-keys) * var(--piano-key-widest));
     }
   }
   /* Hear, Arpeggiate and Clear, side by side under the fretboard, at its right. */

@@ -108,7 +108,7 @@ The Lyric Sheet scrolling on its own at a steady pace in Read mode, for playing 
 _Avoid_: Teleprompter, scroll mode, follow (following the Line playing is something else)
 
 **Key**:
-The key a Song is written in, one of its Details. A Key is a Tonic with major or minor on it, so there are 24, and its spelling follows its signature, which takes sharps wherever one can write them and flats where it can't: the same Key is C# and never Db, and Eb and never D#, a spelling no signature can write. The same 24 are offered wherever a Key is picked, a Song's or a Beat's Details and the Chord Finder's Suggest, though not in the same shape: Details lists all 24, and Suggest takes a Tonic and a quality, which is the same 24 in twelve rows. A Song's and a Beat's Key field stays free text, so a Key typed by hand is kept as written; Suggest's is the Chord Finder's own, so a Key typed there is re-spelled to the Key's own spelling once it's entered. Like a Chord, with a capo on it names the shapes fingered, not the pitch that sounds: capo 2 in G sounds in A.
+The key a Song is written in, one of its Details. A Key is a Tonic with major or minor on it, so there are 24, and its spelling follows its signature, which takes sharps wherever one can write them and flats where it can't: the same Key is C# and never Db, and Eb and never D#, a spelling no signature can write. The same 24 are offered wherever a Key is picked, a Song's or a Beat's Details and the Chord Finder's Suggest, though not in the same shape: Details lists all 24, and Suggest takes a Tonic and a quality, which is the same 24 in twelve rows. A Song's and a Beat's Key field stays free text, so a Key typed by hand is kept as written; Suggest's is the Chord Finder's own, so a Key typed there is re-spelled to the Key's own spelling once it's entered. Like a Chord, with a capo on it names the shapes fingered, not the pitch that sounds: capo 2 in G sounds in A. A piano's keys are not Keys: they stay a plain word, never capitalised.
 
 **Tonic**:
 The note a Key is built on and is named after: the Tonic of C# minor is C#. There are twelve, and a Tonic is a pitch rather than a spelling, so a Key spells its own from its signature: the same Tonic is Eb in Eb major and D# in D# minor. The Chord Finder's Suggest takes a Key as a Tonic and a quality, so the twelve it offers re-spell when the quality changes, and it never offers a Tonic a Key can't be built on: there is no D# major.
@@ -127,11 +127,11 @@ A word whose ending sounds like another's: perfect when its last stressed vowel 
 _Avoid_: Slant rhyme (say near Rhyme)
 
 **Chord Finder**:
-A built-in reference for Chords: look up how to play one, name one from the notes placed on an Instrument, and get Chords that go well with a Chord or a Key. A Voicing can be heard there, strummed or one string at a time. It has its own page and isn't opened from a Song. The user picks the tuning, and the last one picked is kept on each device. It has no capo: a Chord names the shape fingered, so a capo changes nothing about how it is played. It holds nothing of the user's. The app titles its page and navigation label Chords.
+A built-in reference for Chords: look up how to play one, name one from the notes placed on an Instrument, and get Chords that go well with a Chord or a Key. A Voicing can be heard there, its notes together (strummed, on the guitar) or one at a time. It has its own page and isn't opened from a Song. The user picks the Instrument, and on the guitar the tuning, and the last ones picked are kept on each device. It has no capo: a Chord names the shape fingered, so a capo changes nothing about how it is played. It holds nothing of the user's. The app titles its page and navigation label Chords.
 _Avoid_: Chord Library (a library holds the user's things, like the Beat Library)
 
 **Voicing**:
-One way to play a Chord on an Instrument: which strings and frets on a guitar, which keys on a piano. A Chord has many; the user can prefer one per Chord and tuning, kept on each device.
+One way to play a Chord on an Instrument: which strings and frets on a guitar, which keys on a piano. A Chord has many; the user can prefer one per Chord on each Instrument, and on the guitar per tuning too, kept on each device.
 _Avoid_: Shape, fingering, chord diagram (a diagram draws a Voicing)
 
 **Chord Chart**:
@@ -139,7 +139,8 @@ How to play the Chords a Song shows, in Read mode: a diagram of a Voicing for ea
 _Avoid_: Chord strip, chord diagrams, chords used
 
 **Instrument**:
-What a Voicing is played on. Only the guitar for now; others, like a piano, can follow.
+What a Voicing is played on: the guitar or the piano. The Chord Finder offers both; the Chord Chart draws only the guitar.
+_Avoid_: Keyboard (say piano)
 
 **Snapshot**:
 A copy of a Song's Lyric Sheet and Scrapbook as they were, which Bandmate takes on its own: before each editing session, the first change to them 10 minutes or more after the one before, unless nothing has changed since the newest one; just before deleting a Scrapbook Section or an Alternate, naming it; and before every restore. Restoring one makes the Lyric Sheet and Scrapbook the Snapshot's, keeping what was there as a Snapshot first; a Line still there keeps its Cue as it is now, and a Line brought back gets the Cue it had. Snapshots are thinned as they age, each time one is taken: every one from the last day stays, then the newest of each day for the month before, then the newest of each week, a day being the date on the Device whose change took it. The user can Keep one, and a kept Snapshot is never thinned. Snapshots can't be named, renamed or deleted by hand.

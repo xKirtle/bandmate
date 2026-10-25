@@ -12,7 +12,7 @@
   import type { Song } from './api';
   import ChordDiagram from './ChordDiagram.svelte';
   import type { ChordOpener } from './ChordPopover.svelte';
-  import { chartChords, chartTuning, chartVoicing } from './chordChart';
+  import { chartChords, chartInstrument, chartTuning, chartVoicing } from './chordChart';
   import { chartSize } from './sharedChartSize.svelte';
   import { chordChartState } from './sharedChordChartState.svelte';
   import { preferredVoicings } from './sharedPreferredVoicings.svelte';
@@ -32,7 +32,7 @@
   const tuning = $derived(chartTuning(song.tuning));
   const chords = $derived.by(() => {
     if (!tuning) return [];
-    const preferred = preferredVoicings.of(tuning);
+    const preferred = preferredVoicings.of(chartInstrument(tuning));
     return names.map((name) => {
       const drawn = chartVoicing(name, tuning, preferred);
       return { name, voicing: drawn.kind === 'voicing' ? drawn.voicing : null };

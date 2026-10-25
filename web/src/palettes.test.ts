@@ -25,6 +25,7 @@ const PAIRS: [string, string, number, string][] = [
   ['--shelved-fg', '--shelved-bg', 4.5, 'The shelved Status badge'],
   ['--accent', '--surface-2', 3, 'Accent controls and the selected outline on raised areas'],
   ['--text-muted', '--surface-2', 3, 'Icons on controls'],
+  ['--piano-white', '--piano-black', 3, "A piano's white keys beside its black keys"],
   ['--text', '--bg', 7, 'Lines in Read mode'],
   ['--text', '--surface-1', 7, 'Lines in Read mode, on the current Line'],
 ];

@@ -2,8 +2,8 @@
 // on narrow ones, with the same pages in both. Settings has tabs of its own.
 
 import Disc3 from '@lucide/svelte/icons/disc-3';
-import Guitar from '@lucide/svelte/icons/guitar';
 import Music from '@lucide/svelte/icons/music';
+import Music4 from '@lucide/svelte/icons/music-4';
 import Settings from '@lucide/svelte/icons/settings';
 import type { Icon } from './icons';
 
@@ -27,7 +27,7 @@ interface NavLink<Id extends NavPage> {
 export const pages = [
   { id: 'songs', href: '/', label: 'Songs', icon: Music },
   { id: 'beats', href: '/beats', label: 'Beats', icon: Disc3 },
-  { id: 'chords', href: '/chords', label: 'Chords', icon: Guitar },
+  { id: 'chords', href: '/chords', label: 'Chords', icon: Music4 },
 ] as const satisfies readonly NavLink<MainPage>[];
 
 /** Whether a main page is a list, which the navigation returns to as it was left. */

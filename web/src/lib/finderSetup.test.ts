@@ -1,13 +1,47 @@
 import { describe, expect, it } from 'vitest';
 import {
+  finderInstrumentKey,
   finderKeyKey,
   finderTuningKey,
+  readFinderInstrument,
   readFinderKey,
   readFinderTuning,
+  storeFinderInstrument,
   storeFinderKey,
   storeFinderTuning,
 } from './finderSetup';
 import { storage } from './storageFake';
+
+describe('the Instrument', () => {
+  it('is the guitar until another is picked on this device, or without storage, or when it is blocked', () => {
+    expect(readFinderInstrument(storage())).toBe('guitar');
+    expect(readFinderInstrument(undefined)).toBe('guitar');
+    expect(readFinderInstrument(storage({}, true))).toBe('guitar');
+  });
+
+  it('keeps the Instrument picked, to read back after a reload', () => {
+    const s = storage();
+    storeFinderInstrument(s, 'piano');
+    expect(readFinderInstrument(s)).toBe('piano');
+  });
+
+  it('forgets the choice once back to the guitar', () => {
+    const values: Record<string, string> = {};
+    storeFinderInstrument(storage(values), 'piano');
+    storeFinderInstrument(storage(values), 'guitar');
+    expect(values).toEqual({});
+  });
+
+  it('does nothing without storage, or when it is blocked', () => {
+    expect(() => storeFinderInstrument(undefined, 'piano')).not.toThrow();
+    expect(() => storeFinderInstrument(storage({}, true), 'piano')).not.toThrow();
+  });
+
+  it('reads an Instrument it does not offer as the guitar', () => {
+    for (const kept of ['keyboard', 'Piano', ''])
+      expect(readFinderInstrument(storage({ [finderInstrumentKey]: kept })), kept).toBe('guitar');
+  });
+});
 
 describe('the tuning', () => {
   it('is standard tuning until picked on this device', () => {
