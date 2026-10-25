@@ -136,6 +136,11 @@ const sharps = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
 const flats = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
 const common = ['C', 'C#', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B'];
 
+/** A pitch class (0 for C) spelled the common way, as notes no Chord spells are: C# and Eb. */
+export function commonNote(pitchClass: number): string {
+  return common[((pitchClass % 12) + 12) % 12];
+}
+
 /** A note as read at the start of a name, with how it was written. */
 interface Read {
   letter: string;

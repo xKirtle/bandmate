@@ -28,6 +28,7 @@
     type GuitarVoicing,
     type Frets,
     type KeyParts,
+    type PianoKeys,
     type Suggestion,
     type Voicing,
   } from './chordFinder';
@@ -132,16 +133,26 @@
 
   const qualityLabel = (suffix: string) => qualities.find((q) => q.suffix === suffix)?.label ?? suffix;
 
-  // Name it: the shape placed on the fretboard, and what it reads as. It
-  // starts, and clears, with nothing placed: every string muted. It's
-  // offered on the guitar only, so far, and switching Instruments empties it.
+  // Name it: the shape placed on the fretboard, or the keys pressed on the
+  // piano, and what it reads as. It starts, and clears, with nothing placed:
+  // every string muted, no key pressed. Switching Instruments empties it.
   const guitarContext = $derived(context.instrument === 'piano' ? { tuning: standard } : context);
   const nothingPlaced = (): Frets => guitarContext.tuning.map(() => null);
   let placed = $state(nothingPlaced());
-  const named = $derived(nameIt(placed, guitarContext));
+  let pressed = $state<PianoKeys>([]);
+  const named = $derived(piano ? nameIt(pressed, context) : nameIt(placed, guitarContext));
   // Hearing or arpeggiating it plays it even when it reads as no Chord.
-  const placedPlucks = $derived(plucks(placed, guitarContext));
-  const placedName = $derived(named.kind === 'chord' ? named.readings[0] : 'this Chord shape');
+  const placedPlucks = $derived(piano ? plucks(pressed, context) : plucks(placed, guitarContext));
+  const placedName = $derived(named.kind === 'chord' ? named.readings[0] : piano ? 'these keys' : 'this Chord shape');
+
+  /** A key tapped on Name it's piano: pressed, or let go if it was pressed. */
+  const toggleKey = (key: number) =>
+    (pressed = pressed.includes(key) ? pressed.filter((k) => k !== key) : [...pressed, key]);
+
+  function clearPlaced() {
+    placed = nothingPlaced();
+    pressed = [];
+  }
 
   // Switching Instruments starts Look up's Voicings on their first page, and
   // empties Name it.
@@ -151,7 +162,7 @@
     if (piano === pianoShown) return;
     pianoShown = piano;
     page = 0;
-    placed = nothingPlaced();
+    clearPlaced();
   });
 
   /** Opens a reading in Look up, with focus on its tab. */
@@ -226,7 +237,8 @@
 <!-- A Voicing drawn as its Instrument draws one: a keyboard, or a Chord diagram. -->
 {#snippet drawing(voicing: Voicing, chord: string)}
   {#if isPianoVoicing(voicing)}
-    <PianoDiagram {voicing} name={chord} />
+    <!-- Read out low to high, e.g. "B7 on the piano: B3 D#4 F#4 A4". -->
+    <PianoDiagram pressed={voicing.keys} label="{chord} on the piano: {voicing.notes.join(' ')}" />
   {:else}
     <ChordDiagram {voicing} name={chord} />
   {/if}
@@ -373,7 +385,7 @@
                 {@const heard = voicingPlucks(voicing, finderContext)}
                 {#if isPianoVoicing(voicing)}
                   <li>
-                    <PianoDiagram {voicing} name={found.name} />
+                    {@render drawing(voicing, found.name)}
                     <span class="inversion">
                       {inversionNames[voicing.inversion]}{voicing.left.length ? ' over ' + found.bass : ''}
                     </span>
@@ -422,10 +434,6 @@
             {/if}
           {/if}
         {/if}
-      {:else if t.id === 'name-it' && piano}
-        <p class="muted">
-          Name it is offered on the guitar only, for now: pick the guitar to name a Chord from its notes.
-        </p>
       {:else if t.id === 'name-it'}
         <div class="name-it">
           <div class="named" aria-live="polite">
@@ -446,16 +454,22 @@
               <p class="notes"><span class="muted">Notes</span> {named.notes.join(' ')}</p>
             {:else if named.notes.length}
               <p class="unknown">No Chord I know: {named.notes.join(', ')}</p>
+            {:else if piano}
+              <p class="muted">Press the keys of a Chord.</p>
             {:else}
               <p class="muted">Place a finger, or ring a string open above the nut.</p>
             {/if}
           </div>
-          <div class="board">
-            <Fretboard bind:frets={placed} />
+          <div class="board" class:piano>
+            {#if piano}
+              <PianoDiagram {pressed} label="Piano" ontoggle={toggleKey} />
+            {:else}
+              <Fretboard bind:frets={placed} />
+            {/if}
             <div class="board-actions">
-              <HearButton chord={placedName} plucks={placedPlucks} />
+              <HearButton chord={placedName} plucks={placedPlucks} strummed={hearStrummed} />
               <ArpeggiateButton chord={placedName} plucks={placedPlucks} />
-              <button type="button" class="button clear" onclick={() => (placed = nothingPlaced())}>Clear</button>
+              <button type="button" class="button clear" onclick={clearPlaced}>Clear</button>
             </div>
           </div>
         </div>
@@ -739,6 +753,15 @@
     .board {
       flex: 0 0 22rem;
       align-self: flex-start;
+    }
+  }
+  /* The piano's keys as wide as a drawing's at their widest, from C3 to C5. */
+  .board.piano {
+    max-width: calc(var(--piano-white-keys) * var(--piano-key-widest));
+  }
+  @container finder (min-width: 40rem) {
+    .board.piano {
+      flex-basis: calc(var(--piano-white-keys) * var(--piano-key-widest));
     }
   }
   /* Hear, Arpeggiate and Clear, side by side under the fretboard, at its right. */

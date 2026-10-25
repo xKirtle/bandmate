@@ -5,7 +5,7 @@
 // others with the bass under them, in the left hand. Keys are MIDI note
 // numbers: 60 is middle C (C4).
 
-import type { Chord, Tone } from './chordTheory';
+import { commonNote, type Chord, type Tone } from './chordTheory';
 import type { Instrument, Pluck } from './instrument';
 
 /** The lowest key a piano Voicing is drawn on, and played within: C3. */
@@ -32,6 +32,9 @@ export type PianoKeys = readonly number[];
 
 /** Whether a key is a black one. */
 export const isBlackKey = (key: number) => [1, 3, 6, 8, 10].includes(pitchClass(key));
+
+/** A key's note, spelled the common way, as notes no Chord spells are, with its octave: middle C is C4, the key above it C#4. */
+export const pianoKeyName = (key: number) => commonNote(key) + (Math.floor(key / 12) - 1);
 
 /** Middle C, C4. */
 const middleC = 60;

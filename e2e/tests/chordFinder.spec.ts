@@ -76,3 +76,60 @@ test('on a phone, the tabs keep one row and Look up’s fields fit on two', asyn
   await expect(fields).toHaveCount(4);
   expect(await lines(fields)).toBe(2);
 });
+
+async function pickInstrument(page: Page, name: 'Guitar' | 'Piano') {
+  await page.getByRole('combobox', { name: 'Instrument' }).click();
+  await page.getByRole('option', { name }).click();
+}
+
+test('Name it on the piano reads the keys pressed, the lowest as the bass, and switching Instruments empties it', async ({
+  page,
+}) => {
+  await page.goto('/chords');
+  await pickInstrument(page, 'Piano');
+  await page.getByRole('tab', { name: 'Name it' }).click();
+  const nameIt = page.getByRole('tabpanel', { name: 'Name it' });
+  const piano = nameIt.getByRole('group', { name: 'Piano' });
+  const key = (name: string) => piano.getByRole('button', { name, exact: true });
+  const best = nameIt.getByRole('list', { name: 'Readings, best first' }).getByRole('button').first();
+
+  // Tapping presses a key, and tapping it again lets it go.
+  await key('E3').click();
+  await key('C4').click();
+  await key('G4').click();
+  await expect(key('E3')).toHaveAttribute('aria-pressed', 'true');
+  await expect(best).toHaveText('C/E');
+  await expect(nameIt.getByText('Notes E C G')).toBeVisible();
+  await key('E3').click();
+  await expect(key('E3')).toHaveAttribute('aria-pressed', 'false');
+  await expect(best).toHaveText('C');
+
+  // From a computer keyboard it's one tab stop: arrows move a semitone, Home and End go to the ends.
+  await key('G4').focus();
+  await page.keyboard.press('ArrowRight');
+  await expect(key('Ab4')).toBeFocused();
+  await expect(piano.locator('[tabindex="0"]')).toHaveCount(1);
+  await page.keyboard.press('ArrowLeft');
+  await page.keyboard.press('ArrowLeft');
+  await expect(key('F#4')).toBeFocused();
+  await page.keyboard.press('End');
+  await expect(key('C5')).toBeFocused();
+  await page.keyboard.press('Home');
+  await expect(key('C3')).toBeFocused();
+  await page.keyboard.press('Space');
+  await expect(key('C3')).toHaveAttribute('aria-pressed', 'true');
+  await page.keyboard.press('Enter');
+  await expect(key('C3')).toHaveAttribute('aria-pressed', 'false');
+
+  // A reading opens in Look up.
+  await best.click();
+  await expect(page.getByRole('tab', { name: 'Look up' })).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByRole('heading', { name: 'C', exact: true })).toBeVisible();
+
+  // Switching Instruments empties Name it, its C4 and G4 still pressed.
+  await pickInstrument(page, 'Guitar');
+  await pickInstrument(page, 'Piano');
+  await page.getByRole('tab', { name: 'Name it' }).click();
+  await expect(piano.getByRole('button', { pressed: true })).toHaveCount(0);
+  await expect(nameIt.getByText('Press the keys of a Chord.')).toBeVisible();
+});

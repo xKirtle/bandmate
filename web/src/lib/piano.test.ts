@@ -1,5 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { firstVoicing, lookUp, qualities, roots, strummed, voicingPlucks, type PianoVoicing } from './chordFinder';
+import {
+  firstVoicing,
+  lookUp,
+  nameIt,
+  pianoKeyName,
+  qualities,
+  roots,
+  strummed,
+  voicingPlucks,
+  type PianoVoicing,
+} from './chordFinder';
 
 // The piano in the Chord Finder (ADR 0012), through its seam: one hand's
 // Voicings, each inversion in close position, round middle C, drawn on a
@@ -100,5 +110,36 @@ describe('hearing a piano Voicing', () => {
 
   it("plays its keys' pitches low to high, a slash bass first", () => {
     expect(voicingPlucks(voicings('Am/G')[0], piano).map((p) => p.pitch)).toEqual([55, 57, 60, 64]);
+  });
+});
+
+describe('naming the keys pressed in Name it', () => {
+  it('reads them as the guitar reads a shape, the lowest key as the bass', () => {
+    expect(nameIt([60, 64, 67], piano)).toEqual({ kind: 'chord', readings: ['C'], notes: ['C', 'E', 'G'] });
+    expect(nameIt([67, 52, 60], piano)).toMatchObject({ readings: ['C/E'], notes: ['E', 'C', 'G'] });
+  });
+
+  it('lists the notes sounding, low to high, each once, spelled as the best reading spells them', () => {
+    expect(nameIt([59, 63, 66, 69, 71], piano)).toEqual({
+      kind: 'chord',
+      readings: ['B7'],
+      notes: ['B', 'D#', 'F#', 'A'],
+    });
+  });
+
+  it('gives none, with the notes sounding, when no reading fits or no key is pressed', () => {
+    expect(nameIt([60, 66, 71], piano)).toEqual({ kind: 'none', notes: ['C', 'F#', 'B'] });
+    expect(nameIt([], piano)).toEqual({ kind: 'none', notes: [] });
+  });
+});
+
+describe("a key's name, as Name it announces it", () => {
+  it('is its note, spelled the common way, and its octave: middle C is C4', () => {
+    expect(pianoKeyName(48)).toBe('C3');
+    expect(pianoKeyName(60)).toBe('C4');
+    expect(pianoKeyName(61)).toBe('C#4');
+    expect(pianoKeyName(63)).toBe('Eb4');
+    expect(pianoKeyName(71)).toBe('B4');
+    expect(pianoKeyName(72)).toBe('C5');
   });
 });
