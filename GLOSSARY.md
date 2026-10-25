@@ -103,6 +103,10 @@ _Avoid_: Zoom, font size, text size
 How large the Chord Chart's diagrams show in Read mode, for reading at whatever distance the device sits, apart from the Lyric Size. Like the Lyric Size, it's a way of reading the Song, not an edit; it's kept on each device and holds for every Song.
 _Avoid_: Zoom, diagram size
 
+**Auto-scroll**:
+The Lyric Sheet scrolling on its own at a steady pace in Read mode, for playing a Song through without Cues to follow. Its speed is a level from 1 to 10; like Transpose, it's a way of reading the Song, not an edit, and it's kept on each device for each Song. The same level reads at the same pace whatever the Lyric Size. It stops at the end of the Lyric Sheet, and when the Timeline plays, whose cued Lines lead instead.
+_Avoid_: Teleprompter, scroll mode, follow (following the Line playing is something else)
+
 **Key**:
 The key a Song is written in, one of its Details. A Key is a Tonic with major or minor on it, so there are 24, and its spelling follows its signature, which takes sharps wherever one can write them and flats where it can't: the same Key is C# and never Db, and Eb and never D#, a spelling no signature can write. The same 24 are offered wherever a Key is picked, a Song's or a Beat's Details and the Chord Finder's Suggest, though not in the same shape: Details lists all 24, and Suggest takes a Tonic and a quality, which is the same 24 in twelve rows. A Song's and a Beat's Key field stays free text, so a Key typed by hand is kept as written; Suggest's is the Chord Finder's own, so a Key typed there is re-spelled to the Key's own spelling once it's entered. Like a Chord, with a capo on it names the shapes fingered, not the pitch that sounds: capo 2 in G sounds in A.
 

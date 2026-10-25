@@ -3,7 +3,14 @@
 // the page's elements.
 import { describe as group, expect, it } from 'vitest';
 import type { ShortcutPress } from './shortcutPress';
-import { opensShortcuts, songKey, undoKey, type SongKeyContext } from './songKeys';
+import {
+  autoScrollSpeedStep,
+  togglesAutoScroll,
+  opensShortcuts,
+  songKey,
+  undoKey,
+  type SongKeyContext,
+} from './songKeys';
 
 // Which Shortcut a press is, where it was pressed and the repeat rule are
 // shortcutPress.ts's, and tested there: these are the rules about what each
@@ -131,5 +138,49 @@ group('?', () => {
   it('is the only key that opens it', () => {
     expect(opensShortcuts(press('/'))).toBe(false);
     expect(opensShortcuts(press(' '))).toBe(false);
+  });
+});
+
+group('A', () => {
+  it('starts or pauses Auto-scroll', () => {
+    expect(togglesAutoScroll(press('a'))).toBe(true);
+    // Caps Lock on.
+    expect(togglesAutoScroll(press('A'))).toBe(true);
+  });
+
+  it("isn't Ctrl+A, which selects every Clip, nor Space, which stays the Timeline's", () => {
+    expect(togglesAutoScroll(press('a', { ctrlKey: true }))).toBe(false);
+    expect(togglesAutoScroll(press(' '))).toBe(false);
+    expect(songKey(press('a'), idle)).toBeNull();
+  });
+
+  it('is left to a text field or a dialog it was pressed in', () => {
+    const field = document.createElement('input');
+    expect(togglesAutoScroll(press('a', { target: field }))).toBe(false);
+    const dialog = document.createElement('dialog');
+    const button = dialog.appendChild(document.createElement('button'));
+    expect(togglesAutoScroll(press('a', { target: button }))).toBe(false);
+  });
+});
+
+group('[ and ]', () => {
+  it('slow down and speed up Auto-scroll a level', () => {
+    expect(autoScrollSpeedStep(press('['))).toBe(-1);
+    expect(autoScrollSpeedStep(press(']'))).toBe(1);
+  });
+
+  it('are no other key, nor held with a modifier', () => {
+    expect(autoScrollSpeedStep(press('a'))).toBeNull();
+    expect(autoScrollSpeedStep(press('[', { ctrlKey: true }))).toBeNull();
+    expect(autoScrollSpeedStep(press(']', { altKey: true }))).toBeNull();
+    expect(songKey(press(']'), idle)).toBeNull();
+  });
+
+  it('are left to a text field or a dialog they were pressed in', () => {
+    const field = document.createElement('textarea');
+    expect(autoScrollSpeedStep(press('[', { target: field }))).toBeNull();
+    const dialog = document.createElement('dialog');
+    const button = dialog.appendChild(document.createElement('button'));
+    expect(autoScrollSpeedStep(press(']', { target: button }))).toBeNull();
   });
 });

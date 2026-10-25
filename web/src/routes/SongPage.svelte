@@ -291,6 +291,8 @@
 
   // How tall the docked Timeline is, which the side column stops above.
   let timelineHeight = $state(0);
+  // How tall the toast stack is, which Auto-scroll's pill floats above.
+  let toastsHeight = $state(0);
 
   $effect(() => {
     const server = songServer(id);
@@ -454,7 +456,7 @@
 <svelte:window onbeforeunload={warnBeforeUnload} onkeydown={keydown} />
 <svelte:document onvisibilitychange={refreshOnReturn} />
 
-<main class="page" style:--timeline-height="{timelineHeight}px">
+<main class="page" style:--timeline-height="{timelineHeight}px" style:--toasts-height="{toastsHeight}px">
   {#if loadError}
     <p class="error" role="alert">{loadError}</p>
   {:else if !saves || !savedSong || !editing || !details}
@@ -803,7 +805,7 @@
 <!-- Every save the page was refused, one toast per surface, over the page in
      the bottom corner of the window (see Toasts.svelte). -->
 {#if saves}
-  <Toasts {saves} dock={timelineHeight} />
+  <Toasts {saves} dock={timelineHeight} bind:height={toastsHeight} />
 {/if}
 
 {#if showingShortcuts}

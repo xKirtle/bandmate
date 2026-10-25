@@ -11,6 +11,7 @@ group('listGroups', () => {
       'Song editing',
       'Timeline editing',
       'Sync mode',
+      'Read mode',
       'Mouse',
     ]);
     expect(groups.map((g) => g.rows.map((r) => r.name))).toEqual([
@@ -30,6 +31,7 @@ group('listGroups', () => {
         'Split at the playhead',
       ],
       ['Cue the next Line'],
+      ['Start or pause Auto-scroll', 'Slow down or speed up Auto-scroll'],
       [
         'Add or remove a Clip',
         'Select Clips with a box',

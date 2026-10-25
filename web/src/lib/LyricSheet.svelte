@@ -22,6 +22,7 @@
   import ActionsMenu from './ActionsMenu.svelte';
   import CuesMenu from './CuesMenu.svelte';
   import type { MenuAction } from './menu';
+  import AutoScrollButton from './AutoScrollButton.svelte';
   import ReadingMenu from './ReadingMenu.svelte';
   import type { LyricSheetEditing } from './lyricSheetEditing.svelte';
   import SectionEditor from './SectionEditor.svelte';
@@ -293,6 +294,9 @@
   /** Makes a move of one of a Section's Alternates, for its editor. */
   const moveOut = (landing: Landing) => apply(sectionMove(song, landing));
 
+  // The Lyric Sheet, whose end Auto-scroll stops at.
+  let sheet = $state<HTMLElement>();
+
   function onKey(event: KeyboardEvent) {
     if (drag.current && event.key === 'Escape') {
       event.preventDefault();
@@ -305,12 +309,13 @@
 
 <svelte:window onkeydown={onKey} onscroll={() => drag.current && drag.aim(drag.current.x, drag.current.y)} />
 
-<section class="sheet" aria-labelledby="sheet-heading">
+<section class="sheet" aria-labelledby="sheet-heading" bind:this={sheet}>
   <div class="head">
     <!-- Read mode keeps its chrome out of the way of the Lines: the heading is for screen readers only. -->
     <h2 id="sheet-heading" class:visually-hidden={mode === 'read'}>Lyric Sheet</h2>
     <span class="spacer"></span>
     {#if mode === 'read'}
+      <AutoScrollButton {songId} {sheet} playing={playhead !== null} />
       <ReadingMenu {songId} {chords} />
     {/if}
     {#if rhymeMode.canBeOn}

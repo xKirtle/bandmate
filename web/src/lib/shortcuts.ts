@@ -18,7 +18,8 @@
 export type Key = { key: string; mod?: boolean; alt?: boolean; shift?: boolean };
 
 /** Where a Shortcut is listed, in the shortcuts dialog and Settings' Shortcuts tab. */
-export type ShortcutGroup = 'Playback & recording' | 'Song editing' | 'Timeline editing' | 'Sync mode' | 'Mouse';
+export type ShortcutGroup =
+  'Playback & recording' | 'Song editing' | 'Timeline editing' | 'Sync mode' | 'Read mode' | 'Mouse';
 
 type Described = {
   name: string;
@@ -202,6 +203,21 @@ export const shortcuts = {
     description: 'Cues the next Line at the playhead.',
     worksIn: 'Sync mode, in any part of the Song page but a text field, a dialog or a menu.',
     keys: [{ key: 'Enter' }],
+  },
+  autoScroll: {
+    name: 'Start or pause Auto-scroll',
+    group: 'Read mode',
+    description: 'Starts scrolling the Lyric Sheet on its own, or pauses it.',
+    worksIn: "Read mode, in any part of the Song page but a text field or a dialog, while the Timeline isn't playing.",
+    keys: [{ key: 'a' }],
+  },
+  autoScrollSpeed: {
+    name: 'Slow down or speed up Auto-scroll',
+    group: 'Read mode',
+    description: "Slows Auto-scroll down or speeds it up a level, whether it's running or not.",
+    worksIn: 'Read mode, in any part of the Song page but a text field or a dialog.',
+    back: [{ key: '[' }],
+    forward: [{ key: ']' }],
   },
   toggleClip: {
     name: 'Add or remove a Clip',

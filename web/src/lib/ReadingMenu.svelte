@@ -9,22 +9,26 @@
   import SlidersHorizontal from '@lucide/svelte/icons/sliders-horizontal';
   import { tick } from 'svelte';
   import { MediaQuery } from 'svelte/reactivity';
+  import { fastestAutoScrollSpeed, slowestAutoScrollSpeed, startingAutoScrollSpeed } from './autoScrollSpeed';
   import type { ChordsInRead } from './chordChart';
   import { largestChartSize, smallestChartSize, stepChartSize, usualChartSize } from './chartSize';
   import { songChordsShown } from './chordsShown';
+  import { keyHints } from './keyHints';
   import { largestLyricSize, smallestLyricSize, stepLyricSize, usualLyricSize } from './lyricSize';
   import { following, placeBeside } from './popover';
   import { blockedRows, readingBadge } from './readingMenu';
+  import { songAutoScrollSpeed } from './sharedAutoScrollSpeed.svelte';
   import { chartSize } from './sharedChartSize.svelte';
   import { chordChartState } from './sharedChordChartState.svelte';
   import { lyricSize } from './sharedLyricSize.svelte';
   import { songTranspose } from './sharedTranspose.svelte';
+  import { rebound } from './shortcutKeys';
   import { stepTranspose, transposeLimit, transposeText } from './transposeAmount';
 
   // Read mode's choices about how the Song reads, behind one button in the
   // Lyric Sheet's header, in this order: the Lyric Size, Transpose, whether
-  // the Chords show, the Chord Chart's eye and pin, and its Chart Size. Each
-  // is kept on this device, as before.
+  // the Chords show, the Chord Chart's eye and pin, its Chart Size, and
+  // Auto-scroll's speed. Each is kept on this device, as before.
   // It stays open while they change, and every Song has the same rows, a
   // Chord row disabled, saying why, where it can't apply.
 
@@ -38,6 +42,9 @@
   } = $props();
 
   const lyricPercent = $derived(lyricSize.value);
+  const speed = $derived(songAutoScrollSpeed.of(songId));
+  const hints = keyHints();
+  const speedKeys = $derived(rebound().autoScrollSpeed);
   const chordsShown = $derived(songChordsShown.of(songId));
   const transpose = $derived(songTranspose.of(songId));
   const transposeShown = $derived(transposeText(transpose));
@@ -270,6 +277,40 @@
           onclick={() => chartSize.set(stepChartSize(chartPercent, 1))}
           aria-label="Make the Chord Chart larger"
           title={blocked.chartSize ?? 'Make the Chord Chart larger'}><Plus /></button
+        >
+      </div>
+
+      <span id="reading-speed" class="name">Auto-scroll speed</span>
+      <div class="controls" role="group" aria-labelledby="reading-speed">
+        <button
+          type="button"
+          class="button step"
+          disabled={speed <= slowestAutoScrollSpeed}
+          onclick={() => songAutoScrollSpeed.step(songId, -1)}
+          aria-label="Slow Auto-scroll down"
+          aria-keyshortcuts={hints.aria(speedKeys.back)}
+          title={hints.withKeys('Slow Auto-scroll down', speedKeys.back)}><Minus /></button
+        >
+        <button
+          type="button"
+          class="button amount"
+          disabled={speed === startingAutoScrollSpeed}
+          onclick={() => songAutoScrollSpeed.set(songId, startingAutoScrollSpeed)}
+          aria-label={speed === startingAutoScrollSpeed
+            ? `Auto-scroll at its starting speed, ${startingAutoScrollSpeed}`
+            : `Auto-scroll at speed ${speed}; set it back to ${startingAutoScrollSpeed}`}
+          title={speed === startingAutoScrollSpeed
+            ? 'Auto-scroll goes at its starting speed'
+            : `Set Auto-scroll back to its starting speed, ${startingAutoScrollSpeed}`}>{speed}</button
+        >
+        <button
+          type="button"
+          class="button step"
+          disabled={speed >= fastestAutoScrollSpeed}
+          onclick={() => songAutoScrollSpeed.step(songId, 1)}
+          aria-label="Speed Auto-scroll up"
+          aria-keyshortcuts={hints.aria(speedKeys.forward)}
+          title={hints.withKeys('Speed Auto-scroll up', speedKeys.forward)}><Plus /></button
         >
       </div>
     </div>
