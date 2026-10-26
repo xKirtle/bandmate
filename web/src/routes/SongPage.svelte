@@ -24,7 +24,8 @@
   import TuningField from '../lib/TuningField.svelte';
   import LanguagesField from '../lib/LanguagesField.svelte';
   import { LyricSheetEditing } from '../lib/lyricSheetEditing.svelte';
-  import { Saves, type Undone } from '../lib/saves.svelte';
+  import { Saves, surfaceNames, type Undone } from '../lib/saves.svelte';
+  import { unheard, unheardToasts } from '../lib/unheard.svelte';
   import { SongUndo } from '../lib/songUndo.svelte';
   import { scrollBehavior } from '../lib/motion';
   import { detailFields, type DetailFields } from '../lib/songFields';
@@ -293,6 +294,18 @@
   let timelineHeight = $state(0);
   // How tall the toast stack is, which Auto-scroll's pill floats above.
   let toastsHeight = $state(0);
+  // The toasts: each save refused, a surface's own, then a Chord a popover
+  // couldn't hear, as its Instrument's samples didn't load.
+  const toasts = $derived([
+    ...(saves?.errors.map(({ surface, message }) => ({
+      label: surfaceNames[surface],
+      message,
+      dismiss: () => saves?.dismiss(surface),
+    })) ?? []),
+    ...unheardToasts(),
+  ]);
+  // A Chord that couldn't be heard here is this page's to say: leaving it goes.
+  $effect(() => () => unheard.dismiss());
 
   $effect(() => {
     const server = songServer(id);
@@ -802,11 +815,10 @@
   />
 {/if}
 
-<!-- Every save the page was refused, one toast per surface, over the page in
-     the bottom corner of the window (see Toasts.svelte). -->
-{#if saves}
-  <Toasts {saves} dock={timelineHeight} bind:height={toastsHeight} />
-{/if}
+<!-- Every save the page was refused, one toast per surface, and a Chord that
+     couldn't be heard, over the page in the bottom corner of the window (see
+     Toasts.svelte). -->
+<Toasts {toasts} dock={timelineHeight} bind:height={toastsHeight} />
 
 {#if showingShortcuts}
   <ShortcutsDialog onClose={() => (showingShortcuts = false)} />

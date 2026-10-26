@@ -1,0 +1,21 @@
+The guitar samples in these folders, one folder per string named by its open
+note in standard tuning (E2, A2, D3, G3, B3, E4), are recordings of a
+Raimundo 118 nylon-string classical guitar, played by Brian Penkrot in 2011,
+from the University of Iowa Electronic Music Studios' Musical Instrument
+Samples (https://theremin.music.uiowa.edu/MISguitar.html).
+
+University of Iowa Electronic Music Studios, Musical Instrument Samples
+(Raimundo 118, Brian Penkrot, 2011), trimmed, retuned and re-encoded.
+
+The University of Iowa's Musical Instrument Samples page
+(https://theremin.music.uiowa.edu/MIS.html) says of its recordings: "Since
+1997, these recordings have been freely available on this website and may be
+downloaded and used for any projects, without restrictions."
+
+They were taken from Iowa's mono mf recordings of each string (the A
+string's F#3 from its ff recording), at frets 0, 3, 6, 9 and 12 of each
+string. Modified: each note cut from Iowa's scales from its pluck, retuned to
+A440, its level matched to the others, cut to its first 4.5 seconds with a
+0.3 second fade out, and re-encoded mono, 44.1 kHz, MP3 at 96 kb/s, by
+web/scripts/guitar-samples.mjs in Bandmate's source
+(https://github.com/xKirtle/bandmate).

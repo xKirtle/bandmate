@@ -217,3 +217,10 @@ To update it later, replace the file and recreate the container again.
 Bandmate is licensed under the [GNU Affero General Public License v3.0](https://github.com/xKirtle/bandmate/blob/main/LICENSE). If you run a modified Bandmate as a service that others use over a network, you must offer them its source code.
 
 To download Beats from links, the image also includes three programs under their own licenses: [yt-dlp](https://github.com/yt-dlp/yt-dlp) (The Unlicense), [ffmpeg](https://ffmpeg.org) (LGPL v2.1 or later, built from its unmodified [source](https://ffmpeg.org/releases/) without its GPL parts) and [QuickJS](https://bellard.org/quickjs/) (MIT). Settings → About lists them with their versions, and their license texts are in the image at `/usr/local/share/licenses/`. Bandmate without Docker includes none of them.
+
+Bandmate itself includes recordings of a piano and a guitar, to play chords on:
+
+- The piano: the [Salamander Grand Piano](https://github.com/Tonejs/audio/tree/master/salamander) by Alexander Holm ([CC BY 3.0](https://creativecommons.org/licenses/by/3.0/)), trimmed and re-encoded.
+- The guitar: [University of Iowa Electronic Music Studios](https://theremin.music.uiowa.edu/MIS.html), [Musical Instrument Samples](https://theremin.music.uiowa.edu/MISguitar.html) (Raimundo 118, Brian Penkrot, 2011), trimmed, retuned and re-encoded, which Iowa lets anyone use for any project, without restrictions.
+
+Settings → About lists them, and their license texts (for the guitar, Iowa's terms) are served beside the recordings, at `/samples/piano/LICENSE.txt` and `/samples/guitar/LICENSE.txt` on your Bandmate.

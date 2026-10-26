@@ -6,11 +6,13 @@ import {
   pianoKeyName,
   qualities,
   roots,
-  strummed,
-  voicingPlucks,
+  heardVoicing,
+  instrumentSound,
   whiteKeys,
   type PianoVoicing,
 } from './chordFinder';
+import { guitarSamples } from './guitar';
+import { pianoSamples } from './piano';
 
 // The piano in the Chord Finder (ADR 0012), through its seam: one hand's
 // Voicings, each inversion in close position, round middle C, drawn on a
@@ -154,13 +156,16 @@ describe("Suggest's piano Voicing", () => {
 });
 
 describe('hearing a piano Voicing', () => {
-  it('sounds its keys together, not strummed, as the guitar is', () => {
-    expect(strummed(piano)).toBe(false);
-    expect(strummed({ instrument: 'guitar', tuning: [40, 45, 50, 55, 59, 64] })).toBe(true);
+  it('plays its recorded samples, its keys together, while the guitar strums its own', () => {
+    expect(instrumentSound(piano)).toEqual({ samples: pianoSamples, strummed: false });
+    expect(instrumentSound({ instrument: 'guitar', tuning: [40, 45, 50, 55, 59, 64] })).toEqual({
+      samples: guitarSamples,
+      strummed: true,
+    });
   });
 
-  it("plays its keys' pitches low to high, a slash bass first", () => {
-    expect(voicingPlucks(voicings('Am/G')[0], piano).map((p) => p.pitch)).toEqual([55, 57, 60, 64]);
+  it("plays its keys' MIDI note numbers low to high, a slash bass first", () => {
+    expect(heardVoicing(voicings('Am/G')[0], piano).map((n) => n.midi)).toEqual([55, 57, 60, 64]);
   });
 });
 

@@ -6,7 +6,8 @@
 // numbers: 60 is middle C (C4).
 
 import { commonNote, type Chord, type Tone } from './chordTheory';
-import type { Instrument, Pluck } from './instrument';
+import type { HeardNote, Instrument } from './instrument';
+import { samplesIn, type SampleSet } from './samples';
 
 /** The lowest key a piano Voicing is drawn on, and played within: C3. */
 export const lowestKey = 48;
@@ -139,13 +140,26 @@ function pianoVoicings(chord: Chord): PianoVoicing[] {
   return found;
 }
 
-/** How bright a key sounds: darker low down, brighter up high, so the plucked tone it's heard with for now follows the keyboard. */
-const brightness = (key: number) => Math.min(1, Math.max(0, (key - lowestKey) / (highestKey - lowestKey)));
+/**
+ * The piano's recorded samples: the Salamander Grand Piano, by Alexander
+ * Holm (CC BY 3.0), one velocity, every minor third from F#2 to C5, so a
+ * slash bass down to about E2 plays from a sample a semitone or two away.
+ * Its gain matches a low C's keys together to the guitar's strum of C,
+ * leaving its loudest Voicing, Am7/G with its bass at G2, 5 dB from
+ * clipping (#1205).
+ */
+export const pianoSamples: SampleSet = {
+  name: 'Piano',
+  samples: [42, 45, 48, 51, 54, 57, 60, 63, 66, 69, 72].map((note) => ({ note })),
+  url: samplesIn('piano'),
+  gain: 0.55,
+};
 
 /**
- * The piano. The notes placed on it are its keys, and Hear sounds them
- * together, not strummed. A preferred Voicing is kept by its inversion,
- * which of the Chord's tones is lowest, not by its keys. It counts the
+ * The piano. The notes placed on it are its keys, which it plays from its
+ * recorded samples, and Hear sounds them together, not strummed. A
+ * preferred Voicing is kept by
+ * its inversion, which of the Chord's tones is lowest, not by its keys. It counts the
  * hand's tones, so it survives the keys' placement being tuned, but not a
  * change to which optional tones a Chord of more than four notes leaves out.
  */
@@ -153,9 +167,8 @@ export function piano(): Instrument<PianoVoicing, PianoKeys, number> {
   return {
     voicings: pianoVoicings,
     placement: (voicing) => voicing.keys,
-    plucks: (keys): Pluck[] =>
-      [...keys].sort((a, b) => a - b).map((pitch) => ({ pitch, brightness: brightness(pitch) })),
-    strummed: false,
+    heardNotes: (keys): HeardNote[] => [...keys].sort((a, b) => a - b).map((midi) => ({ midi })),
+    sound: { samples: pianoSamples, strummed: false },
     preferredStorageKey: 'bandmate.preferredVoicings.piano',
     preference: (voicing) => voicing.inversion,
     prefers: (voicing, inversion) => voicing.inversion === inversion,

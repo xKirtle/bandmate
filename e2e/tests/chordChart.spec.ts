@@ -1,5 +1,6 @@
 import type { Locator, Page } from '@playwright/test';
 import type { Bandmate } from '../bandmate';
+import { failRequests } from '../faults';
 import { expect, test } from '../fixtures';
 
 // The Chord Chart and a Chord's popover in Read mode, on the device's
@@ -108,6 +109,36 @@ test("a Chord's popover on the piano steps through its inversions on C3 to C5, p
     .getByRole('listitem');
   await expect(cards.first()).toContainText('1st inversion');
   await expect(cards.first()).toContainText('Preferred');
+});
+
+test("a Chord's popover on the piano loads its samples as it first opens, and says in the toast stack if they can't", async ({
+  page,
+  bandmate,
+}) => {
+  const song = await songWith(bandmate, ['C']);
+  let loaded = 0;
+  page.on('requestfinished', (r) => {
+    if (r.url().includes('/samples/piano/')) loaded++;
+  });
+  await pickInstrument(page, 'Piano');
+  await expect.poll(() => loaded).toBe(11);
+
+  // None load on the Song page until the popover opens; then they fail, and so does a Hear.
+  const fault = await failRequests(page, { url: '**/samples/piano/*.mp3' }, { times: 22, status: 0 });
+  await page.goto(`/songs/${song.id}`);
+  await expect(chart(page).getByRole('img', { name: 'C on the piano: C4 E4 G4' })).toBeVisible();
+  expect(fault.count).toBe(0);
+  await chart(page).getByRole('button', { name: /C/ }).click();
+  await expect.poll(() => fault.count).toBe(11);
+  const popover = page.getByRole('dialog', { name: 'C diagram' });
+  await popover.getByRole('button', { name: 'Hear C' }).click();
+  await fault.spent;
+  const toast = page.getByRole('alert').filter({ hasText: 'Piano' });
+  await expect(toast).toContainText("Couldn't be heard");
+
+  // Dismissed, it goes.
+  await toast.getByRole('button', { name: 'Dismiss the Piano error' }).click();
+  await expect(toast).toHaveCount(0);
 });
 
 /** The Reading menu, opened, in Read mode's Lyric Sheet. */
