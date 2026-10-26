@@ -30,7 +30,8 @@ async function onThisDevice(page: Page, kept: Record<string, string>) {
 
 const sheet = (page: Page) => page.getByRole('region', { name: 'Lyric Sheet' });
 const chart = (page: Page) => page.getByRole('region', { name: 'Chord Chart' });
-const chordOf = (page: Page, name: string) => sheet(page).locator('.chord span', { hasText: new RegExp(`^${name}$`) });
+/** A Chord over a Line in the Lyric Sheet, by its name, e.g. "F#m". */
+const chordOf = (page: Page, name: string) => sheet(page).getByText(name, { exact: true });
 
 const style = (el: Locator, property: string) =>
   el.evaluate((node, property) => getComputedStyle(node).getPropertyValue(property), property);
@@ -162,6 +163,6 @@ test('printing from Read mode leaves hidden Chords and a hidden Chord Chart off 
 
   await expect(page.getByRole('dialog', { name: 'Keyboard shortcuts' })).toBeHidden();
   await expect(sheet(page).getByText('Sing it out')).toBeVisible();
-  await expect(sheet(page).locator('.chord')).toHaveCount(0);
+  for (const name of ['G', 'C', 'D']) await expect(chordOf(page, name)).toHaveCount(0);
   await expect(chart(page)).toBeHidden();
 });

@@ -165,7 +165,7 @@
       : null,
   );
   const summary = $derived(shownDetails ? detailsSummary(shownDetails, transpose) : '');
-  const printed = $derived(shownDetails ? printedDetails(shownDetails, transpose) : '');
+  const printedLine = $derived(shownDetails ? printedDetails(shownDetails, transpose) : '');
   const notes = $derived(details?.notes.shown ?? '');
   const hasNotes = $derived(notes.trim() !== '');
 
@@ -670,8 +670,8 @@
               <p class="summary" class:muted={!summary}>{summary || 'No Details yet.'}</p>
               {#if hasNotes}{@render notesToggle()}{/if}
             </div>
-            {#if printed}
-              <p class="print-details">{printed}</p>
+            {#if printedLine}
+              <p class="print-details">{printedLine}</p>
             {/if}
             {#if tags.length > 0}
               <div class="read-tags"><TagChips {tags} /></div>

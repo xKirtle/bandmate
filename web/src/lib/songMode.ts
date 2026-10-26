@@ -13,15 +13,15 @@ export function openingMode(status: Status): Mode {
   return status === 'finished' ? 'read' : 'write';
 }
 
+/** A Song's Details that set how it's played, as typed: "" when not set. */
+export type DetailsText = { key: string; bpm: string; capo: string; tuning: string };
+
 /**
  * A Song's Details as one line of text, as Read mode shows them, e.g. "C#m · 92 BPM · Capo 2 · Standard".
  * With the Chords transposed by semitones, a readable key shows as the one
  * they're shown in, with the written one: "A (written G)".
  */
-export function detailsSummary(
-  details: { key: string; bpm: string; capo: string; tuning: string },
-  transpose = 0,
-): string {
+export function detailsSummary(details: DetailsText, transpose = 0): string {
   const key = details.key.trim();
   const shownKey = transposeKey(key, transpose);
   const bpm = details.bpm.trim();
@@ -38,10 +38,7 @@ export function detailsSummary(
  * so the paper never claims a Key the Song isn't in, with how far the Chords
  * are transposed beside it.
  */
-export function printedDetails(
-  details: { key: string; bpm: string; capo: string; tuning: string },
-  transpose = 0,
-): string {
+export function printedDetails(details: DetailsText, transpose = 0): string {
   const key = details.key.trim();
   const amount = transpose === 0 ? '' : transposeText(transpose);
   const bpm = details.bpm.trim();
