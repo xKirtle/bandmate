@@ -183,7 +183,8 @@ const browserKeys = ['w', 't', 'n', 'q', 'l', 'h', 'm', 'Tab', 'PageUp', 'PageDo
 function kept(key: Key): KeptFor | null {
   const bare = !key.mod && !key.alt && !key.shift;
   if (key.mod && browserKeys.includes(key.key)) return 'browser';
-  // Printing, which makes a Print of the Song page. With Shift or Alt, P is free.
+  // The browser's print, which makes a Print of the Song, with Ctrl or ⌘ alone:
+  // with Shift or Alt too, P is free.
   if (key.mod && !key.alt && !key.shift && key.key === 'p') return 'browser';
   if (key.key === 'Tab') return 'tab';
   if (key.key === 'Escape') return 'escape';

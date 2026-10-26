@@ -110,15 +110,13 @@ group('refusing a key', () => {
     expect(choose(defaultShortcutKeys, record, { key: 'w' }).ok).toBe(true);
   });
 
-  it('refuses Ctrl+P or ⌘P, which prints, but not with Shift or bare', () => {
-    expect(refused(record, { key: 'p', mod: true }).kind).toBe('browser');
-    expect(refusalMessage(refused(record, { key: 'p', mod: true }), 'other').text).toBe(
-      "Ctrl+P can't be chosen: the browser keeps it.",
-    );
-    expect(refusalMessage(refused(record, { key: 'p', mod: true }), 'mac').text).toBe(
-      "⌘P can't be chosen: the browser keeps it.",
-    );
+  it('refuses Ctrl+P or ⌘P, which prints, but not with Shift or Alt, or bare', () => {
+    const print = refused(record, { key: 'p', mod: true });
+    expect(print.kind).toBe('browser');
+    expect(refusalMessage(print, 'other').text).toBe("Ctrl+P can't be chosen: the browser keeps it.");
+    expect(refusalMessage(print, 'mac').text).toBe("⌘P can't be chosen: the browser keeps it.");
     expect(choose(defaultShortcutKeys, record, { key: 'p', mod: true, shift: true }).ok).toBe(true);
+    expect(choose(defaultShortcutKeys, record, { key: 'p', mod: true, alt: true }).ok).toBe(true);
     expect(choose(defaultShortcutKeys, record, { key: 'p' }).ok).toBe(true);
   });
 
