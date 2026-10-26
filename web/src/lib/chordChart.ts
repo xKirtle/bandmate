@@ -6,12 +6,15 @@ import type { Song } from './api';
 import { hasChords } from './chords';
 import {
   chordName,
-  finderInstrument,
+  highestKey,
   lookUp,
+  lowestKey,
   readTuning,
   standard,
-  type GuitarContext,
-  type GuitarVoicing,
+  type FinderContext,
+  type InstrumentName,
+  type PianoVoicing,
+  type Voicing,
 } from './chordFinder';
 import { activeAlternate, sectionsInArrangement } from './sections';
 import { transposeChord } from './transpose';
@@ -59,31 +62,54 @@ export function chartTuning(text: string): readonly number[] | null {
 }
 
 /**
- * The Instrument the Chord Chart draws: the guitar, in the tuning it draws
- * for (from chartTuning). Its preferred Voicings are the Chord Finder's.
+ * What the Chord Chart draws on: the device's Instrument, shared with the
+ * Chord Finder. On the guitar, it's in the Song's tuning (from chartTuning),
+ * or null when that can't be read. The piano has no tuning, so the Song's
+ * doesn't matter on it, even one that can't be read.
  */
-export function chartInstrument(tuning: readonly number[]) {
-  return finderInstrument({ instrument: 'guitar', tuning });
+export function chartContext(instrument: InstrumentName, tuning: string): FinderContext | null {
+  if (instrument === 'piano') return { instrument: 'piano' };
+  const read = chartTuning(tuning);
+  return read && { instrument: 'guitar', tuning: read };
+}
+
+/** A stretch of a piano's keys, as MIDI note numbers, both ends drawn. */
+export interface KeyRange {
+  lowest: number;
+  highest: number;
+}
+
+const octave = 12;
+
+/**
+ * The keys every piano card in the Chord Chart draws, so they line up: the
+ * whole octaves, C to C, just covering every key any of its Voicings
+ * presses, each card marking only its own. Never wider than the Chord
+ * Finder's C3 to C5, which every piano Voicing fits, and C3 to C5 with none.
+ */
+export function chartKeyRange(voicings: readonly PianoVoicing[]): KeyRange {
+  const pressed = voicings.flatMap((v) => v.keys);
+  if (pressed.length === 0) return { lowest: lowestKey, highest: highestKey };
+  const lowest = Math.max(lowestKey, Math.floor(Math.min(...pressed) / octave) * octave);
+  const highest = Math.min(highestKey, Math.max(lowest + octave, Math.ceil(Math.max(...pressed) / octave) * octave));
+  return { lowest, highest };
 }
 
 /**
  * What the Chord Chart draws for a Chord as shown: the preferred Voicing of
- * it in the tuning, else the top-ranked one, as the Chord Finder would, and
- * as a Chord's popover opens on. Or why it draws none: the Chord can't be read, it has no
- * Voicing in the tuning, or the tuning can't be read (null, from chartTuning).
+ * it on the device's Instrument (on the guitar, in the tuning), else the
+ * top-ranked one, as the Chord Finder would, and as a Chord's popover opens
+ * on. Or why it draws none: the Chord can't be read, it has no Voicing, or
+ * the guitar's tuning can't be read (a null context, from chartContext).
  */
 export type ChartVoicing =
-  | { kind: 'voicing'; voicing: GuitarVoicing }
+  | { kind: 'voicing'; voicing: Voicing }
   | { kind: 'unreadable-chord' }
   | { kind: 'no-voicing' }
   | { kind: 'unreadable-tuning' };
 
-export function chartVoicing(
-  name: string,
-  tuning: readonly number[] | null,
-  preferred?: GuitarContext['preferred'],
-): ChartVoicing {
-  const found = chartVoicings(name, tuning, preferred);
+export function chartVoicing(name: string, context: FinderContext | null): ChartVoicing {
+  const found = chartVoicings(name, context);
   if (found.kind !== 'voicings') return found;
   const voicing = found.voicings[0];
   return voicing ? { kind: 'voicing', voicing } : { kind: 'no-voicing' };
@@ -91,23 +117,20 @@ export function chartVoicing(
 
 /**
  * What a Chord's popover steps through: every Voicing of the Chord as shown
- * in the tuning, the preferred one first, else the top-ranked, as the Chord
- * Finder lists them. With the Chord's name as the Chord Finder reads it, the
- * name preferring one names it by, and whether the first is preferred. Or
- * why there are none to step through: the Chord or the tuning can't be read.
+ * on the device's Instrument, the preferred one first, else the top-ranked,
+ * as the Chord Finder lists them. With the Chord's name as the Chord Finder
+ * reads it, the name preferring one names it by, and whether the first is
+ * preferred. Or why there are none to step through: the Chord or the
+ * guitar's tuning can't be read.
  */
 export type ChartVoicings =
-  | { kind: 'voicings'; chord: string; voicings: GuitarVoicing[]; preferred: boolean }
+  | { kind: 'voicings'; chord: string; voicings: Voicing[]; preferred: boolean }
   | { kind: 'unreadable-chord' }
   | { kind: 'unreadable-tuning' };
 
-export function chartVoicings(
-  name: string,
-  tuning: readonly number[] | null,
-  preferred?: GuitarContext['preferred'],
-): ChartVoicings {
-  if (!tuning) return { kind: 'unreadable-tuning' };
-  const found = lookUp(name, { tuning, preferred });
+export function chartVoicings(name: string, context: FinderContext | null): ChartVoicings {
+  if (!context) return { kind: 'unreadable-tuning' };
+  const found = lookUp(name, context);
   if (found.kind !== 'chord') return { kind: 'unreadable-chord' };
   return { kind: 'voicings', chord: found.name, voicings: found.voicings, preferred: found.preferred };
 }

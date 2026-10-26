@@ -1,11 +1,13 @@
 // The Chord Finder's Instrument, its tuning and the Key Suggest suggests
 // from. The user picks them on the Finder's page, and the last ones picked
 // are kept on this device, like hiding a Song's Chords: the guitar, standard
-// tuning and C major until picked here.
+// tuning and C major until picked here. The Instrument is the device's, which
+// the Chord Chart draws too.
 
 import { instruments, keys, tunings, tuningText, type InstrumentName } from './chordFinder';
+import type { DeviceSettingStorage } from './deviceSetting.svelte';
 
-/** Where the Chord Finder's Instrument is kept on this device. */
+/** Where the device's Instrument is kept on this device: under the Chord Finder's name, where it was first picked. */
 export const finderInstrumentKey = 'bandmate.chordFinder.instrument';
 const defaultInstrument = instruments[0];
 
@@ -28,6 +30,13 @@ export function storeFinderInstrument(storage: Storage | undefined, instrument: 
     // Not kept, e.g. in a private window; the choice still applies until reload.
   }
 }
+
+/** The device's Instrument, shared by the Chord Finder and the Chord Chart, kept the way a Device Setting is. */
+export const instrumentSetting = {
+  key: finderInstrumentKey,
+  read: readFinderInstrument,
+  store: storeFinderInstrument,
+} satisfies DeviceSettingStorage<InstrumentName>;
 
 /** Where the Chord Finder's tuning is kept on this device. */
 export const finderTuningKey = 'bandmate.chordFinder.tuning';

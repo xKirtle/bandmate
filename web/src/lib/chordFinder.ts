@@ -35,7 +35,7 @@ export { qualities, roots, type Quality, type Suggestion } from './chordTheory';
 export { keys };
 export type { Frets, GuitarVoicing } from './guitar';
 export type { Pluck } from './instrument';
-export { pianoKeyName, type PianoKeys, type PianoVoicing } from './piano';
+export { highestKey, lowestKey, pianoKeyName, whiteKeys, type PianoKeys, type PianoVoicing } from './piano';
 
 /** Standard tuning, its strings' pitches low to high, as MIDI note numbers (E2 A2 D3 G3 B3 E4). */
 export const standard: readonly number[] = standardTuning;
@@ -93,8 +93,8 @@ export function isPianoVoicing(voicing: Voicing): voicing is PianoVoicing {
 /** The Chord Finder on the guitar, in a tuning. */
 export interface GuitarContext {
   /**
-   * The Instrument: the guitar. Left out, it's the guitar too, as the Chord
-   * Chart's context leaves it, since the Chart only draws the guitar.
+   * The Instrument: the guitar. Left out, it's the guitar too, as a context
+   * that's only ever the guitar's, like Name it's fretboard, leaves it.
    */
   instrument?: 'guitar';
   /** The strings' pitches, low to high, as MIDI note numbers. */
