@@ -19,6 +19,8 @@ export interface InstrumentSound {
 export interface HeardNote {
   /** Its MIDI note number. */
   midi: number;
+  /** The string it's played on, 0 the thickest, on an Instrument with strings: it plays that string's recording. */
+  string?: number;
 }
 
 /**

@@ -91,7 +91,7 @@ function play({ notes, gap, sound }: Played<AudioBuffer>): void {
   const start = context.currentTime + 0.01;
   const sources = notes.map((note, i) => {
     const source = context.createBufferSource();
-    const { sample, rate } = sampleFor(sound.set, note.midi);
+    const { sample, rate } = sampleFor(sound.set, note);
     source.buffer = sound.samples.get(sample) ?? null;
     source.playbackRate.value = rate;
     source.connect(gain);

@@ -150,7 +150,7 @@ function pianoVoicings(chord: Chord): PianoVoicing[] {
  */
 export const pianoSamples: SampleSet = {
   name: 'Piano',
-  notes: [42, 45, 48, 51, 54, 57, 60, 63, 66, 69, 72],
+  samples: [42, 45, 48, 51, 54, 57, 60, 63, 66, 69, 72].map((note) => ({ note })),
   url: samplesIn('piano'),
   gain: 0.55,
 };

@@ -5,7 +5,8 @@
 
 import type { Chord } from './chordTheory';
 import type { HeardNote, Instrument } from './instrument';
-import { samplesIn, type SampleSet } from './samples';
+import { standardTuning } from './guitarTuning';
+import { sampleFileName, samplesIn, type SampleSet } from './samples';
 
 /** The frets placed on a guitar, low string to high: 0 for open, null for muted. */
 export type Frets = readonly (number | null)[];
@@ -152,26 +153,30 @@ export function diagramStartFret(voicing: GuitarVoicing, rows: number): number {
   return fretted.length === 0 || Math.max(...fretted) <= rows ? 1 : Math.min(...fretted);
 }
 
-/** What strumming frets on a guitar plays, low string to high, muted strings skipped: each string's MIDI note number. */
+/** What strumming frets on a guitar plays, low string to high, muted strings skipped: each string's MIDI note number, on that string. */
 function guitarHeardNotes(frets: Frets, tuning: readonly number[]): HeardNote[] {
-  return frets.flatMap((fret, string) => (fret === null ? [] : [{ midi: tuning[string] + fret }]));
+  return frets.flatMap((fret, string) => (fret === null ? [] : [{ midi: tuning[string] + fret, string }]));
 }
 
+/** The frets recorded on each string, as web/scripts/guitar-samples.mjs makes them: every 3, so no note in standard tuning is pitch-shifted more than a semitone. */
+const recordedFrets = [0, 3, 6, 9, 12];
+
 /**
- * The guitar's recorded samples: a steel-string acoustic from the University
- * of Iowa Electronic Music Studios, packaged by Nicholaus Brosowsky
- * (tonejs-instruments, CC BY 3.0), every 2 semitones from D2 to D5, so
- * standard tuning's open low E, D and high E play as recorded. There's none
- * below D2 or above D5: Drop C's low C and the top string's 12th fret play
- * from an end, 2 semitones away. Its gain matches the strum of C to the
- * synthesised one it replaced, leaving every Voicing measured, six strings
- * too, at least 8 dB from clipping (#1205).
+ * The guitar's recorded samples: the University of Iowa Musical Instrument
+ * Samples' Raimundo 118, a nylon-string classical, recorded string by
+ * string, at frets 0, 3, 6, 9 and 12 of each of standard tuning's strings,
+ * so a note sounds as its own string does there (#1209). Each string's are
+ * served from a folder named by its open note. A string tuned away from
+ * standard still plays its own recordings, from the nearest: Drop D's low
+ * D is the low E's open string pitched down. Its gain matches the strum of C
+ * to the guitar's before (#1207), and leaves every Voicing measured at least
+ * 5 dB from clipping.
  */
 export const guitarSamples: SampleSet = {
   name: 'Guitar',
-  notes: [38, 40, 42, 44, 46, 48, 50, 52, 54, 56, 58, 60, 62, 64, 66, 68, 70, 72, 74],
-  url: samplesIn('guitar'),
-  gain: 0.23,
+  samples: standardTuning.flatMap((open, string) => recordedFrets.map((fret) => ({ note: open + fret, string }))),
+  url: (sample) => samplesIn(`guitar/${sampleFileName(standardTuning[sample.string ?? 0])}`)(sample),
+  gain: 0.64,
 };
 
 /**
