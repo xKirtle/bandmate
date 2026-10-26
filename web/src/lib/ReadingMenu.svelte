@@ -16,10 +16,14 @@
   import { keyHints } from './keyHints';
   import { largestLyricSize, smallestLyricSize, stepLyricSize, usualLyricSize } from './lyricSize';
   import { following, placeBeside } from './popover';
+  import { instruments } from './chordFinder';
+  import { instrumentText } from './deviceInstrument';
+  import Picker from './Picker.svelte';
   import { blockedRows, readingBadge } from './readingMenu';
   import { songAutoScrollSpeed } from './sharedAutoScrollSpeed.svelte';
   import { chartSize } from './sharedChartSize.svelte';
   import { chordChartState } from './sharedChordChartState.svelte';
+  import { instrument } from './sharedInstrument.svelte';
   import { lyricSize } from './sharedLyricSize.svelte';
   import { songTranspose } from './sharedTranspose.svelte';
   import { rebound } from './shortcutKeys';
@@ -27,10 +31,12 @@
 
   // Read mode's choices about how the Song reads, behind one button in the
   // Lyric Sheet's header, in this order: the Lyric Size, Transpose, whether
-  // the Chords show, the Chord Chart's eye and pin, its Chart Size, and
-  // Auto-scroll's speed. Each is kept on this device, as before.
-  // It stays open while they change, and every Song has the same rows, a
-  // Chord row disabled, saying why, where it can't apply.
+  // the Chords show, the Chord Chart's eye and pin, its Chart Size, the
+  // device's Instrument, and Auto-scroll's speed. Each is kept on this
+  // device, as before. It stays open while they change, and every Song has
+  // the same rows, a Chord row disabled, saying why, where it can't apply.
+  // The Instrument never is: it's the device's, whatever the Song, and the
+  // Chord Finder plays it too.
 
   let {
     songId,
@@ -280,6 +286,19 @@
         >
       </div>
 
+      <span id="reading-instrument" class="name">Instrument</span>
+      <div class="controls">
+        <Picker
+          id="reading-instrument-picker"
+          class="instrument"
+          aria-labelledby="reading-instrument"
+          options={instruments}
+          value={instrument.value}
+          text={instrumentText}
+          onpick={(picked) => instrument.set(picked)}
+        />
+      </div>
+
       <span id="reading-speed" class="name">Auto-scroll speed</span>
       <div class="controls" role="group" aria-labelledby="reading-speed">
         <button
@@ -336,6 +355,8 @@
     align-items: center;
     gap: var(--space-2) var(--space-4);
     max-width: calc(100vw - 2rem);
+    /* Wide enough for "−11" or "175%", so the steps don't move as the amount changes. */
+    --amount: 3.25rem;
     padding: var(--space-3) var(--space-4);
   }
   .panel:focus {
@@ -358,9 +379,8 @@
     min-width: var(--control);
     padding: 0;
   }
-  /* Wide enough for "−11" or "175%", so the steps don't move as the amount changes. */
   .amount {
-    min-width: 3.25rem;
+    min-width: var(--amount);
     padding: 0 var(--space-2);
     font-variant-numeric: tabular-nums;
   }
@@ -369,6 +389,10 @@
   .amount:disabled:not(.blocked) {
     opacity: 1;
     color: var(--text-muted);
+  }
+  /* As wide as the three buttons of the rows above it. */
+  .controls :global(.instrument) {
+    width: calc(2 * var(--control) + var(--amount) + 2 * var(--space-1));
   }
   .pin[aria-pressed='true'] :global(.lucide-pin) {
     fill: currentColor;

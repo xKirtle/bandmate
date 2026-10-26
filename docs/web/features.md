@@ -28,13 +28,13 @@ Write lyrics the way you would in a notebook, with the chords right where you pl
 9. **Scrapbook**: sections that aren't in the song: leftovers and ideas to come back to.
 10. **Rhymes**: suggestions for the word you're writing. See [Rhymes](#rhymes).
 
-And this is Read mode, here on a phone: the chords over the words, and how to play each one at the top. The button at the top right sets the text size, transposes or hides the chords, and shows, pins or resizes the chord shapes: larger to read them from a music stand further off, smaller to fit more on a phone. The chord shapes' size is separate from the text size, and both hold for every song on that device.
+And this is Read mode, here on a phone: the chords over the words, and how to play each one at the top. The button at the top right sets the text size, transposes or hides the chords, and shows, pins or resizes the chord shapes: larger to read them from a music stand further off, smaller to fit more on a phone. The chord shapes' size is separate from the text size, and both hold for every song on that device. The same button switches the chord shapes between guitar and piano, for the [Chords](#chords) page too.
 
 <img class="phone" src="@screenshots/phone-lyric-sheet.png" alt="A song in Read mode on a phone, with the chord shapes at the top">
 
 Hover or tap a chord, or tap its shape at the top, to step through the other ways to play it, and prefer one. Press the speaker to hear the shape strummed, in the song's tuning. It plays the shape as you'd finger it, so the capo doesn't change it, and it plays over the song if that's playing.
 
-With piano picked on the [Chords](#chords) page, the shapes at the top are piano keys instead, all drawn over the same keys so they line up, and the speaker plays the keys together. The song's tuning doesn't matter on piano.
+With piano picked, in the reading options, on the [Chords](#chords) page or in [Settings](/settings#settings), the shapes at the top are piano keys instead, all drawn over the same keys so they line up, and the speaker plays the keys together. The song's tuning doesn't matter on piano.
 
 To play a song through from a music stand without line timings, press **Auto-scroll**, beside the reading options, or **A**: the lyrics scroll on their own at a steady pace, and keep the same pace whatever the text size. Scroll by hand to skip ahead or go back, and it carries on from there. While it runs, a bar floats at the bottom: slow it down or speed it up there with − and +, or pause it, or press **A** again. Set its speed, from 1 to 10, in the reading options too, or with **[** and **]**; each song keeps its own speed on that device. It stops at the end of the song, and starts from the top again if you press it there. While the timeline plays, the line playing leads instead, so Auto-scroll stops. Where the browser allows, and Bandmate is served over HTTPS, the screen stays on while it runs.
 
@@ -66,7 +66,7 @@ A [Backup](/settings#backups) of a song holds its Snapshots, so restoring the Ba
 
 ## Chords
 
-The **Chords** page, in the side bar, helps with chords away from any song, on guitar, in standard tuning or any other, or on piano. Pick one under **Instrument**; that device remembers it, and Read mode shows chords on it too.
+The **Chords** page, in the side bar, helps with chords away from any song, on guitar, in standard tuning or any other, or on piano. Pick one under **Instrument**; that device remembers it, and Read mode shows chords on it too. Switch it here, in Read mode's reading options, or in Settings.
 
 <img src="@screenshots/chords-look-up.png" alt="Look up showing Cmaj7: its notes, then its shapes as chord diagrams, best first">
 

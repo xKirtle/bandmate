@@ -1,6 +1,6 @@
 import { DeviceSetting } from './deviceSetting.svelte';
 import { deviceStorage } from './deviceStorage';
-import { instrumentSetting } from './finderSetup';
+import { instrumentSetting } from './deviceInstrument';
 
 // The device's Instrument, shared by the Chord Finder, the Chord Chart and a
 // Chord's popover, so picking one in any of them, in any of this device's

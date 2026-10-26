@@ -109,3 +109,70 @@ test("a Chord's popover on the piano steps through its inversions on C3 to C5, p
   await expect(cards.first()).toContainText('1st inversion');
   await expect(cards.first()).toContainText('Preferred');
 });
+
+/** The Reading menu, opened, in Read mode's Lyric Sheet. */
+async function openReading(page: Page) {
+  await page.getByRole('region', { name: 'Lyric Sheet' }).getByRole('button', { name: 'Reading', exact: true }).click();
+  return page.getByRole('dialog', { name: 'Reading options' });
+}
+
+test('the Reading menu picks the Instrument, and the Chart and popover switch at once, the menu still open', async ({
+  page,
+  bandmate,
+}) => {
+  const song = await songWith(bandmate, ['C']);
+  await page.goto(`/songs/${song.id}`);
+  await expect(chart(page).getByRole('img', { name: 'C: x 3 2 0 1 0' })).toBeVisible();
+
+  const reading = await openReading(page);
+  const picker = reading.getByRole('combobox', { name: 'Instrument' });
+  await expect(picker).toHaveText('Guitar');
+  await picker.click();
+  await page.getByRole('option', { name: 'Piano' }).click();
+  await expect(picker).toHaveText('Piano');
+  await expect(reading).toBeVisible();
+  await expect(chart(page).getByRole('img', { name: 'C on the piano: C4 E4 G4' })).toBeVisible();
+
+  // Escape closes the picker's list first, then the menu.
+  await picker.press('ArrowDown');
+  await expect(page.getByRole('option', { name: 'Guitar' })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('option')).toHaveCount(0);
+  await expect(reading).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(reading).toHaveCount(0);
+
+  await chart(page).getByRole('button', { name: /C/ }).click();
+  await expect(
+    page.getByRole('dialog', { name: 'C diagram' }).getByRole('img', { name: 'C on the piano: C4 E4 G4' }),
+  ).toBeVisible();
+
+  // It's the device's: the Chord Finder plays it too.
+  await page.goto('/chords');
+  await expect(page.getByRole('combobox', { name: 'Instrument' })).toHaveText('Piano');
+});
+
+test("Settings' This device lists the Instrument, and picking it there switches an open Song's Chart and the Chord Finder", async ({
+  page,
+  bandmate,
+}) => {
+  const song = await songWith(bandmate, ['C']);
+  await page.goto(`/songs/${song.id}`);
+  await expect(chart(page).getByRole('img', { name: 'C: x 3 2 0 1 0' })).toBeVisible();
+
+  const settings = await page.context().newPage();
+  await settings.goto('/settings');
+  const instrument = settings.getByRole('group', { name: 'Instrument' });
+  await expect(instrument.getByRole('radio', { name: 'Guitar' })).toBeChecked();
+  await instrument.getByRole('radio', { name: 'Piano' }).check();
+
+  // The Song open in another tab switches without a reload, its Reading menu with it.
+  await expect(chart(page).getByRole('img', { name: 'C on the piano: C4 E4 G4' })).toBeVisible();
+  await expect((await openReading(page)).getByRole('combobox', { name: 'Instrument' })).toHaveText('Piano');
+
+  // Picked back in the Chord Finder, Settings shows the guitar again.
+  await page.goto('/chords');
+  await page.getByRole('combobox', { name: 'Instrument' }).click();
+  await page.getByRole('option', { name: 'Guitar' }).click();
+  await expect(instrument.getByRole('radio', { name: 'Guitar' })).toBeChecked();
+});

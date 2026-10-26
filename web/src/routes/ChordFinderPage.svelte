@@ -3,10 +3,12 @@
   // the Instrument, the guitar until picked, and on the guitar the tuning,
   // standard tuning until picked, and the Key Suggest suggests from, C major
   // until picked. The last ones picked are kept on this device. The
-  // Instrument is the device's, so the Chord Chart draws the one picked here.
+  // Instrument is the device's, the one the Chord Chart draws and the Reading
+  // menu and Settings pick too.
   // The piano has no tuning, so the field hides while it's picked.
   import ChordFinder from '../lib/ChordFinder.svelte';
-  import { instruments, readTuning, standard, type FinderContext, type InstrumentName } from '../lib/chordFinder';
+  import { instruments, readTuning, standard, type FinderContext } from '../lib/chordFinder';
+  import { instrumentText } from '../lib/deviceInstrument';
   import { deviceStorage } from '../lib/deviceStorage';
   import { readFinderKey, readFinderTuning, storeFinderKey, storeFinderTuning } from '../lib/finderSetup';
   import Picker from '../lib/Picker.svelte';
@@ -21,8 +23,6 @@
   const context = $derived<FinderContext>(
     instrument === 'piano' ? { instrument: 'piano' } : { instrument: 'guitar', tuning: readTuning(tuning) ?? standard },
   );
-
-  const instrumentLabel = (i: InstrumentName) => (i === 'piano' ? 'Piano' : 'Guitar');
 
   function keep() {
     tuningError = '';
@@ -43,7 +43,7 @@
         aria-labelledby="finder-instrument-label"
         options={instruments}
         value={instrument}
-        text={instrumentLabel}
+        text={instrumentText}
         onpick={(picked) => deviceInstrument.set(picked)}
       />
     </div>
