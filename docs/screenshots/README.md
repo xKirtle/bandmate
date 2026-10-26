@@ -17,6 +17,8 @@ The screenshots in the README and on the docs site, `docs/web/`, taken in the da
 | `phone-song-list.png` | The Songs page on a phone: both Folders, then the Songs in none |
 | `phone-timeline.png` | The hero Song on a phone held sideways, the Timeline filling the screen |
 | `phone-lyric-sheet.png` | The hero Song in Read mode on a phone                          |
+| `chord-chart-guitar.png` | The hero Song's Chord Chart in Read mode, on the guitar |
+| `chord-chart-piano.png` | The hero Song's Chord Chart in Read mode, on the piano |
 | `read-mode.png`         | The hero Song in Read mode, with the Line playing highlighted  |
 | `sync-mode.webp`        | Sync mode cueing the Bridge's Lines, animated                  |
 | `snapshots.png` | The hero Song's Snapshots, grouped into the last 24 hours, daily and weekly, the oldest Kept and open beside Now, with Verse 1's third Line rewritten since. The capture takes them just before, so it shows them as taken over weeks |

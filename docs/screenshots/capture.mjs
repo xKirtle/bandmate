@@ -621,6 +621,38 @@ const phone = {
   await page.context().close();
 }
 
+// The hero Song's Chord Chart in Read mode, on the guitar, then the piano.
+// The device's Instrument is kept in the browser, so each has its own context.
+for (const instrument of ["guitar", "piano"]) {
+  const context = await browser.newContext(desktop);
+  // The guitar is the default, kept as no choice at all.
+  if (instrument === "piano")
+    await context.addInitScript(() =>
+      localStorage.setItem("bandmate.chordFinder.instrument", "piano"),
+    );
+  const page = await context.newPage();
+  await page.goto(heroURL);
+  await page.waitForLoadState("networkidle");
+  await readMode(page);
+  const chart = page.getByRole("region", { name: "Chord Chart" });
+  await chart.waitFor();
+  // Off the Chord Chart, which the click into Read mode leaves it over.
+  await page.mouse.move(0, 0);
+  // Its row scrolls sideways, and the piano's fit fewer: up to the last
+  // Chord shown whole, so none is cut in half.
+  const box = await chart.boundingBox();
+  let right = box.x;
+  for (const chord of await chart.getByRole("listitem").all()) {
+    const { x, width } = await chord.boundingBox();
+    if (x + width > box.x + box.width) break;
+    right = x + width;
+  }
+  await save(page, `chord-chart-${instrument}`, {
+    clip: { ...box, x: box.x - 16, width: right + 16 - (box.x - 16) },
+  });
+  await context.close();
+}
+
 // Read mode, with the Line playing highlighted.
 {
   const page = await open(heroURL);

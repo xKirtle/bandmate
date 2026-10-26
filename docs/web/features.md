@@ -36,6 +36,9 @@ Hover or tap a chord, or tap its shape at the top, to step through the other way
 
 With piano picked, in the reading options, on the [Chords](#chords) page or in [Settings](/settings#settings), the shapes at the top are piano keys instead, all drawn over the same keys so they line up, and the speaker plays the keys together. The song's tuning doesn't matter on piano.
 
+<img src="@screenshots/chord-chart-guitar.png" alt="The chord shapes at the top of a song in Read mode, on guitar: a fretboard diagram for each chord">
+<img src="@screenshots/chord-chart-piano.png" alt="The same chord shapes on piano: each chord's keys coloured on the same stretch of keyboard">
+
 To play a song through from a music stand without line timings, press **Auto-scroll**, beside the reading options, or **A**: the lyrics scroll on their own at a steady pace, and keep the same pace whatever the text size. Scroll by hand to skip ahead or go back, and it carries on from there. While it runs, a bar floats at the bottom: slow it down or speed it up there with − and +, or pause it, or press **A** again. Set its speed, from 1 to 10, in the reading options too, or with **[** and **]**; each song keeps its own speed on that device. It stops at the end of the song, and starts from the top again if you press it there. While the timeline plays, the line playing leads instead, so Auto-scroll stops. Where the browser allows, and Bandmate is served over HTTPS, the screen stays on while it runs.
 
 ### Rhymes
