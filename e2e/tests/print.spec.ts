@@ -40,18 +40,15 @@ const chordOf = (page: Page, name: string) => sheet(page).getByText(name, { exac
 const style = (el: Locator, property: string) =>
   el.evaluate((node, property) => getComputedStyle(node).getPropertyValue(property), property);
 
-/** The Song page printed from Read mode, as it lays out under print media. */
-async function printed(page: Page, songId: number) {
+/** The Song page printed, from the mode it opens in, as it lays out under print media. */
+async function printed(page: Page, songId: number, mode: 'Read' | 'Write' = 'Read') {
   await page.goto(`/songs/${songId}`);
-  await expect(sheet(page).getByRole('region', { name: 'Verse' })).toBeVisible();
-  await page.emulateMedia({ media: 'print' });
-}
-
-/** The Song page printed from Write mode, as it lays out under print media. */
-async function printedFromWrite(page: Page, songId: number) {
-  await page.goto(`/songs/${songId}`);
-  await expect(page.getByRole('radio', { name: 'Write' })).toBeChecked();
-  await expect(page.getByRole('button', { name: 'Add Section' })).toBeVisible();
+  await expect(page.getByRole('radio', { name: mode })).toBeChecked();
+  const loaded =
+    mode === 'Read'
+      ? sheet(page).getByRole('region', { name: 'Verse' })
+      : page.getByRole('button', { name: 'Add Section' });
+  await expect(loaded).toBeVisible();
   await page.emulateMedia({ media: 'print' });
 }
 
@@ -190,7 +187,7 @@ test('printing from Write mode shows the title, the Details line and the Lyric S
     [`bandmate.chordsHidden.${song.id}`]: '1',
     'bandmate.chordChart': 'pinned',
   });
-  await printedFromWrite(page, song.id);
+  await printed(page, song.id, 'Write');
 
   await expect(page.getByRole('heading', { name: 'Music Stand', level: 1 })).toBeVisible();
   // The Key prints plainly: there's no Transpose in Write mode.
