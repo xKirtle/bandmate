@@ -134,7 +134,7 @@ describe("samples that can't load", () => {
     expect(pending).toHaveLength(2);
   });
 
-  it('say nothing for a press something else was pressed since, only for the last', async () => {
+  it('speak only for the last press, not one something else was pressed since', async () => {
     const { player, toasts, settle } = setUp();
     player.hear(notes(60), struck);
     player.hear(notes(40), strummed);

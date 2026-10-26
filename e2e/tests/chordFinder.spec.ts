@@ -188,13 +188,13 @@ test('the guitar and the piano play samples Bandmate serves itself; when they ca
   page.on('request', (r) => {
     if (r.url().endsWith('.mp3')) asked.push(new URL(r.url()));
   });
-  const of = (instrument: string) => asked.filter((url) => url.pathname.includes(`/samples/${instrument}/`));
+  const samplesOf = (instrument: string) => asked.filter((url) => url.pathname.includes(`/samples/${instrument}/`));
   await page.goto('/chords');
   // Opening the Chord Finder loads the guitar's 19 samples, and picking the
   // piano its 11, from Bandmate itself.
-  await expect.poll(() => of('guitar').length).toBe(19);
+  await expect.poll(() => samplesOf('guitar').length).toBe(19);
   await pickInstrument(page, 'Piano');
-  await expect.poll(() => of('piano').length).toBe(11);
+  await expect.poll(() => samplesOf('piano').length).toBe(11);
   expect(asked).toHaveLength(30);
   expect(asked.every((url) => url.origin === new URL(page.url()).origin)).toBe(true);
 
