@@ -15,7 +15,7 @@
   import { instrument as deviceInstrument, pickInstrument } from '../lib/sharedInstrument.svelte';
   import Toasts from '../lib/Toasts.svelte';
   import TuningField from '../lib/TuningField.svelte';
-  import { unheardToasts } from '../lib/unheard.svelte';
+  import { unheard, unheardToasts } from '../lib/unheard.svelte';
 
   const instrument = $derived(deviceInstrument.value);
   let tuning = $state(readFinderTuning(deviceStorage()));
@@ -25,6 +25,9 @@
   const context = $derived<FinderContext>(
     instrument === 'piano' ? { instrument: 'piano' } : { instrument: 'guitar', tuning: readTuning(tuning) ?? standard },
   );
+
+  // A Chord that couldn't be heard here is this page's to say: leaving it goes.
+  $effect(() => () => unheard.dismiss());
 
   function keep() {
     tuningError = '';

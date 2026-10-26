@@ -1,5 +1,6 @@
 // Hearing a Chord: a Voicing's notes, played in the browser on the app's one
-// audio context, made on first use, as hearing's rules (hearing.ts) say. The
+// audio context, made on the first press, as browsers require, as hearing's
+// rules (hearing.ts) say. The
 // piano plays its recorded samples (ADR 0030), each note from the nearest
 // one, faster or slower to sound at the note. The guitar, for now, plays a
 // plucked string synthesised for each note, a Karplus–Strong pluck: a burst
@@ -31,14 +32,21 @@ const sustain = 0.996;
 /** The Hear or Arpeggiate still ringing, if any: what a new one cuts off. */
 let ringing: { gain: GainNode; sources: AudioBufferSourceNode[] } | null = null;
 
+/**
+ * Where samples are decoded, at the rate they're encoded at: offline, so
+ * loading them before any press doesn't make the app's audio context before
+ * a gesture lets it play. Playing resamples them to the context's rate.
+ */
+let decoder: OfflineAudioContext | undefined;
+
 const player = hearing<AudioBuffer>({
   loadSample: async (url) => {
     const response = await fetch(url);
     if (!response.ok) throw new Error(`${url}: ${response.status}`);
-    const context = audioContext();
-    const decoded = await context.decodeAudioData(await response.arrayBuffer());
+    decoder ??= new OfflineAudioContext(1, 1, 44100);
+    const decoded = await decoder.decodeAudioData(await response.arrayBuffer());
     const from = fromOnset(decoded.getChannelData(0), decoded.sampleRate);
-    const sample = context.createBuffer(1, from.length, decoded.sampleRate);
+    const sample = new AudioBuffer({ length: from.length, sampleRate: decoded.sampleRate });
     sample.copyToChannel(from as Float32Array<ArrayBuffer>, 0);
     return sample;
   },

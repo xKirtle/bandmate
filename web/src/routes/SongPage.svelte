@@ -25,7 +25,7 @@
   import LanguagesField from '../lib/LanguagesField.svelte';
   import { LyricSheetEditing } from '../lib/lyricSheetEditing.svelte';
   import { Saves, surfaceNames, type Undone } from '../lib/saves.svelte';
-  import { unheardToasts } from '../lib/unheard.svelte';
+  import { unheard, unheardToasts } from '../lib/unheard.svelte';
   import { SongUndo } from '../lib/songUndo.svelte';
   import { scrollBehavior } from '../lib/motion';
   import { detailFields, type DetailFields } from '../lib/songFields';
@@ -304,6 +304,8 @@
     })) ?? []),
     ...unheardToasts(),
   ]);
+  // A Chord that couldn't be heard here is this page's to say: leaving it goes.
+  $effect(() => () => unheard.dismiss());
 
   $effect(() => {
     const server = songServer(id);

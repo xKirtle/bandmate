@@ -21,3 +21,5 @@ One error per surface, so four at most, which the stack's bounded height holds. 
 The "changed elsewhere" banner stays where it is, a block on the page rather than a toast. It is not a refusal that has passed; it is a standing state, with a paragraph to read and a Reload to press, and it should hold the page rather than queue behind a mistyped BPM.
 
 This covers the Song page's refused saves and nothing else. The app has around twenty other error lines, in dialogs, cards and fields, and almost all of them already sit against the thing that failed — a Latency Offset typed wrong says so under the field, and moving that into a corner of the window would be this decision applied where its reasoning doesn't hold.
+
+ADR 0030 extends the stack to one more toast with nowhere beside its cause to live: a Chord that couldn't be heard, its Instrument's samples not loading, on the Song page and the Chord Finder's page.
