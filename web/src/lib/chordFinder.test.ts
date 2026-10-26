@@ -601,7 +601,7 @@ function palette(key: string): string[] | null {
 /** The MIDI note numbers hearing a shape plays, low string to high. */
 const midis = (written: string, ctx: GuitarContext = context) => heardNotes(shape(written), ctx).map((n) => n.midi);
 
-/** How bright each string hearing a shape plays sounds, low string to high. */
+/** How bright each string sounds when a shape is heard, low string to high. */
 const brightness = (written: string) => heardNotes(shape(written), context).map((n) => n.brightness);
 
 describe('what hearing a Voicing plays', () => {

@@ -3,7 +3,7 @@
   // Instrument sounds it: strummed, if plucked, as the guitar, or its notes
   // together, if struck, as the piano.
   import Volume2 from '@lucide/svelte/icons/volume-2';
-  import type { HeardNote, Sound } from './chordFinder';
+  import type { HeardNote, InstrumentSound } from './chordFinder';
   import { hear } from './hear';
 
   let {
@@ -16,7 +16,7 @@
     /** What to hear, low to high: the Chord Finder's heardNotes. With none, as in Name it with nothing placed, it's disabled. */
     notes: readonly HeardNote[];
     /** How the Instrument sounds: plucked, strummed low to high, or struck, its notes together. */
-    sound: Sound;
+    sound: InstrumentSound;
   } = $props();
 </script>
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { finderInstrument, firstVoicing, lookUp, nameIt, readTuning, standard, heardVoicing } from './chordFinder';
+import { finderInstrument, firstVoicing, heardVoicing, lookUp, nameIt, readTuning, standard } from './chordFinder';
 import { readPreferredVoicings, storePreferredVoicing } from './preferredVoicings';
 import { storage } from './storageFake';
 

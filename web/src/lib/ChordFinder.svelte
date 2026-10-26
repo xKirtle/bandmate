@@ -15,13 +15,13 @@
     lookUp,
     nameIt,
     heardNotes,
-    qualities,
     heardVoicing,
+    qualities,
     roots,
     otherQuality,
     splitKey,
     standard,
-    sound,
+    instrumentSound,
     suggest,
     tonics,
     type FinderContext,
@@ -82,7 +82,7 @@
   const piano = $derived(context.instrument === 'piano');
   const finderContext = $derived(preferredVoicings.preferring(context));
   const found = $derived(lookUp(name, finderContext));
-  const heardSound = $derived(sound(context));
+  const sound = $derived(instrumentSound(context));
 
   /** How many Voicings show at once; the rest are a page away. */
   const pageSize = 8;
@@ -268,7 +268,7 @@
           {@const heard = heardVoicing(voicing, finderContext)}
           {@render drawing(voicing, s.chord)}
           <div class="voicing-actions">
-            <HearButton chord={s.chord} notes={heard} sound={heardSound} />
+            <HearButton chord={s.chord} notes={heard} {sound} />
             <ArpeggiateButton chord={s.chord} notes={heard} />
             <button
               type="button"
@@ -402,7 +402,7 @@
                     <span class="keys muted">{voicing.notes.join(' ')}</span>
                     {#if preferred}<span class="rank">Preferred</span>{/if}
                     <div class="voicing-actions">
-                      <HearButton chord={found.name} notes={heard} sound={heardSound} />
+                      <HearButton chord={found.name} notes={heard} {sound} />
                       <ArpeggiateButton chord={found.name} notes={heard} />
                       {@render preferButton(
                         voicing,
@@ -416,7 +416,7 @@
                     <ChordDiagram {voicing} name={found.name} />
                     <span class="rank muted">{preferred ? 'Preferred' : rank + 1}</span>
                     <div class="voicing-actions">
-                      <HearButton chord={found.name} notes={heard} sound={heardSound} />
+                      <HearButton chord={found.name} notes={heard} {sound} />
                       <ArpeggiateButton chord={found.name} notes={heard} />
                       {@render preferButton(
                         voicing,
@@ -473,7 +473,7 @@
               <Fretboard bind:frets={placed} />
             {/if}
             <div class="board-actions">
-              <HearButton chord={placedName} notes={placedNotes} sound={heardSound} />
+              <HearButton chord={placedName} notes={placedNotes} {sound} />
               <ArpeggiateButton chord={placedName} notes={placedNotes} />
               <button type="button" class="button clear" onclick={clearPlaced}>Clear</button>
             </div>

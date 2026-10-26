@@ -10,16 +10,16 @@
 // browsers require. A new Hear or Arpeggiate cuts off whatever still rings:
 // they never layer.
 
-import type { HeardNote, Sound } from './chordFinder';
+import type { HeardNote, InstrumentSound } from './chordFinder';
 import { audioContext } from './timelinePlayer';
 
-/** How long a string rings, at most, in seconds. */
+/** How long a note rings, at most, in seconds. */
 const ringFor = 3;
-/** The gap between one string and the next in a strum, in seconds. */
+/** The gap between one note and the next in a strum, in seconds. */
 const strumGap = 0.03;
-/** The gap between one string and the next in an arpeggio, in seconds: slow enough to hear each note. */
+/** The gap between one note and the next in an arpeggio, in seconds: slow enough to hear each one. */
 const arpeggioGap = 0.175;
-/** The fixed volume of a Hear or Arpeggiate, low enough that six strings together don't clip. */
+/** The fixed volume of a Hear or Arpeggiate, low enough that six notes together don't clip. */
 const volume = 0.3;
 /** How quickly a Hear or Arpeggiate cut off falls silent, in seconds, so it ends without a click. */
 const cutOffIn = 0.03;
@@ -38,7 +38,7 @@ let ringing: { gain: GainNode; sources: AudioBufferSourceNode[] } | null = null;
  * notes sound together, as a Chord's keys pressed on a piano. Cuts off
  * whatever still rings.
  */
-export function hear(notes: readonly HeardNote[], sound: Sound): void {
+export function hear(notes: readonly HeardNote[], sound: InstrumentSound): void {
   play(notes, sound === 'plucked' ? strumGap : 0);
 }
 

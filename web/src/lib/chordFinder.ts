@@ -26,7 +26,7 @@ import {
   readGuitarTuning,
   standardTuning,
 } from './guitarTuning';
-import type { HeardNote, Instrument, Sound } from './instrument';
+import type { HeardNote, Instrument, InstrumentSound } from './instrument';
 import { piano, type PianoKeys, type PianoVoicing } from './piano';
 import { keys } from './transpose';
 
@@ -34,7 +34,7 @@ export { qualities, roots, type Quality, type Suggestion } from './chordTheory';
 /** The one list of Keys (transpose.ts), the list a Song's and a Beat's Key field offers, and what Suggest's Tonics are projected from. */
 export { keys };
 export type { Frets, GuitarVoicing } from './guitar';
-export type { HeardNote, Sound } from './instrument';
+export type { HeardNote, InstrumentSound } from './instrument';
 export { highestKey, lowestKey, pianoKeyName, whiteKeys, type PianoKeys, type PianoVoicing } from './piano';
 
 /** Standard tuning, its strings' pitches low to high, as MIDI note numbers (E2 A2 D3 G3 B3 E4). */
@@ -225,7 +225,7 @@ export function heardNotes(placement: Placement, context: FinderContext): HeardN
 }
 
 /** How the Finder's Instrument sounds: plucked, which Hear strums, as on the guitar, or struck, which Hear sounds together, as on the piano. */
-export function sound(context: FinderContext): Sound {
+export function instrumentSound(context: FinderContext): InstrumentSound {
   return finderInstrument(context).sound;
 }
 

@@ -6,8 +6,8 @@
 
 import type { Chord } from './chordTheory';
 
-/** How an Instrument sounds: a plucked string, as the guitar's, or a struck one, as the piano's. */
-export type Sound = 'plucked' | 'struck';
+/** How an Instrument sounds: a plucked string, as the guitar's, or a struck one, as the piano's. Not a Song's Sound, an audio file. */
+export type InstrumentSound = 'plucked' | 'struck';
 
 /** One note heard: which note, and how bright it sounds. */
 export interface HeardNote {
@@ -30,7 +30,7 @@ export interface Instrument<Voicing, Placement, Preference> {
   /** What the notes placed on it sound, low to high: what hearing them plays. */
   heardNotes(placement: Placement): HeardNote[];
   /** How it sounds. Hear strums a plucked sound's notes, low to high, as a guitar's strings are, and sounds a struck one's together, as a piano's keys are. */
-  sound: Sound;
+  sound: InstrumentSound;
   /** Where its preferred Voicings are kept on this device. */
   preferredStorageKey: string;
   /** What's kept of a Voicing when the user prefers it. */

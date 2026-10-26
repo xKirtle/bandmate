@@ -156,10 +156,10 @@ const octaveUpDarkens = 0.5;
 
 /**
  * What strumming frets on a guitar plays, low string to high, muted
- * strings skipped: each string's MIDI note number, and how bright it sounds. A thicker
- * string sounds darker than a thinner one, and a string darker the higher up
- * the neck it's fretted, so the same note sounds warmer on a thicker string
- * up the neck than open on a thin one.
+ * strings skipped: each string's MIDI note number, and how bright it
+ * sounds. A thicker string sounds darker than a thinner one, and a string
+ * darker the higher up the neck it's fretted, so the same note sounds
+ * warmer on a thicker string up the neck than open on a thin one.
  */
 function guitarHeardNotes(frets: Frets, tuning: readonly number[]): HeardNote[] {
   const thinnest = Math.max(1, tuning.length - 1);
@@ -173,9 +173,9 @@ function guitarHeardNotes(frets: Frets, tuning: readonly number[]): HeardNote[] 
 
 /**
  * The guitar in a tuning, its strings' pitches low to high as MIDI note
- * numbers. The notes placed on it are its frets, its sound is plucked, and a preferred Voicing is
- * kept by its frets, per tuning: a Voicing preferred in standard tuning
- * doesn't pick a wrong one in Drop D. The tuning is kept by its pitches, so
+ * numbers. Its sound is plucked. The notes placed on it are its frets, and
+ * a preferred Voicing is kept by its frets, per tuning: a Voicing preferred
+ * in standard tuning doesn't pick a wrong one in Drop D. The tuning is kept by its pitches, so
  * "Drop D" and "D A D G B E" share.
  */
 export function guitar(tuning: readonly number[]): Instrument<GuitarVoicing, Frets, Frets> {
