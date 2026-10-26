@@ -6,8 +6,8 @@ import {
   pianoKeyName,
   qualities,
   roots,
-  strummed,
-  voicingPlucks,
+  heardVoicing,
+  instrumentSound,
   whiteKeys,
   type PianoVoicing,
 } from './chordFinder';
@@ -154,13 +154,13 @@ describe("Suggest's piano Voicing", () => {
 });
 
 describe('hearing a piano Voicing', () => {
-  it('sounds its keys together, not strummed, as the guitar is', () => {
-    expect(strummed(piano)).toBe(false);
-    expect(strummed({ instrument: 'guitar', tuning: [40, 45, 50, 55, 59, 64] })).toBe(true);
+  it('sounds struck, its keys together, not plucked and strummed, as the guitar is', () => {
+    expect(instrumentSound(piano)).toBe('struck');
+    expect(instrumentSound({ instrument: 'guitar', tuning: [40, 45, 50, 55, 59, 64] })).toBe('plucked');
   });
 
-  it("plays its keys' pitches low to high, a slash bass first", () => {
-    expect(voicingPlucks(voicings('Am/G')[0], piano).map((p) => p.pitch)).toEqual([55, 57, 60, 64]);
+  it("plays its keys' MIDI note numbers low to high, a slash bass first", () => {
+    expect(heardVoicing(voicings('Am/G')[0], piano).map((n) => n.midi)).toEqual([55, 57, 60, 64]);
   });
 });
 

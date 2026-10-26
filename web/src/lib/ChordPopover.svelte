@@ -21,10 +21,11 @@
   // Clear goes back to the top-ranked one: the device's preference the Chord
   // Finder keeps, so the Chart and the Chord Finder follow at once. That's
   // allowed in Read mode, as it's a device setting, not an edit to the Song.
-  // Hear, beside it, strums the one showing in the Song's tuning, as the Chart
-  // draws it, or on the piano sounds its keys together: the capo changes
-  // nothing, as a Chord names the shape fingered. A Chord that can't be read,
-  // or on the guitar a tuning that can't be, says so instead.
+  // Hear, beside it, sounds the one showing, on the guitar strummed in the
+  // Song's tuning, as the Chart draws it, or on the piano its keys together:
+  // the capo changes nothing, as a Chord names the shape fingered. A Chord
+  // that can't be read, or on the guitar a tuning that can't be, says so
+  // instead.
   // Opened by hovering a Chord in a Line with a pointer, tapping it on a touch
   // screen, or clicking a diagram in the Chart. It opens over the Line, on
   // the Lines already played, or under it when there's no room above, so the
@@ -36,7 +37,7 @@
   import type { Song } from './api';
   import ChordDiagram from './ChordDiagram.svelte';
   import { chartContext, chartVoicings } from './chordChart';
-  import { finderInstrument, isPianoVoicing, strummed, voicingPlucks } from './chordFinder';
+  import { finderInstrument, heardVoicing, instrumentSound, isPianoVoicing } from './chordFinder';
   import HearButton from './HearButton.svelte';
   import PianoDiagram from './PianoDiagram.svelte';
   import { following, popoverLeft, popoverTop } from './popover';
@@ -198,7 +199,7 @@
       </div>
       <div class="actions">
         {#if context}
-          <HearButton chord={opened.name} plucks={voicingPlucks(voicing, context)} strummed={strummed(context)} />
+          <HearButton chord={opened.name} notes={heardVoicing(voicing, context)} sound={instrumentSound(context)} />
         {/if}
         <!-- One button, so focus stays on it as Prefer turns to Clear. -->
         <button

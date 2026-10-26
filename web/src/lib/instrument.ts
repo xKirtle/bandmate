@@ -6,10 +6,13 @@
 
 import type { Chord } from './chordTheory';
 
-/** One note sounded: its pitch, and how bright it sounds. */
-export interface Pluck {
-  /** As a MIDI note number. */
-  pitch: number;
+/** How an Instrument sounds: a plucked string, as the guitar's, or a struck one, as the piano's. Not a Song's Sound, an audio file. */
+export type InstrumentSound = 'plucked' | 'struck';
+
+/** One note heard: which note, and how bright it sounds. */
+export interface HeardNote {
+  /** Its MIDI note number. */
+  midi: number;
   /** From dark, near 0, to bright, 1: the guitar's open top string. */
   brightness: number;
 }
@@ -25,9 +28,9 @@ export interface Instrument<Voicing, Placement, Preference> {
   /** The notes a Voicing places on it. */
   placement(voicing: Voicing): Placement;
   /** What the notes placed on it sound, low to high: what hearing them plays. */
-  plucks(placement: Placement): Pluck[];
-  /** Whether Hear strums its notes, low to high, as a guitar's strings are; else it sounds them together, as a piano's keys are. */
-  strummed: boolean;
+  heardNotes(placement: Placement): HeardNote[];
+  /** How it sounds. Hear strums a plucked sound's notes, low to high, as a guitar's strings are, and sounds a struck one's together, as a piano's keys are. */
+  sound: InstrumentSound;
   /** Where its preferred Voicings are kept on this device. */
   preferredStorageKey: string;
   /** What's kept of a Voicing when the user prefers it. */

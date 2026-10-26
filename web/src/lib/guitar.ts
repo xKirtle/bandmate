@@ -4,7 +4,7 @@
 // players use come first. So any tuning works.
 
 import type { Chord } from './chordTheory';
-import type { Instrument, Pluck } from './instrument';
+import type { HeardNote, Instrument } from './instrument';
 
 /** The frets placed on a guitar, low string to high: 0 for open, null for muted. */
 export type Frets = readonly (number | null)[];
@@ -155,35 +155,35 @@ export function diagramStartFret(voicing: GuitarVoicing, rows: number): number {
 const octaveUpDarkens = 0.5;
 
 /**
- * What strumming frets on a guitar plucks, low string to high, muted
- * strings skipped: each string's pitch, and how bright it sounds. A thicker
- * string sounds darker than a thinner one, and a string darker the higher up
- * the neck it's fretted, so the same note sounds warmer on a thicker string
- * up the neck than open on a thin one.
+ * What strumming frets on a guitar plays, low string to high, muted
+ * strings skipped: each string's MIDI note number, and how bright it
+ * sounds. A thicker string sounds darker than a thinner one, and a string
+ * darker the higher up the neck it's fretted, so the same note sounds
+ * warmer on a thicker string up the neck than open on a thin one.
  */
-function guitarPlucks(frets: Frets, tuning: readonly number[]): Pluck[] {
+function guitarHeardNotes(frets: Frets, tuning: readonly number[]): HeardNote[] {
   const thinnest = Math.max(1, tuning.length - 1);
   return frets.flatMap((fret, string) => {
     if (fret === null) return [];
     // The thickest string at 0.4, the thinnest at 1.
     const byString = 0.4 + 0.6 * (string / thinnest);
-    return [{ pitch: tuning[string] + fret, brightness: byString * octaveUpDarkens ** (fret / 12) }];
+    return [{ midi: tuning[string] + fret, brightness: byString * octaveUpDarkens ** (fret / 12) }];
   });
 }
 
 /**
  * The guitar in a tuning, its strings' pitches low to high as MIDI note
- * numbers. The notes placed on it are its frets, and a preferred Voicing is
- * kept by its frets, per tuning: a Voicing preferred in standard tuning
- * doesn't pick a wrong one in Drop D. The tuning is kept by its pitches, so
+ * numbers. Its sound is plucked. The notes placed on it are its frets, and
+ * a preferred Voicing is kept by its frets, per tuning: a Voicing preferred
+ * in standard tuning doesn't pick a wrong one in Drop D. The tuning is kept by its pitches, so
  * "Drop D" and "D A D G B E" share.
  */
 export function guitar(tuning: readonly number[]): Instrument<GuitarVoicing, Frets, Frets> {
   return {
     voicings: (chord) => guitarVoicings(chord, tuning),
     placement: (voicing) => voicing.frets,
-    plucks: (frets) => guitarPlucks(frets, tuning),
-    strummed: true,
+    heardNotes: (frets) => guitarHeardNotes(frets, tuning),
+    sound: 'plucked',
     preferredStorageKey: `bandmate.preferredVoicings.guitar.${tuning.join('-')}`,
     preference: (voicing) => voicing.frets,
     prefers: (voicing, frets) => voicing.frets.length === frets.length && voicing.frets.every((f, i) => f === frets[i]),

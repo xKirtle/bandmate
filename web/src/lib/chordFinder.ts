@@ -26,7 +26,7 @@ import {
   readGuitarTuning,
   standardTuning,
 } from './guitarTuning';
-import type { Instrument, Pluck } from './instrument';
+import type { HeardNote, Instrument, InstrumentSound } from './instrument';
 import { piano, type PianoKeys, type PianoVoicing } from './piano';
 import { keys } from './transpose';
 
@@ -34,7 +34,7 @@ export { qualities, roots, type Quality, type Suggestion } from './chordTheory';
 /** The one list of Keys (transpose.ts), the list a Song's and a Beat's Key field offers, and what Suggest's Tonics are projected from. */
 export { keys };
 export type { Frets, GuitarVoicing } from './guitar';
-export type { Pluck } from './instrument';
+export type { HeardNote, InstrumentSound } from './instrument';
 export { highestKey, lowestKey, pianoKeyName, whiteKeys, type PianoKeys, type PianoVoicing } from './piano';
 
 /** Standard tuning, its strings' pitches low to high, as MIDI note numbers (E2 A2 D3 G3 B3 E4). */
@@ -207,7 +207,7 @@ export type NameIt =
  * note come first, then the simpler names.
  */
 export function nameIt(placement: Placement, context: FinderContext): NameIt {
-  const sounding = plucks(placement, context).map((p) => p.pitch % 12);
+  const sounding = heardNotes(placement, context).map((n) => n.midi % 12);
   const chords = nameNotes(sounding);
   const notes = spellNotes(sounding, chords[0] ?? null);
   return chords.length ? { kind: 'chord', readings: chords.map((c) => c.name), notes } : { kind: 'none', notes };
@@ -215,23 +215,23 @@ export function nameIt(placement: Placement, context: FinderContext): NameIt {
 
 /**
  * What hearing the notes placed on the Finder's Instrument plays, low to
- * high: each note's pitch, and how bright it sounds. On the guitar, its
- * strings in the tuning, muted strings skipped, each as bright as the string
- * and fret it's played on: what a strum plays. On the piano, its keys,
- * which Hear sounds together.
+ * high: each note's MIDI note number, and how bright it sounds. On the
+ * guitar, its strings in the tuning, muted strings skipped, each as bright as
+ * the string and fret it's played on: what a strum plays. On the piano, its
+ * keys, which Hear sounds together.
  */
-export function plucks(placement: Placement, context: FinderContext): Pluck[] {
-  return finderInstrument(context).plucks(placement);
+export function heardNotes(placement: Placement, context: FinderContext): HeardNote[] {
+  return finderInstrument(context).heardNotes(placement);
 }
 
-/** Whether Hear strums a Voicing on the Finder's Instrument, as on the guitar, or sounds its notes together, as on the piano. */
-export function strummed(context: FinderContext): boolean {
-  return finderInstrument(context).strummed;
+/** How the Finder's Instrument sounds: plucked, which Hear strums, as on the guitar, or struck, which Hear sounds together, as on the piano. */
+export function instrumentSound(context: FinderContext): InstrumentSound {
+  return finderInstrument(context).sound;
 }
 
-/** What hearing a Voicing on the Finder's Instrument plays: the notes it places, as plucks plays them. */
-export function voicingPlucks(voicing: Voicing, context: FinderContext): Pluck[] {
-  return plucks(finderInstrument(context).placement(voicing), context);
+/** What hearing a Voicing on the Finder's Instrument plays: the notes it places, as heardNotes plays them. */
+export function heardVoicing(voicing: Voicing, context: FinderContext): HeardNote[] {
+  return heardNotes(finderInstrument(context).placement(voicing), context);
 }
 
 /**

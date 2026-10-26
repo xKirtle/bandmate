@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { finderInstrument, firstVoicing, lookUp, nameIt, readTuning, standard, voicingPlucks } from './chordFinder';
+import { finderInstrument, firstVoicing, heardVoicing, lookUp, nameIt, readTuning, standard } from './chordFinder';
 import { readPreferredVoicings, storePreferredVoicing } from './preferredVoicings';
 import { storage } from './storageFake';
 
@@ -31,10 +31,10 @@ describe('a context naming the guitar', () => {
 });
 
 describe('hearing a Voicing', () => {
-  it("plucks its strings' pitches on the Instrument, low to high, muted strings skipped", () => {
+  it("plays its strings' MIDI note numbers on the Instrument, low to high, muted strings skipped", () => {
     // C major in standard tuning: C3 E3 G3 C4 E4.
     const c = firstVoicing('C', guitarIn(standard))!;
-    expect(voicingPlucks(c, guitarIn(standard)).map((p) => p.pitch)).toEqual([48, 52, 55, 60, 64]);
+    expect(heardVoicing(c, guitarIn(standard)).map((n) => n.midi)).toEqual([48, 52, 55, 60, 64]);
   });
 });
 
