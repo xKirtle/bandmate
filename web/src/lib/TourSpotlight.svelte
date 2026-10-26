@@ -337,4 +337,10 @@
   .spacer {
     flex: 1;
   }
+  /* The Tour never prints. */
+  @media print {
+    .tour {
+      display: none;
+    }
+  }
 </style>

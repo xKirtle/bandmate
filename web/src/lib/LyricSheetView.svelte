@@ -215,4 +215,30 @@
   .clickable {
     cursor: pointer;
   }
+  /* On paper, with no highlight, as blocks rather than flex items, which
+     browsers break across pages less reliably: a Section is never broken
+     across pages unless it's longer than one, nor its Label left at the
+     foot of one. */
+  @media print {
+    .view {
+      display: block;
+      margin: 0;
+    }
+    .section,
+    .line-box {
+      margin: 0;
+      padding: 0;
+      background: none;
+      box-shadow: none;
+    }
+    .section {
+      break-inside: avoid;
+    }
+    .section + .section {
+      margin-top: var(--lyric-read-section-gap);
+    }
+    h3 {
+      break-after: avoid;
+    }
+  }
 </style>

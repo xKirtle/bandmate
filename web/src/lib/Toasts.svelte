@@ -136,4 +136,10 @@
       bottom: calc(var(--nav-bottom-space) + var(--space-4));
     }
   }
+  /* A toast is about the page, not on it: it never prints. */
+  @media print {
+    .stack {
+      display: none;
+    }
+  }
 </style>

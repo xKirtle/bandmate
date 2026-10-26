@@ -586,4 +586,13 @@
   .duplicate :global(.button) {
     width: 100%;
   }
+  /* A Print leaves off the header's tools: Auto-scroll and the Reading menu. */
+  @media print {
+    .sheet {
+      margin: 0;
+    }
+    .head {
+      display: none;
+    }
+  }
 </style>

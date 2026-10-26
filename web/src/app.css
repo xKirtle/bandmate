@@ -131,6 +131,57 @@
   }
 }
 
+/* A Song's Print, from the browser's own print (GLOSSARY.md). Paper is
+   black on white whatever the Palette and theme: every colour token is ink
+   or paper here, over every Palette's (hence !important, as theirs are more
+   specific). Chords stand apart from the lyrics by their weight alone. The
+   Lyric Size and Chart Size are for reading a device at a distance, so
+   paper has fixed sizes of its own, set here without them. */
+@media print {
+  :root {
+    color-scheme: light !important;
+    --bg: var(--paper) !important;
+    --surface-1: var(--paper) !important;
+    --surface-2: var(--paper) !important;
+    --border: var(--ink) !important;
+    --text: var(--ink) !important;
+    --text-muted: var(--ink) !important;
+    --accent: var(--ink) !important;
+    --accent-text: var(--paper) !important;
+    --piano-white: var(--paper) !important;
+    --piano-black: var(--ink) !important;
+
+    --lyric-read-line: 1.125rem;
+    --lyric-read-chord: 1rem;
+    --lyric-read-section-gap: var(--space-6);
+    --chart-read-name: var(--text-md);
+    --chart-chord: 5rem;
+    /* Round each page, the footer's page number in the bottom one. */
+    --print-margin: 15mm;
+  }
+  body {
+    padding-bottom: 0;
+  }
+  .app {
+    display: block;
+  }
+  /* Nothing floating prints: a dialog, a popover or a menu. */
+  dialog,
+  [popover] {
+    display: none !important;
+  }
+}
+
+@page {
+  margin: var(--print-margin);
+
+  @bottom-center {
+    content: counter(page);
+    color: var(--ink);
+    font-size: var(--text-sm);
+  }
+}
+
 /* Reduced motion: every transition and animation takes its duration from
    these, so nothing animates. Script's own motion asks motion.ts. */
 @media (prefers-reduced-motion: reduce) {

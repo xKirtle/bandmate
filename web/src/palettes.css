@@ -48,6 +48,10 @@
   --dim: rgb(0 0 0 / 0.6);
   /* Drawn on a scrim, whatever the theme, e.g. the Cover crop's frame. */
   --on-scrim: white;
+  /* A Print's paper and ink, whatever the Palette and theme: app.css sets
+     every colour token to one or the other under print media. */
+  --paper: white;
+  --ink: black;
   /* Lifts a floating layer (a popover, menu or floating bar) off the page. */
   --shadow-float: 0 0.5rem 1.5rem color-mix(in srgb, var(--text) 18%, transparent);
   /* Rings what's selected, or what a drop would land on. */
