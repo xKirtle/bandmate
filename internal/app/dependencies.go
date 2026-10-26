@@ -19,7 +19,7 @@ const webDependencies = "dependencies.json"
 // About page lists them: the Go modules the binary is built from, the web
 // packages in the SPA's bundle, the programs bundled beside them in the
 // image, and the data built into the binary, such as the dictionaries
-// Rhymes are found in.
+// Rhymes are found in and the samples the Instruments sound from.
 type dependencies struct {
 	Go       []build.Dependency `json:"go"`
 	Web      []build.Dependency `json:"web"`
@@ -39,7 +39,7 @@ func shipped(goModules []build.Dependency, spa fs.FS, programsManifest string) d
 		Go:       listedGoModules(goModules),
 		Web:      recorded("the web app's dependencies", func() ([]byte, error) { return fs.ReadFile(spa, webDependencies) }),
 		Programs: recorded("the bundled programs", func() ([]byte, error) { return os.ReadFile(programsManifest) }),
-		Data:     languagedata.Credits(),
+		Data:     append(languagedata.Credits(), sampleCredits...),
 	}
 }
 

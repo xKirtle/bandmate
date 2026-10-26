@@ -1,25 +1,25 @@
-// Hearing a Chord: a Voicing's notes, synthesised in the browser, with no
-// samples. Each note is, for now, a plucked string, a Karplus–Strong pluck: a
-// burst of noise fed round a delay line one period of the note long and
-// softened on each pass, so it rings at that note and dies away as a string
-// does. What it hears, each note's MIDI note number and how bright it sounds,
-// and the Instrument's sound come from the Chord Finder (heardNotes, sound),
-// so this knows nothing about a guitar's strings or a piano's keys.
+// Hearing a Chord: a Voicing's notes, played in the browser on the app's one
+// audio context, made on first use, as hearing's rules (hearing.ts) say. The
+// piano plays its recorded samples (ADR 0030), each note from the nearest
+// one, faster or slower to sound at the note. The guitar, for now, plays a
+// plucked string synthesised for each note, a Karplus–Strong pluck: a burst
+// of noise fed round a delay line one period of the note long and softened
+// on each pass, so it rings at that note and dies away as a string does.
+// What it hears, each note's MIDI note number, and the Instrument's sound
+// come from the Chord Finder (heardNotes, sound), so this knows nothing
+// about a guitar's strings or a piano's keys.
 //
-// It plays on the app's one audio context, made on the first press, as
-// browsers require. A new Hear or Arpeggiate cuts off whatever still rings:
-// they never layer.
+// A new Hear or Arpeggiate cuts off whatever still rings: they never layer.
 
-import type { HeardNote, InstrumentSound } from './chordFinder';
+import { hearing, type Played } from './hearing';
+import type { HeardNote, InstrumentSound } from './instrument';
+import { fromOnset, sampleFor } from './samples';
 import { audioContext } from './timelinePlayer';
+import { unheard } from './unheard.svelte';
 
-/** How long a note rings, at most, in seconds. */
+/** How long a plucked note rings, at most, in seconds. */
 const ringFor = 3;
-/** The gap between one note and the next in a strum, in seconds. */
-const strumGap = 0.03;
-/** The gap between one note and the next in an arpeggio, in seconds: slow enough to hear each one. */
-const arpeggioGap = 0.175;
-/** The fixed volume of a Hear or Arpeggiate, low enough that six notes together don't clip. */
+/** The fixed volume of the guitar's pluck, low enough that six notes together don't clip. Samples play at their set's gain. */
 const volume = 0.3;
 /** How quickly a Hear or Arpeggiate cut off falls silent, in seconds, so it ends without a click. */
 const cutOffIn = 0.03;
@@ -31,15 +31,41 @@ const sustain = 0.996;
 /** The Hear or Arpeggiate still ringing, if any: what a new one cuts off. */
 let ringing: { gain: GainNode; sources: AudioBufferSourceNode[] } | null = null;
 
+const player = hearing<AudioBuffer>({
+  loadSample: async (url) => {
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`${url}: ${response.status}`);
+    const context = audioContext();
+    const decoded = await context.decodeAudioData(await response.arrayBuffer());
+    const from = fromOnset(decoded.getChannelData(0), decoded.sampleRate);
+    const sample = context.createBuffer(1, from.length, decoded.sampleRate);
+    sample.copyToChannel(from as Float32Array<ArrayBuffer>, 0);
+    return sample;
+  },
+  play,
+  cutOff: () => cutOff(audioContext()),
+  unheard: (set) => unheard.show(set),
+  heard: (set) => unheard.heard(set),
+});
+
 /**
- * Hears a Voicing once, as its Instrument sounds it. A plucked sound is
- * strummed downwards: the first note first, each next one a short gap after,
- * as the Chord Finder's heardNotes lists them, lowest first. A struck sound's
- * notes sound together, as a Chord's keys pressed on a piano. Cuts off
- * whatever still rings.
+ * Loads an Instrument's samples, if it has any and they aren't loaded yet,
+ * so a press plays at once: when the Chord Finder or a Chord's popover
+ * opens, and when the Instrument is picked.
+ */
+export function prepareToHear(sound: InstrumentSound): void {
+  player.prepare(sound);
+}
+
+/**
+ * Hears a Voicing once, as its Instrument sounds it: strummed downwards, the
+ * first note first, each next one a short gap after, as the Chord Finder's
+ * heardNotes lists them, lowest first, or its notes together, as a Chord's
+ * keys pressed on a piano. Cuts off whatever still rings.
  */
 export function hear(notes: readonly HeardNote[], sound: InstrumentSound): void {
-  play(notes, sound === 'plucked' ? strumGap : 0);
+  resume();
+  player.hear(notes, sound);
 }
 
 /**
@@ -47,35 +73,49 @@ export function hear(notes: readonly HeardNote[], sound: InstrumentSound): void 
  * heardNotes lists them, far enough apart to hear each one, each left
  * ringing. Cuts off whatever still rings.
  */
-export function arpeggiate(notes: readonly HeardNote[]): void {
-  play(notes, arpeggioGap);
+export function arpeggiate(notes: readonly HeardNote[], sound: InstrumentSound): void {
+  resume();
+  player.arpeggiate(notes, sound);
 }
 
-/** Plays notes one after another, `gap` seconds apart, each left ringing, cutting off whatever still rings. */
-function play(notes: readonly HeardNote[], gap: number): void {
-  const context = audioContext();
-  // Resumed while the press that asked for it still counts.
-  void context.resume().catch(() => {});
-  cutOff(context);
-  if (notes.length === 0) return;
+/** Resumes the audio context while the press that asked for it still counts, as browsers require. */
+function resume() {
+  void audioContext()
+    .resume()
+    .catch(() => {});
+}
 
+/** Plays notes one after another, `gap` seconds apart, each left ringing, from their samples or plucked. */
+function play({ notes, gap, sound }: Played<AudioBuffer>): void {
+  const context = audioContext();
+  cutOff(context);
   const gain = context.createGain();
-  gain.gain.value = volume;
+  gain.gain.value = sound === 'pluck' ? volume : sound.set.gain;
   gain.connect(context.destination);
   const start = context.currentTime + 0.01;
   const sources = notes.map((note, i) => {
     const source = context.createBufferSource();
-    source.buffer = pluck(context, note);
+    if (sound === 'pluck') source.buffer = pluck(context, note);
+    else {
+      const { sample, rate } = sampleFor(sound.set, note.midi);
+      source.buffer = sound.samples.get(sample) ?? null;
+      source.playbackRate.value = rate;
+    }
     source.connect(gain);
     source.start(start + i * gap);
     return source;
   });
   const played = { gain, sources };
   ringing = played;
-  sources[sources.length - 1].onended = () => {
-    if (ringing === played) ringing = null;
-    gain.disconnect();
-  };
+  // Notes pitched down ring longer than those after them, so it's done once every one has ended.
+  let ringingNotes = sources.length;
+  for (const source of sources) {
+    source.onended = () => {
+      if (--ringingNotes > 0) return;
+      if (ringing === played) ringing = null;
+      gain.disconnect();
+    };
+  }
 }
 
 /** Fades out the Hear or Arpeggiate still ringing, quickly enough to sound cut off, slowly enough not to click. */
@@ -101,7 +141,7 @@ function cutOff(context: AudioContext) {
  * milliseconds' work, so no two strums sound quite the same, as on a real
  * guitar.
  */
-function pluck(context: BaseAudioContext, { midi, brightness }: HeardNote): AudioBuffer {
+function pluck(context: BaseAudioContext, { midi, brightness = 1 }: HeardNote): AudioBuffer {
   const samples = pluckSamples(440 * 2 ** ((midi - 69) / 12), brightness, context.sampleRate);
   const buffer = context.createBuffer(1, samples.length, context.sampleRate);
   buffer.copyToChannel(samples, 0);

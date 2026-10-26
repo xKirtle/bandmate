@@ -5,16 +5,25 @@
 // so another Instrument sits beside the guitar without reworking any of them.
 
 import type { Chord } from './chordTheory';
+import type { SampleSet } from './samples';
 
-/** How an Instrument sounds: a plucked string, as the guitar's, or a struck one, as the piano's. Not a Song's Sound, an audio file. */
-export type InstrumentSound = 'plucked' | 'struck';
+/** How an Instrument sounds when a Voicing on it is heard. Not a Song's Sound, an audio file. */
+export interface InstrumentSound {
+  /**
+   * The recorded samples it plays (ADR 0030), or the guitar's synthesised
+   * pluck, which it plays until it has samples of its own.
+   */
+  samples: SampleSet | 'pluck';
+  /** Whether Hear strums its notes, low to high, as a guitar's strings are, rather than sounding them together, as a piano's keys are. */
+  strummed: boolean;
+}
 
-/** One note heard: which note, and how bright it sounds. */
+/** One note heard: which note, and, on the guitar, how bright it sounds. */
 export interface HeardNote {
   /** Its MIDI note number. */
   midi: number;
-  /** From dark, near 0, to bright, 1: the guitar's open top string. */
-  brightness: number;
+  /** From dark, near 0, to bright, 1: the guitar's open top string. Only the guitar's pluck reads it; samples sound as recorded. */
+  brightness?: number;
 }
 
 /**

@@ -173,7 +173,8 @@ function guitarHeardNotes(frets: Frets, tuning: readonly number[]): HeardNote[] 
 
 /**
  * The guitar in a tuning, its strings' pitches low to high as MIDI note
- * numbers. Its sound is plucked. The notes placed on it are its frets, and
+ * numbers. It sounds as a synthesised pluck, which Hear strums, until it
+ * has recorded samples of its own. The notes placed on it are its frets, and
  * a preferred Voicing is kept by its frets, per tuning: a Voicing preferred
  * in standard tuning doesn't pick a wrong one in Drop D. The tuning is kept by its pitches, so
  * "Drop D" and "D A D G B E" share.
@@ -183,7 +184,7 @@ export function guitar(tuning: readonly number[]): Instrument<GuitarVoicing, Fre
     voicings: (chord) => guitarVoicings(chord, tuning),
     placement: (voicing) => voicing.frets,
     heardNotes: (frets) => guitarHeardNotes(frets, tuning),
-    sound: 'plucked',
+    sound: { samples: 'pluck', strummed: true },
     preferredStorageKey: `bandmate.preferredVoicings.guitar.${tuning.join('-')}`,
     preference: (voicing) => voicing.frets,
     prefers: (voicing, frets) => voicing.frets.length === frets.length && voicing.frets.every((f, i) => f === frets[i]),

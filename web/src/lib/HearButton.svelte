@@ -1,7 +1,7 @@
 <script lang="ts">
   // Hears a Chord: an icon button that sounds a Voicing once, as its
-  // Instrument sounds it: strummed, if plucked, as the guitar, or its notes
-  // together, if struck, as the piano.
+  // Instrument sounds it: strummed, as the guitar, or its notes together, as
+  // the piano.
   import Volume2 from '@lucide/svelte/icons/volume-2';
   import type { HeardNote, InstrumentSound } from './chordFinder';
   import { hear } from './hear';
@@ -15,7 +15,7 @@
     chord: string;
     /** What to hear, low to high: the Chord Finder's heardNotes. With none, as in Name it with nothing placed, it's disabled. */
     notes: readonly HeardNote[];
-    /** How the Instrument sounds: plucked, strummed low to high, or struck, its notes together. */
+    /** How the Instrument sounds: which samples it plays, or the guitar's pluck, strummed low to high or its notes together. */
     sound: InstrumentSound;
   } = $props();
 </script>

@@ -1,24 +1,37 @@
 <!--
-  The Song page's toast stack: every save it was refused, one toast per
-  surface, so four at most (ADR 0029). A toast is labelled with the surface
-  the edit was made on — the error is no longer beside its cause, so the
-  label does the work proximity used to — and never with a Clip, since one
-  edit can cover several.
+  The toast stack: every save the Song page was refused, one toast per
+  surface, so four at most (ADR 0029), and, there and on the Chord Finder's
+  page, the Instrument a Chord couldn't be heard on, its samples not loading
+  (ADR 0030). A toast is labelled with where it came from, the surface the
+  edit was made on or the Instrument — the error is no longer beside its
+  cause, so the label does the work proximity used to — and never with a
+  Clip, since one edit can cover several.
 
-  It's never on a timer: it stays until that surface's own next save lands,
-  which Saves clears it on, or until its dismiss is pressed, because it may
-  be the only record that an edit was taken back.
+  It's never on a timer: it stays until what it's about is put right, that
+  surface's own next save landing, which Saves clears it on, or the
+  Instrument's samples loading, or until its dismiss is pressed, because it
+  may be the only record that an edit was taken back.
 -->
+<script lang="ts" module>
+  /** One toast: what it's labelled with, what it says, and how it's dismissed. */
+  export interface Toast {
+    /** Where it came from: a surface of the Song page, or an Instrument. Names its dismiss too, so several at once are told apart. */
+    label: string;
+    message: string;
+    dismiss: () => void;
+  }
+</script>
+
 <script lang="ts">
   import X from '@lucide/svelte/icons/x';
-  import { surfaceNames, type Saves } from './saves.svelte';
 
   let {
-    saves,
+    toasts,
     dock = 0,
     height = $bindable(0),
   }: {
-    saves: Saves;
+    /** The toasts, the latest last. */
+    toasts: readonly Toast[];
     /** How much of the foot of the window the docked Timeline takes, which the stack stays clear of. */
     dock?: number;
     /** How tall the stack is, 0 while it's empty, for what floats above it to stay clear of, as Auto-scroll's pill does. */
@@ -26,34 +39,30 @@
   } = $props();
 
   $effect(() => {
-    if (saves.errors.length === 0) height = 0;
+    if (toasts.length === 0) height = 0;
   });
 
   /**
-   * Keeps the end of the stack in view as an error comes or goes: the
-   * surface refused latest is last, and once the stack is taller than its
-   * bound it's the one that would be scrolled out of sight.
+   * Keeps the end of the stack in view as a toast comes or goes: the latest
+   * is last, and once the stack is taller than its bound it's the one that
+   * would be scrolled out of sight.
    */
   const showingLatest = (stack: HTMLElement) => {
-    void saves.errors;
+    void toasts.length;
     stack.scrollTop = stack.scrollHeight;
   };
 </script>
 
-{#if saves.errors.length > 0}
+{#if toasts.length > 0}
   <div class="stack" style:--dock="{dock}px" bind:offsetHeight={height} {@attach showingLatest}>
-    <!-- The surface refused latest is last, so it's nearest the corner. -->
-    {#each saves.errors as { surface, message } (surface)}
+    <!-- The latest is last, so it's nearest the corner. -->
+    {#each toasts as { label, message, dismiss } (label)}
       <div class="toast" role="alert">
-        <span class="surface">{surfaceNames[surface]}</span>
+        <span class="label">{label}</span>
         <p class="error message">{message}</p>
-        <!-- Named by its surface, so four at once are told apart. -->
-        <button
-          type="button"
-          class="dismiss"
-          aria-label="Dismiss the {surfaceNames[surface]} error"
-          title="Dismiss"
-          onclick={() => saves.dismiss(surface)}><X /></button
+        <!-- Named by its label, so several at once are told apart. -->
+        <button type="button" class="dismiss" aria-label="Dismiss the {label} error" title="Dismiss" onclick={dismiss}
+          ><X /></button
         >
       </div>
     {/each}
@@ -100,7 +109,7 @@
       transform: translateY(var(--space-2));
     }
   }
-  .surface {
+  .label {
     flex-shrink: 0;
     color: var(--text-muted);
   }

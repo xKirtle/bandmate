@@ -11,6 +11,7 @@ import {
   whiteKeys,
   type PianoVoicing,
 } from './chordFinder';
+import { pianoSamples } from './piano';
 
 // The piano in the Chord Finder (ADR 0012), through its seam: one hand's
 // Voicings, each inversion in close position, round middle C, drawn on a
@@ -154,9 +155,12 @@ describe("Suggest's piano Voicing", () => {
 });
 
 describe('hearing a piano Voicing', () => {
-  it('sounds struck, its keys together, not plucked and strummed, as the guitar is', () => {
-    expect(instrumentSound(piano)).toBe('struck');
-    expect(instrumentSound({ instrument: 'guitar', tuning: [40, 45, 50, 55, 59, 64] })).toBe('plucked');
+  it('plays its recorded samples, its keys together, while the guitar strums its pluck', () => {
+    expect(instrumentSound(piano)).toEqual({ samples: pianoSamples, strummed: false });
+    expect(instrumentSound({ instrument: 'guitar', tuning: [40, 45, 50, 55, 59, 64] })).toEqual({
+      samples: 'pluck',
+      strummed: true,
+    });
   });
 
   it("plays its keys' MIDI note numbers low to high, a slash bass first", () => {

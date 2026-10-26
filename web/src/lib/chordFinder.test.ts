@@ -601,8 +601,8 @@ function palette(key: string): string[] | null {
 /** The MIDI note numbers hearing a shape plays, low string to high. */
 const midis = (written: string, ctx: GuitarContext = context) => heardNotes(shape(written), ctx).map((n) => n.midi);
 
-/** How bright each string sounds when a shape is heard, low string to high. */
-const brightness = (written: string) => heardNotes(shape(written), context).map((n) => n.brightness);
+/** How bright each string sounds when a shape is heard, low string to high: NaN, failing every check, for one without. */
+const brightness = (written: string) => heardNotes(shape(written), context).map((n) => n.brightness ?? NaN);
 
 describe('what hearing a Voicing plays', () => {
   it("is its strings' MIDI note numbers in the tuning, low string to high", () => {
