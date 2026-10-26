@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # Makes the recorded samples the Instruments sound from (ADR 0030), as they
-# ship in public/samples/: downloads each set's source files at a pinned
-# commit, then trims each one's leading silence, keeps what's heard with a
-# short fade out, and encodes it mono, 44.1 kHz, MP3 at 96 kb/s, as #1205
-# measured and picked them. The files are committed, so builds don't run
-# this: run it again only to remake them, which needs network access, curl
-# and an ffmpeg with libmp3lame.
+# ship in public/samples/: downloads each set's source files, pinned by
+# commit or checksum, then trims each one's leading silence, keeps what's
+# heard with a short fade out, and encodes it mono, 44.1 kHz, MP3 at
+# 96 kb/s, as #1205 measured and picked them. The files are committed, so builds don't run
+# this: run it again only to remake them, which needs network access, curl,
+# Node and an ffmpeg with libmp3lame.
 #
 # Run from anywhere: bash web/scripts/samples.sh
 set -euo pipefail
@@ -38,16 +38,12 @@ make_set piano \
   6 5.5 0.5 \
   Fs2 A2 C3 Ds3 Fs3 A3 C4 Ds4 Fs4 A4 C5
 
-# The guitar: a steel-string acoustic from the University of Iowa Electronic
-# Music Studios' Musical Instrument Samples, as Nicholaus Brosowsky's
-# tonejs-instruments packages them (CC-BY 3.0;
-# https://github.com/nbrosowsky/tonejs-instruments, samples/guitar-acoustic/,
-# the same files nbrosowsky.github.io/tonejs-instruments/samples/ serves),
-# every 2 semitones from D2 to D5. 4.5 s each, fading out over the last
-# 0.3 s.
-make_set guitar \
-  "https://raw.githubusercontent.com/nbrosowsky/tonejs-instruments/622c2f1c32c8cfce4158ddc3eb26e518ddef37e5/samples/guitar-acoustic" \
-  4.5 4.2 0.3 \
-  D2 E2 Fs2 Gs2 As2 C3 D3 E3 Fs3 Gs3 As3 C4 D4 E4 Fs4 Gs4 As4 C5 D5
+# The guitar: the University of Iowa Musical Instrument Samples' Raimundo
+# 118, a nylon-string classical recorded string by string, frets 0, 3, 6, 9
+# and 12 of each string, retuned, levelled and encoded as above, 4.5 s each,
+# fading out over the last 0.3 s. Iowa's files are scales, so a script of
+# its own splits them into notes: see guitar-samples.mjs.
+rm -rf "$public/samples/guitar"/*/
+node "$(dirname "$0")/guitar-samples.mjs" "$public/samples/guitar"
 
-du -ch "$public"/samples/*/*.mp3 | tail -1
+du -ch "$public"/samples/piano/*.mp3 "$public"/samples/guitar/*/*.mp3 | tail -1

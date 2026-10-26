@@ -10,7 +10,7 @@
 // tested without it.
 
 import type { HeardNote, InstrumentSound } from './instrument';
-import type { SampleSet } from './samples';
+import type { Sample as RecordedSample, SampleSet } from './samples';
 
 /** The gap between one note and the next in a strum, in seconds. */
 const strumGap = 0.03;
@@ -21,7 +21,7 @@ const arpeggioGap = 0.175;
 export interface Played<Sample> {
   notes: readonly HeardNote[];
   gap: number;
-  sound: { set: SampleSet; samples: ReadonlyMap<number, Sample> };
+  sound: { set: SampleSet; samples: ReadonlyMap<RecordedSample, Sample> };
 }
 
 /** What hearing needs done: loading a sample, playing and cutting off, and saying when an Instrument can't be heard. */
@@ -48,15 +48,15 @@ export interface Hearing {
 }
 
 export function hearing<Sample>(deps: HearingDeps<Sample>): Hearing {
-  const loading = new Map<SampleSet, Promise<ReadonlyMap<number, Sample>>>();
-  const loaded = new Map<SampleSet, ReadonlyMap<number, Sample>>();
+  const loading = new Map<SampleSet, Promise<ReadonlyMap<RecordedSample, Sample>>>();
+  const loaded = new Map<SampleSet, ReadonlyMap<RecordedSample, Sample>>();
   // Counts presses, so one waiting on its samples knows whether another came since.
   let presses = 0;
 
-  function load(set: SampleSet): Promise<ReadonlyMap<number, Sample>> {
+  function load(set: SampleSet): Promise<ReadonlyMap<RecordedSample, Sample>> {
     let found = loading.get(set);
     if (!found) {
-      found = Promise.all(set.notes.map(async (note) => [note, await deps.loadSample(set.url(note))] as const)).then(
+      found = Promise.all(set.samples.map(async (s) => [s, await deps.loadSample(set.url(s))] as const)).then(
         (samples) => {
           const map = new Map(samples);
           loaded.set(set, map);

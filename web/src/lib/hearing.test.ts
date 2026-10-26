@@ -7,9 +7,19 @@ import type { SampleSet } from './samples';
 // playing faked: a sample is its URL, and what's played is recorded. The
 // player's sound itself is tested by ear.
 
-const piano: SampleSet = { name: 'Piano', notes: [60, 63], url: (n) => `/piano/${n}.mp3`, gain: 0.55 };
+const piano: SampleSet = {
+  name: 'Piano',
+  samples: [{ note: 60 }, { note: 63 }],
+  url: (s) => `/piano/${s.note}.mp3`,
+  gain: 0.55,
+};
 const struck: InstrumentSound = { samples: piano, strummed: false };
-const guitar: SampleSet = { name: 'Guitar', notes: [40, 42], url: (n) => `/guitar/${n}.mp3`, gain: 0.23 };
+const guitar: SampleSet = {
+  name: 'Guitar',
+  samples: [{ note: 40 }, { note: 42 }],
+  url: (s) => `/guitar/${s.note}.mp3`,
+  gain: 0.23,
+};
 const strummed: InstrumentSound = { samples: guitar, strummed: true };
 const notes = (...midi: number[]): HeardNote[] => midi.map((m) => ({ midi: m }));
 
@@ -69,8 +79,8 @@ describe("the piano's samples", () => {
     expect(gap).toBe(0);
     expect(sound.set).toBe(piano);
     expect([...sound.samples]).toEqual([
-      [60, '/piano/60.mp3'],
-      [63, '/piano/63.mp3'],
+      [{ note: 60 }, '/piano/60.mp3'],
+      [{ note: 63 }, '/piano/63.mp3'],
     ]);
   });
 

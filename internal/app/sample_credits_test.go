@@ -13,14 +13,17 @@ import (
 func TestAboutCreditsTheInstrumentsSamples(t *testing.T) {
 	got := getDependencies(t, func(*app.Config) {})
 
-	for _, name := range []string{"Salamander Grand Piano", "University of Iowa Musical Instrument Samples"} {
+	for name, license := range map[string]string{
+		"Salamander Grand Piano":                        "CC-BY-3.0",
+		"University of Iowa Musical Instrument Samples": "LicenseRef-Iowa-MIS",
+	} {
 		i := slices.IndexFunc(got.Data, func(d dependency) bool { return d.Name == name })
 		if i < 0 {
 			t.Errorf("data = %+v, want the %s", got.Data, name)
 			continue
 		}
-		if d := got.Data[i]; d.Version == "" || d.License != "CC-BY-3.0" {
-			t.Errorf("%s = %+v, want a version and CC-BY-3.0", name, d)
+		if d := got.Data[i]; d.Version == "" || d.License != license {
+			t.Errorf("%s = %+v, want a version and %s", name, d, license)
 		}
 	}
 }
