@@ -6,7 +6,7 @@
 // numbers: 60 is middle C (C4).
 
 import { commonNote, type Chord, type Tone } from './chordTheory';
-import type { Instrument, Pluck } from './instrument';
+import type { HeardNote, Instrument } from './instrument';
 
 /** The lowest key a piano Voicing is drawn on, and played within: C3. */
 export const lowestKey = 48;
@@ -143,8 +143,8 @@ function pianoVoicings(chord: Chord): PianoVoicing[] {
 const brightness = (key: number) => Math.min(1, Math.max(0, (key - lowestKey) / (highestKey - lowestKey)));
 
 /**
- * The piano. The notes placed on it are its keys, and Hear sounds them
- * together, not strummed. A preferred Voicing is kept by its inversion,
+ * The piano. The notes placed on it are its keys, and its sound is struck:
+ * Hear sounds them together, not strummed. A preferred Voicing is kept by its inversion,
  * which of the Chord's tones is lowest, not by its keys. It counts the
  * hand's tones, so it survives the keys' placement being tuned, but not a
  * change to which optional tones a Chord of more than four notes leaves out.
@@ -153,9 +153,9 @@ export function piano(): Instrument<PianoVoicing, PianoKeys, number> {
   return {
     voicings: pianoVoicings,
     placement: (voicing) => voicing.keys,
-    plucks: (keys): Pluck[] =>
-      [...keys].sort((a, b) => a - b).map((pitch) => ({ pitch, brightness: brightness(pitch) })),
-    strummed: false,
+    heardNotes: (keys): HeardNote[] =>
+      [...keys].sort((a, b) => a - b).map((midi) => ({ midi, brightness: brightness(midi) })),
+    sound: 'struck',
     preferredStorageKey: 'bandmate.preferredVoicings.piano',
     preference: (voicing) => voicing.inversion,
     prefers: (voicing, inversion) => voicing.inversion === inversion,

@@ -1,15 +1,16 @@
-// Hearing a Chord: plucked strings synthesised in the browser, with no
-// samples. Each string is a Karplus–Strong pluck, a burst of noise fed round
-// a delay line one period of its pitch long and softened on each pass, so it
-// rings at that pitch and dies away as a string does. What it plucks, each
-// string's pitch and how bright it sounds, comes from the Chord Finder
-// (plucks), so this knows nothing about a guitar's strings or frets.
+// Hearing a Chord: a Voicing's notes, synthesised in the browser, with no
+// samples. Each note is, for now, a plucked string, a Karplus–Strong pluck: a
+// burst of noise fed round a delay line one period of the note long and
+// softened on each pass, so it rings at that note and dies away as a string
+// does. What it hears, each note's MIDI note number and how bright it sounds,
+// and the Instrument's sound come from the Chord Finder (heardNotes, sound),
+// so this knows nothing about a guitar's strings or a piano's keys.
 //
 // It plays on the app's one audio context, made on the first press, as
-// browsers require. A new strum or arpeggio cuts off whatever still rings:
+// browsers require. A new Hear or Arpeggiate cuts off whatever still rings:
 // they never layer.
 
-import type { Pluck } from './chordFinder';
+import type { HeardNote, Sound } from './chordFinder';
 import { audioContext } from './timelinePlayer';
 
 /** How long a string rings, at most, in seconds. */
@@ -18,59 +19,53 @@ const ringFor = 3;
 const strumGap = 0.03;
 /** The gap between one string and the next in an arpeggio, in seconds: slow enough to hear each note. */
 const arpeggioGap = 0.175;
-/** The fixed volume of a strum or arpeggio, low enough that six strings together don't clip. */
+/** The fixed volume of a Hear or Arpeggiate, low enough that six strings together don't clip. */
 const volume = 0.3;
-/** How quickly a strum or arpeggio cut off falls silent, in seconds, so it ends without a click. */
+/** How quickly a Hear or Arpeggiate cut off falls silent, in seconds, so it ends without a click. */
 const cutOffIn = 0.03;
-/** How loud a pick starts, as the noise's RMS level, before the strum's volume. */
+/** How loud a pick starts, as the noise's RMS level, before the volume. */
 const pickLevel = 0.3;
 /** How much of a string's sound each pass round the loop keeps: the closer to 1, the longer it rings. */
 const sustain = 0.996;
 
-/** The strum or arpeggio still ringing, if any: what a new one cuts off. */
+/** The Hear or Arpeggiate still ringing, if any: what a new one cuts off. */
 let ringing: { gain: GainNode; sources: AudioBufferSourceNode[] } | null = null;
 
 /**
- * Strums once, downwards: the first pluck first, each next one a short gap
- * after, as the Chord Finder's plucks lists them, lowest string first. Cuts
- * off whatever still rings.
+ * Hears a Voicing once, as its Instrument sounds it. A plucked sound is
+ * strummed downwards: the first note first, each next one a short gap after,
+ * as the Chord Finder's heardNotes lists them, lowest first. A struck sound's
+ * notes sound together, as a Chord's keys pressed on a piano. Cuts off
+ * whatever still rings.
  */
-export function strum(plucks: readonly Pluck[]): void {
-  play(plucks, strumGap);
+export function hear(notes: readonly HeardNote[], sound: Sound): void {
+  play(notes, sound === 'plucked' ? strumGap : 0);
 }
 
 /**
- * Sounds every pluck at once, as a Chord's keys pressed together on a
- * piano. Cuts off whatever still rings.
+ * Arpeggiates: sounds each note once, lowest first, as the Chord Finder's
+ * heardNotes lists them, far enough apart to hear each one, each left
+ * ringing. Cuts off whatever still rings.
  */
-export function together(plucks: readonly Pluck[]): void {
-  play(plucks, 0);
+export function arpeggiate(notes: readonly HeardNote[]): void {
+  play(notes, arpeggioGap);
 }
 
-/**
- * Arpeggiates: plucks each string once, lowest first, as the Chord Finder's
- * plucks lists them, far enough apart to hear each note, each left ringing.
- * Cuts off whatever still rings.
- */
-export function arpeggiate(plucks: readonly Pluck[]): void {
-  play(plucks, arpeggioGap);
-}
-
-/** Plays plucks one after another, `gap` seconds apart, each left ringing, cutting off whatever still rings. */
-function play(plucks: readonly Pluck[], gap: number): void {
+/** Plays notes one after another, `gap` seconds apart, each left ringing, cutting off whatever still rings. */
+function play(notes: readonly HeardNote[], gap: number): void {
   const context = audioContext();
   // Resumed while the press that asked for it still counts.
   void context.resume().catch(() => {});
   cutOff(context);
-  if (plucks.length === 0) return;
+  if (notes.length === 0) return;
 
   const gain = context.createGain();
   gain.gain.value = volume;
   gain.connect(context.destination);
   const start = context.currentTime + 0.01;
-  const sources = plucks.map((p, i) => {
+  const sources = notes.map((note, i) => {
     const source = context.createBufferSource();
-    source.buffer = pluck(context, p);
+    source.buffer = pluck(context, note);
     source.connect(gain);
     source.start(start + i * gap);
     return source;
@@ -83,7 +78,7 @@ function play(plucks: readonly Pluck[], gap: number): void {
   };
 }
 
-/** Fades out the strum or arpeggio still ringing, quickly enough to sound cut off, slowly enough not to click. */
+/** Fades out the Hear or Arpeggiate still ringing, quickly enough to sound cut off, slowly enough not to click. */
 function cutOff(context: AudioContext) {
   if (!ringing) return;
   const { gain, sources } = ringing;
@@ -102,12 +97,12 @@ function cutOff(context: AudioContext) {
 }
 
 /**
- * A pluck at the context's sample rate. Made afresh each time, a few
+ * A note plucked, at the context's sample rate. Made afresh each time, a few
  * milliseconds' work, so no two strums sound quite the same, as on a real
  * guitar.
  */
-function pluck(context: BaseAudioContext, { pitch, brightness }: Pluck): AudioBuffer {
-  const samples = pluckSamples(440 * 2 ** ((pitch - 69) / 12), brightness, context.sampleRate);
+function pluck(context: BaseAudioContext, { midi, brightness }: HeardNote): AudioBuffer {
+  const samples = pluckSamples(440 * 2 ** ((midi - 69) / 12), brightness, context.sampleRate);
   const buffer = context.createBuffer(1, samples.length, context.sampleRate);
   buffer.copyToChannel(samples, 0);
   return buffer;
@@ -135,8 +130,8 @@ function pluckSamples(frequency: number, brightness: number, sampleRate: number)
   // overtones of a darker one out sooner still.
   const damping = 0.55 * dark;
   // The loop's delay is the line's length, the blend's and the low-pass's
-  // delays at the pitch, and the all-pass's fraction, kept between 0.1 and
-  // 1.1 to stay stable.
+  // delays at the note's frequency, and the all-pass's fraction, kept
+  // between 0.1 and 1.1 to stay stable.
   const period = sampleRate / frequency;
   const w = (2 * Math.PI) / period;
   const blendDelay = Math.atan2(blend * Math.sin(w), 1 - blend + blend * Math.cos(w)) / w;

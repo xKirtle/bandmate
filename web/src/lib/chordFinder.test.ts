@@ -6,7 +6,7 @@ import {
   qualities,
   readTuning,
   roots,
-  plucks,
+  heardNotes,
   keyName,
   keys,
   tonics,
@@ -598,34 +598,34 @@ function palette(key: string): string[] | null {
   return s.kind === 'key' ? s.chords.map((c) => `${c.numeral} ${c.chord}`) : null;
 }
 
-/** The pitches hearing a shape plucks, low string to high. */
-const pitches = (written: string, ctx: GuitarContext = context) => plucks(shape(written), ctx).map((p) => p.pitch);
+/** The MIDI note numbers hearing a shape plays, low string to high. */
+const midis = (written: string, ctx: GuitarContext = context) => heardNotes(shape(written), ctx).map((n) => n.midi);
 
-/** How bright each string hearing a shape plucks sounds, low string to high. */
-const brightness = (written: string) => plucks(shape(written), context).map((p) => p.brightness);
+/** How bright each string hearing a shape plays sounds, low string to high. */
+const brightness = (written: string) => heardNotes(shape(written), context).map((n) => n.brightness);
 
-describe('what hearing a Voicing plucks', () => {
-  it("is its strings' pitches in the tuning, low string to high, as MIDI note numbers", () => {
+describe('what hearing a Voicing plays', () => {
+  it("is its strings' MIDI note numbers in the tuning, low string to high", () => {
     // E major: E2 B2 E3 G#3 B3 E4.
-    expect(pitches('022100')).toEqual([40, 47, 52, 56, 59, 64]);
+    expect(midis('022100')).toEqual([40, 47, 52, 56, 59, 64]);
   });
 
   it('skips muted strings', () => {
     // C major: C3 E3 G3 C4 E4.
-    expect(pitches('x32010')).toEqual([48, 52, 55, 60, 64]);
-    expect(pitches('xx0232')).toEqual([50, 57, 62, 66]);
-    expect(pitches('xxxxxx')).toEqual([]);
+    expect(midis('x32010')).toEqual([48, 52, 55, 60, 64]);
+    expect(midis('xx0232')).toEqual([50, 57, 62, 66]);
+    expect(midis('xxxxxx')).toEqual([]);
   });
 
-  it('plucks a shape that reads as no Chord too', () => {
+  it('plays a shape that reads as no Chord too', () => {
     // x344xx reads as no Chord: C3 F#3 B3. x3x5xx sounds one note twice: C3 C4.
-    expect(pitches('x344xx')).toEqual([48, 54, 59]);
-    expect(pitches('x3x5xx')).toEqual([48, 60]);
+    expect(midis('x344xx')).toEqual([48, 54, 59]);
+    expect(midis('x3x5xx')).toEqual([48, 60]);
   });
 
   it('follows the tuning in use', () => {
     // D5 in Drop D: D2 A2 D3.
-    expect(pitches('000xxx', { tuning: readTuning('Drop D')! })).toEqual([38, 45, 50]);
+    expect(midis('000xxx', { tuning: readTuning('Drop D')! })).toEqual([38, 45, 50]);
   });
 
   it('sounds each string between dark, 0, and bright, 1', () => {

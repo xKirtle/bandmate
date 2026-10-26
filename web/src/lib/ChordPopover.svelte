@@ -36,7 +36,7 @@
   import type { Song } from './api';
   import ChordDiagram from './ChordDiagram.svelte';
   import { chartContext, chartVoicings } from './chordChart';
-  import { finderInstrument, isPianoVoicing, strummed, voicingPlucks } from './chordFinder';
+  import { finderInstrument, heardVoicing, isPianoVoicing, sound } from './chordFinder';
   import HearButton from './HearButton.svelte';
   import PianoDiagram from './PianoDiagram.svelte';
   import { following, popoverLeft, popoverTop } from './popover';
@@ -198,7 +198,7 @@
       </div>
       <div class="actions">
         {#if context}
-          <HearButton chord={opened.name} plucks={voicingPlucks(voicing, context)} strummed={strummed(context)} />
+          <HearButton chord={opened.name} notes={heardVoicing(voicing, context)} sound={sound(context)} />
         {/if}
         <!-- One button, so focus stays on it as Prefer turns to Clear. -->
         <button
