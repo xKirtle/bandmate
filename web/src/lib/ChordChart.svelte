@@ -158,16 +158,16 @@
      diagram, its starting fret drawn in its own units, scales with the
      width. */
   .row li {
-    flex: 0 0 calc(6.5rem * var(--chart-size));
+    flex: 0 0 var(--chart-chord);
   }
   /* On the piano, a white key (1 wide to 4.5 tall) makes the keyboard as
      tall as a guitar diagram at the same Chart Size: that diagram's width
-     inside the card's padding, at its viewBox's 128 wide to 126 tall. At a
-     small Chart Size it's narrower than --piano-key-narrowest, as the user
-     chose. Each card is the keyboard's width, --chart-white-keys keys, with
-     its padding. */
+     inside the card's padding, at ChordDiagram's viewBox for five frets,
+     128 wide to 126 tall, as .empty is. At a small Chart Size it's narrower
+     than --piano-key-narrowest, as the user chose. Each card is the
+     keyboard's width, --chart-white-keys keys, with its padding. */
   .row.piano {
-    --piano-key: calc((6.5rem * var(--chart-size) - 2 * var(--space-1)) * 126 / 128 / 4.5);
+    --piano-key: calc((var(--chart-chord) - 2 * var(--space-1)) * 126 / 128 / 4.5);
   }
   .row.piano li {
     flex-basis: calc(var(--chart-white-keys) * var(--piano-key) + 2 * var(--space-1));

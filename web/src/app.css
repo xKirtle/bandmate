@@ -76,6 +76,9 @@
      Chart Size, which the Chart sets on the page as a fraction: 1 at 100%. */
   --chart-size: 1;
   --chart-read-name: calc(var(--text-lg) * var(--chart-size));
+  /* A Chord's card in the Chord Chart on the guitar, scaled by the Chart
+     Size: 6.5rem at 100%. A piano card is as tall as one. */
+  --chart-chord: calc(6.5rem * var(--chart-size));
 
   /* Spacing, in quarter-rem steps, for every gap, padding and margin. */
   --space-1: 0.25rem;

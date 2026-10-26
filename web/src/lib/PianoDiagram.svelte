@@ -1,21 +1,20 @@
 <script lang="ts">
   // A keyboard, from C3 to C5 unless given a shorter stretch, the same keys
   // on every drawing that's compared, so they compare at a glance: each key
-  // pressed filled with the accent and marked
-  // with a dot, so it's told by its mark and not by colour alone (no accent
-  // reaches 3:1 against both key colours in every Palette), and each C
-  // named, middle C among them. A white key is 1 wide to 4.5 tall whatever
-  // the room, so the height follows the width, which grows with the room up
-  // to the widest key (--piano-key, where it's set, else --piano-key-widest);
-  // where the room is narrower than the keyboard at its
-  // narrowest key (a phone under about 340px), it shrinks to fit. Unlike a
-  // Chord diagram, it's never mirrored for a left-handed player: a piano's
-  // low notes are on the left either way. The Chord Finder and the Chord
-  // Chart draw a piano Voicing with it, and Name it plays it: given ontoggle,
-  // tapping a key presses it or lets it go, and it's one tab stop, ← and →
-  // moving a semitone, Home and End to the ends.
+  // pressed filled with the accent and marked with a dot, so it's told by
+  // its mark and not by colour alone (no accent reaches 3:1 against both key
+  // colours in every Palette), and each C named, middle C among them. A
+  // white key is 1 wide to 4.5 tall whatever the room, so the height follows
+  // the width, which grows with the room up to the widest key (--piano-key,
+  // where it's set, else --piano-key-widest); where the room is narrower
+  // than the keyboard at its narrowest key (a phone under about 340px), it
+  // shrinks to fit. Unlike a Chord diagram, it's never mirrored for a
+  // left-handed player: a piano's low notes are on the left either way. The
+  // Chord Finder and the Chord Chart draw a piano Voicing with it, and Name
+  // it plays it: given ontoggle, tapping a key presses it or lets it go, and
+  // it's one tab stop, ← and → moving a semitone, Home and End to the ends.
   import { tick } from 'svelte';
-  import { highestKey, isBlackKey, lowestKey, middleC, pianoKeyName, whiteKeys, type PianoKeys } from './piano';
+  import { highestKey, isBlackKey, lowestKey, middleC, pianoKeyName, type PianoKeys } from './piano';
 
   let {
     pressed,
