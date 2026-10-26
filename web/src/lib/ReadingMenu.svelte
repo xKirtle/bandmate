@@ -23,7 +23,7 @@
   import { songAutoScrollSpeed } from './sharedAutoScrollSpeed.svelte';
   import { chartSize } from './sharedChartSize.svelte';
   import { chordChartState } from './sharedChordChartState.svelte';
-  import { instrument } from './sharedInstrument.svelte';
+  import { instrument, pickInstrument } from './sharedInstrument.svelte';
   import { lyricSize } from './sharedLyricSize.svelte';
   import { songTranspose } from './sharedTranspose.svelte';
   import { rebound } from './shortcutKeys';
@@ -295,7 +295,7 @@
           options={instruments}
           value={instrument.value}
           text={instrumentText}
-          onpick={(picked) => instrument.set(picked)}
+          onpick={pickInstrument}
         />
       </div>
 

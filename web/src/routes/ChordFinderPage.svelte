@@ -12,8 +12,10 @@
   import { deviceStorage } from '../lib/deviceStorage';
   import { readFinderKey, readFinderTuning, storeFinderKey, storeFinderTuning } from '../lib/finderSetup';
   import Picker from '../lib/Picker.svelte';
-  import { instrument as deviceInstrument } from '../lib/sharedInstrument.svelte';
+  import { instrument as deviceInstrument, pickInstrument } from '../lib/sharedInstrument.svelte';
+  import Toasts from '../lib/Toasts.svelte';
   import TuningField from '../lib/TuningField.svelte';
+  import { unheard, unheardToasts } from '../lib/unheard.svelte';
 
   const instrument = $derived(deviceInstrument.value);
   let tuning = $state(readFinderTuning(deviceStorage()));
@@ -23,6 +25,9 @@
   const context = $derived<FinderContext>(
     instrument === 'piano' ? { instrument: 'piano' } : { instrument: 'guitar', tuning: readTuning(tuning) ?? standard },
   );
+
+  // A Chord that couldn't be heard here is this page's to say: leaving it goes.
+  $effect(() => () => unheard.dismiss());
 
   function keep() {
     tuningError = '';
@@ -44,7 +49,7 @@
         options={instruments}
         value={instrument}
         text={instrumentText}
-        onpick={(picked) => deviceInstrument.set(picked)}
+        onpick={pickInstrument}
       />
     </div>
     {#if instrument === 'guitar'}
@@ -73,6 +78,9 @@
     }}
   />
 </main>
+
+<!-- A Chord that couldn't be heard, its Instrument's samples not loading. -->
+<Toasts toasts={unheardToasts()} />
 
 <style>
   .setup {

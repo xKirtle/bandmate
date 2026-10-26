@@ -14,7 +14,7 @@
   import { instruments } from '../lib/chordFinder';
   import { instrumentText } from '../lib/deviceInstrument';
   import { appearance } from '../lib/sharedAppearance.svelte';
-  import { instrument } from '../lib/sharedInstrument.svelte';
+  import { instrument, pickInstrument } from '../lib/sharedInstrument.svelte';
   import { leftHanded } from '../lib/sharedLeftHanded.svelte';
 
   // Recording is offered only as wide as the Timeline offers editing, so
@@ -93,7 +93,7 @@
               type="radio"
               name="instrument"
               checked={instrument.value === choice}
-              onchange={() => instrument.set(choice)}
+              onchange={() => pickInstrument(choice)}
               aria-describedby="instrument-note"
             />
             <span>{instrumentText(choice)}</span>

@@ -1,4 +1,5 @@
 import type { Locator, Page } from '@playwright/test';
+import { failRequests } from '../faults';
 import { expect, test } from '../fixtures';
 import { customTuningNotes as notes, pickCustomTuning, warnsOnLeaving } from '../songPage';
 
@@ -177,4 +178,34 @@ test('a piano Voicing preferred comes first in Look up and is the one Suggest dr
   await expect(clear).toHaveCount(0);
   await pickInstrument(page, 'Guitar');
   await expect(clear).toHaveCount(1);
+});
+
+test('the piano plays samples Bandmate serves itself; when they can’t load, a toast says so and the next Hear tries again', async ({
+  page,
+}) => {
+  const samples = '**/samples/piano/*.mp3';
+  const asked: URL[] = [];
+  page.on('request', (r) => {
+    if (r.url().endsWith('.mp3')) asked.push(new URL(r.url()));
+  });
+  await page.goto('/chords');
+  await pickInstrument(page, 'Piano');
+  // Picking the piano loads its 11 samples, from Bandmate itself.
+  await expect.poll(() => asked.length).toBe(11);
+  expect(asked.every((url) => url.origin === new URL(page.url()).origin)).toBe(true);
+
+  // Opened again with none of them loading: the Chord Finder's opening
+  // tries, and fails, and so does a Hear.
+  const fault = await failRequests(page, { url: samples }, { times: 22, status: 0 });
+  await page.reload();
+  const hear = page.getByRole('tabpanel', { name: 'Look up' }).getByRole('button', { name: 'Hear C' }).first();
+  await expect.poll(() => fault.count).toBe(11);
+  await hear.click();
+  await fault.spent;
+  const toast = page.getByRole('alert').filter({ hasText: 'Piano' });
+  await expect(toast).toContainText("Couldn't be heard");
+
+  // The next Hear tries again, and once they load, the toast goes.
+  await hear.click();
+  await expect(toast).toHaveCount(0);
 });

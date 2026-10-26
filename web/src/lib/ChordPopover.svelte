@@ -38,6 +38,7 @@
   import ChordDiagram from './ChordDiagram.svelte';
   import { chartContext, chartVoicings } from './chordChart';
   import { finderInstrument, heardVoicing, instrumentSound, isPianoVoicing } from './chordFinder';
+  import { prepareToHear } from './hear';
   import HearButton from './HearButton.svelte';
   import PianoDiagram from './PianoDiagram.svelte';
   import { following, popoverLeft, popoverTop } from './popover';
@@ -72,6 +73,11 @@
   const showing = $derived(Math.min(at, voicings.length - 1));
   const voicing = $derived(voicings[showing]);
   const isPreferred = $derived(found?.kind === 'voicings' && found.preferred && showing === 0);
+  // The Instrument's samples load as the popover first opens, and as another
+  // is picked while it's open, so a Hear plays at once.
+  $effect(() => {
+    if (opened && context) prepareToHear(instrumentSound(context));
+  });
 
   // Round from the last Voicing to the first and back, so the buttons are
   // never disabled under the focus they hold.

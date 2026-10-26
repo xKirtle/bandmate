@@ -215,16 +215,16 @@ export function nameIt(placement: Placement, context: FinderContext): NameIt {
 
 /**
  * What hearing the notes placed on the Finder's Instrument plays, low to
- * high: each note's MIDI note number, and how bright it sounds. On the
- * guitar, its strings in the tuning, muted strings skipped, each as bright as
- * the string and fret it's played on: what a strum plays. On the piano, its
- * keys, which Hear sounds together.
+ * high: each note's MIDI note number. On the guitar, its strings in the
+ * tuning, muted strings skipped, each as bright as the string and fret it's
+ * played on: what a strum plays. On the piano, its keys, which Hear sounds
+ * together.
  */
 export function heardNotes(placement: Placement, context: FinderContext): HeardNote[] {
   return finderInstrument(context).heardNotes(placement);
 }
 
-/** How the Finder's Instrument sounds: plucked, which Hear strums, as on the guitar, or struck, which Hear sounds together, as on the piano. */
+/** How the Finder's Instrument sounds: which samples it plays, or the guitar's pluck, and whether Hear strums them, as on the guitar, or sounds them together, as on the piano. */
 export function instrumentSound(context: FinderContext): InstrumentSound {
   return finderInstrument(context).sound;
 }
