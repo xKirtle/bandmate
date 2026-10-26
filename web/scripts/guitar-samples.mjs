@@ -24,7 +24,7 @@ import { join } from 'node:path';
 const rate = 44100;
 const iowa = 'https://theremin.music.uiowa.edu/sound%20files/MIS/Piano_Other/guitar/';
 
-/** Each string Iowa recorded, by the name its files use, and its open note, standard tuning's, thickest first. */
+/** Each string Iowa recorded, by the name its files use, and its open note: standardTuning's in guitarTuning.ts, thickest first. */
 const strings = [
   { sul: 'sulE', open: 40 },
   { sul: 'sulA', open: 45 },
@@ -33,7 +33,7 @@ const strings = [
   { sul: 'sulB', open: 59 },
   { sul: 'sul_E', open: 64 },
 ];
-/** The frets recorded on each string: every 3, so no note is pitch-shifted more than a semitone. */
+/** The frets recorded on each string: every 3, so no note is pitch-shifted more than a semitone. guitar.ts plays these. */
 const frets = [0, 3, 6, 9, 12];
 
 /** The files taken, mono, and each one's SHA-256 when the set was picked. */
@@ -43,7 +43,6 @@ const originals = {
   'Guitar.mf.sulA.A2B2.mono.aif': 'a298fddd7cc2d5e83eb63852360040dc87b63caa1638cf82589f8614e158525c',
   'Guitar.mf.sulA.C3B3.mono.aif': 'df38afee2f363a8a4262384e496e7de0720318be10851f10b18f7285464ae985',
   'Guitar.ff.sulA.C3B3.mono.aif': '39904825e7dff5570cb19157f345e0af3be9bad0741cc60cf35cd2b7763731ba',
-  'Guitar.mf.sulA.C4E4.mono.aif': '251cd9af1c391f886a3beadef9177d38f8ff46e14027deb15eed81318bfdb2f4',
   'Guitar.mf.sulD.D3B3.mono.aif': '464a66a5fbd4c8f835bcddfeb9c875ee2d75e81e156cfe80a362473681c9ffa7',
   'Guitar.mf.sulD.C4Ab4.mono.aif': '0d57284a40691bd79582694d0b0234cd89356e8cbaf3b5efb3b7aef001d02932',
   'Guitar.mf.sulG.G3B3.mono.aif': '6e9bcd0b29470ba131aa43d08e51f94b9daaf00a16fff07f52be95196d48bece',
@@ -73,6 +72,7 @@ const fixes = {
  */
 const levelAt = (midi) => -14.515 - 0.2004 * (midi - 40) - 8;
 
+// Files are named as samples.ts's sampleFileName names them.
 const sharpNames = ['C', 'Cs', 'D', 'Ds', 'E', 'F', 'Fs', 'G', 'Gs', 'A', 'As', 'B'];
 const noteName = (midi) => sharpNames[midi % 12] + (Math.floor(midi / 12) - 1);
 const flatNames = { C: 0, Db: 1, D: 2, Eb: 3, E: 4, F: 5, Gb: 6, G: 7, Ab: 8, A: 9, Bb: 10, B: 11 };
@@ -236,7 +236,7 @@ try {
       ]);
       // Skips the encoder's delay before measuring.
       const now = centsOff(pitch(decode(path).subarray(1200)), midi);
-      if (Math.abs(now) > 10) throw new Error(`${path} came out ${now.toFixed(0)} cents out`);
+      if (Math.abs(now) > 5) throw new Error(`${path} came out ${now.toFixed(0)} cents out`);
       console.log(`${noteName(open)}/${noteName(midi)}: was ${cents.toFixed(0)} cents, now ${now.toFixed(0)}`);
     }
   }

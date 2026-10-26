@@ -61,7 +61,7 @@ describe('hearing a Voicing', () => {
   });
 
   it("plays the same pitches on other strings from those strings' recordings: Am as x02555 and as 577555", () => {
-    // Which recording each of a shape's notes plays, by its pitch.
+    // Which recording each of a Voicing's notes plays, by its pitch.
     const recorded = (frets: (number | null)[]) =>
       new Map(heardNotes(frets, guitarIn(standard)).map((n) => [n.midi, sampleFor(guitarSamples, n).sample]));
     const open = recorded([null, 0, 2, 5, 5, 5]);

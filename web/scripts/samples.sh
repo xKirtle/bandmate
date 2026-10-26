@@ -3,9 +3,9 @@
 # ship in public/samples/: downloads each set's source files, pinned by
 # commit or checksum, then trims each one's leading silence, keeps what's
 # heard with a short fade out, and encodes it mono, 44.1 kHz, MP3 at
-# 96 kb/s, as #1205 measured and picked them. The files are committed, so builds don't run
-# this: run it again only to remake them, which needs network access, curl,
-# Node and an ffmpeg with libmp3lame.
+# 96 kb/s, as #1205 measured and picked them. The files are committed, so
+# builds don't run this: run it again only to remake them, which needs
+# network access, curl, Node and an ffmpeg with libmp3lame.
 #
 # Run from anywhere: bash web/scripts/samples.sh
 set -euo pipefail

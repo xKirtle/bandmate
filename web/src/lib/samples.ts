@@ -23,7 +23,7 @@ export interface SampleSet {
   samples: readonly Sample[];
   /** Where a sample is served. */
   url(sample: Sample): string;
-  /** How loud its samples play: matched to the guitar's synthesised strum they replaced (#1205), with no Voicing clipping. */
+  /** How loud its samples play: a strum matched to the guitar's synthesised one they replaced (#1205), with no Voicing clipping. */
   gain: number;
 }
 
@@ -55,7 +55,8 @@ export function fromOnset(decoded: Float32Array, sampleRate: number): Float32Arr
  * Which sample plays a note, and at what playback rate, so it sounds at the
  * note: the nearest sample on the note's string, if the set has that
  * string's, else the nearest of all, or the lower of two equally near,
- * pitched up. A note outside them plays from the nearest end.
+ * pitched up. A note outside them plays from the nearest end. The sample
+ * is the set's own, one of its samples, so it can key what's loaded of it.
  */
 export function sampleFor(set: SampleSet, { midi, string }: HeardNote): { sample: Sample; rate: number } {
   const onString = set.samples.filter((s) => s.string !== undefined && s.string === string);

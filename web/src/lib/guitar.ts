@@ -6,7 +6,7 @@
 import type { Chord } from './chordTheory';
 import type { HeardNote, Instrument } from './instrument';
 import { standardTuning } from './guitarTuning';
-import { sampleFileName, type SampleSet } from './samples';
+import { sampleFileName, samplesIn, type SampleSet } from './samples';
 
 /** The frets placed on a guitar, low string to high: 0 for open, null for muted. */
 export type Frets = readonly (number | null)[];
@@ -158,7 +158,7 @@ function guitarHeardNotes(frets: Frets, tuning: readonly number[]): HeardNote[] 
   return frets.flatMap((fret, string) => (fret === null ? [] : [{ midi: tuning[string] + fret, string }]));
 }
 
-/** The frets recorded on each string: every 3, so no note in its tuning is pitch-shifted more than a semitone. */
+/** The frets recorded on each string, as web/scripts/guitar-samples.mjs makes them: every 3, so no note in standard tuning is pitch-shifted more than a semitone. */
 const recordedFrets = [0, 3, 6, 9, 12];
 
 /**
@@ -175,8 +175,7 @@ const recordedFrets = [0, 3, 6, 9, 12];
 export const guitarSamples: SampleSet = {
   name: 'Guitar',
   samples: standardTuning.flatMap((open, string) => recordedFrets.map((fret) => ({ note: open + fret, string }))),
-  url: ({ note, string = 0 }) =>
-    `${import.meta.env.BASE_URL}samples/guitar/${sampleFileName(standardTuning[string])}/${sampleFileName(note)}.mp3`,
+  url: (sample) => samplesIn(`guitar/${sampleFileName(standardTuning[sample.string ?? 0])}`)(sample),
   gain: 0.64,
 };
 
