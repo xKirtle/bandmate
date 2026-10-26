@@ -158,14 +158,15 @@
     ),
   );
   // The Details as Read mode shows them, with the key the Chords are shown in,
-  // and as Read mode prints them, with the Key as written.
+  // and as they print, with the Key as written: with how far Read mode
+  // transposes the Chords, and plainly from Write mode, which has no Transpose.
   const shownDetails = $derived(
     details
       ? { key: details.key.shown, bpm: details.bpm.shown, capo: details.capo.shown, tuning: details.tuning.shown }
       : null,
   );
   const summary = $derived(shownDetails ? detailsSummary(shownDetails, transpose) : '');
-  const printedLine = $derived(shownDetails ? printedDetails(shownDetails, transpose) : '');
+  const printedLine = $derived(shownDetails ? printedDetails(shownDetails, writing ? 0 : transpose) : '');
   const notes = $derived(details?.notes.shown ?? '');
   const hasNotes = $derived(notes.trim() !== '');
 
@@ -508,6 +509,8 @@
                   required
                   autocomplete="off"
                   enterkeyhint="done"></textarea>
+                <!-- What a Print shows in place of the field. -->
+                <h1 class="title print-title">{title}</h1>
               {:else}
                 <h1 class="title">{title}</h1>
               {/if}
@@ -670,15 +673,15 @@
               <p class="summary" class:muted={!summary}>{summary || 'No Details yet.'}</p>
               {#if hasNotes}{@render notesToggle()}{/if}
             </div>
-            {#if printedLine}
-              <p class="print-details">{printedLine}</p>
-            {/if}
             {#if tags.length > 0}
               <div class="read-tags"><TagChips {tags} /></div>
             {/if}
             {#if notesOpen && hasNotes}
               <p id="song-notes" class="read-notes">{notes}</p>
             {/if}
+          {/if}
+          {#if printedLine}
+            <p class="print-details">{printedLine}</p>
           {/if}
         </section>
 
@@ -1057,6 +1060,10 @@
     white-space: pre-wrap;
     overflow-wrap: anywhere;
   }
+  /* Write mode's title as it prints, in place of its field: on paper only. */
+  .print-title {
+    display: none;
+  }
   /* The Details as they print, with the Key as written: on paper only. */
   .print-details {
     display: none;
@@ -1244,7 +1251,9 @@
   /* A Print: the title, the Details line as it prints, then the Lyric
      Sheet, in one column across the paper. The Cover, the Status and when
      it was edited, the head's tools and mode switch, the Details as shown
-     with the Tags and Notes, the side column and Delete are left off. */
+     (or Write mode's fields for them) with the Tags and Notes, the side
+     column and Delete are left off, and Write mode's title field leaves its
+     place to a heading. */
   @media print {
     .page {
       max-width: none;
@@ -1277,6 +1286,10 @@
     .details {
       margin: 0 0 var(--space-6);
     }
+    textarea.title {
+      display: none;
+    }
+    .print-title,
     .print-details {
       display: block;
     }

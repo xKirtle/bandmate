@@ -2,13 +2,17 @@ import type { Locator, Page } from '@playwright/test';
 import type { Bandmate } from '../bandmate';
 import { expect, test } from '../fixtures';
 
-// A Song's Print from Read mode: the browser's own print, under print media,
-// shows the title, the Details line and the Lyric Sheet as Read mode shows it
-// on this device, black on white at paper's own sizes, and nothing else.
+// A Song's Print: the browser's own print, under print media, shows the
+// title, the Details line and the Lyric Sheet, as Read mode shows it on this
+// device or, from Write mode, as written, black on white at paper's own
+// sizes, and nothing else.
 
-/** A finished Song, which opens in Read mode, with Details, Notes, Tags, a Master, a Scrapbook Section and two Sections. */
-async function standSong(bandmate: Bandmate) {
-  const song = await bandmate.song({ title: 'Music Stand', status: 'finished', tags: ['live'] });
+/**
+ * A Song with Details, Notes, Tags, a Master, a Scrapbook Section and two Sections:
+ * finished, it opens in Read mode, and drafting, in Write mode.
+ */
+async function standSong(bandmate: Bandmate, status: 'finished' | 'drafting' = 'finished') {
+  const song = await bandmate.song({ title: 'Music Stand', status, tags: ['live'] });
   await bandmate.setDetails(song.id, { key: 'G', capo: 2, bpm: 92, notes: 'Only for me' });
   const verse = (await bandmate.addSection(song.id, 'Verse')).sections.at(-1)!;
   await bandmate.setLines(song.id, verse.alternates[0].id, '[G]Hello [C]world');
@@ -36,10 +40,18 @@ const chordOf = (page: Page, name: string) => sheet(page).getByText(name, { exac
 const style = (el: Locator, property: string) =>
   el.evaluate((node, property) => getComputedStyle(node).getPropertyValue(property), property);
 
-/** The Song page printed, as it lays out under print media. */
+/** The Song page printed from Read mode, as it lays out under print media. */
 async function printed(page: Page, songId: number) {
   await page.goto(`/songs/${songId}`);
   await expect(sheet(page).getByRole('region', { name: 'Verse' })).toBeVisible();
+  await page.emulateMedia({ media: 'print' });
+}
+
+/** The Song page printed from Write mode, as it lays out under print media. */
+async function printedFromWrite(page: Page, songId: number) {
+  await page.goto(`/songs/${songId}`);
+  await expect(page.getByRole('radio', { name: 'Write' })).toBeChecked();
+  await expect(page.getByRole('button', { name: 'Add Section' })).toBeVisible();
   await page.emulateMedia({ media: 'print' });
 }
 
@@ -165,4 +177,59 @@ test('printing from Read mode leaves hidden Chords and a hidden Chord Chart off 
   await expect(sheet(page).getByText('Sing it out')).toBeVisible();
   for (const name of ['G', 'C', 'D']) await expect(chordOf(page, name)).toHaveCount(0);
   await expect(chart(page)).toBeHidden();
+});
+
+test('printing from Write mode shows the title, the Details line and the Lyric Sheet as written, and no editor', async ({
+  page,
+  bandmate,
+}) => {
+  const song = await standSong(bandmate, 'drafting');
+  // Read mode's choices, none of which Write mode has.
+  await onThisDevice(page, {
+    [`bandmate.transpose.${song.id}`]: '2',
+    [`bandmate.chordsHidden.${song.id}`]: '1',
+    'bandmate.chordChart': 'pinned',
+  });
+  await printedFromWrite(page, song.id);
+
+  await expect(page.getByRole('heading', { name: 'Music Stand', level: 1 })).toBeVisible();
+  // The Key prints plainly: there's no Transpose in Write mode.
+  await expect(page.getByText('G · Capo 2 · 92 BPM', { exact: true })).toBeVisible();
+
+  // The Lyric Sheet as written, laid out as Read mode prints it: Chords shown, as written.
+  for (const label of ['Verse', 'Chorus']) {
+    const section = sheet(page).getByRole('region', { name: label });
+    await expect(section).toBeVisible();
+    await expect(section.getByRole('heading', { name: label })).toBeVisible();
+    expect(await style(section, 'break-inside')).toBe('avoid');
+  }
+  const verse = sheet(page).getByRole('region', { name: 'Verse' });
+  const chorus = sheet(page).getByRole('region', { name: 'Chorus' });
+  await expect(verse.getByText('Hello', { exact: true })).toBeVisible();
+  await expect(chorus.getByText('Sing it out', { exact: true })).toBeVisible();
+  for (const name of ['G', 'C']) await expect(verse.getByText(name, { exact: true })).toBeVisible();
+  for (const name of ['D', 'G']) await expect(chorus.getByText(name, { exact: true })).toBeVisible();
+  for (const name of ['A', 'E']) await expect(chordOf(page, name)).toHaveCount(0);
+  await expect(chart(page)).toHaveCount(0);
+
+  // No editor, input or control prints, nor anything else Read mode's print leaves off.
+  const controls = page.locator('input, textarea, select, button, [contenteditable="true"], [role="textbox"]');
+  await expect(controls.filter({ visible: true })).toHaveCount(0);
+  const leftOut = [
+    page.getByRole('navigation', { name: 'Library' }),
+    page.getByRole('region', { name: 'Timeline' }),
+    page.getByText('Final mix'),
+    page.getByText('A scrapped line'),
+    page.getByText('Only for me'),
+    page.getByText('live', { exact: true }),
+    page.getByText(/^Edited/),
+    page.getByText(/Put Chords in brackets/),
+  ];
+  for (const what of leftOut) await expect(what).toBeHidden();
+
+  // Black on white, at paper's sizes, as from Read mode.
+  const chord = chorus.getByText('D', { exact: true });
+  expect(await style(chord, 'color')).toBe('rgb(0, 0, 0)');
+  expect(await style(chord, 'font-weight')).toBe('700');
+  expect(await style(page.locator('body'), 'background-color')).toBe('rgb(255, 255, 255)');
 });
