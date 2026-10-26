@@ -355,6 +355,8 @@
     align-items: center;
     gap: var(--space-2) var(--space-4);
     max-width: calc(100vw - 2rem);
+    /* Wide enough for "−11" or "175%", so the steps don't move as the amount changes. */
+    --amount: 3.25rem;
     padding: var(--space-3) var(--space-4);
   }
   .panel:focus {
@@ -377,9 +379,8 @@
     min-width: var(--control);
     padding: 0;
   }
-  /* Wide enough for "−11" or "175%", so the steps don't move as the amount changes. */
   .amount {
-    min-width: 3.25rem;
+    min-width: var(--amount);
     padding: 0 var(--space-2);
     font-variant-numeric: tabular-nums;
   }
@@ -391,7 +392,7 @@
   }
   /* As wide as the three buttons of the rows above it. */
   .controls :global(.instrument) {
-    width: calc(2 * var(--control) + 3.25rem + 2 * var(--space-1));
+    width: calc(2 * var(--control) + var(--amount) + 2 * var(--space-1));
   }
   .pin[aria-pressed='true'] :global(.lucide-pin) {
     fill: currentColor;

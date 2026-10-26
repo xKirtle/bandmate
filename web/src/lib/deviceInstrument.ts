@@ -40,7 +40,9 @@ export const instrumentSetting = {
   store: storeInstrument,
 } satisfies DeviceSettingStorage<InstrumentName>;
 
+const instrumentNames: Record<InstrumentName, string> = { guitar: 'Guitar', piano: 'Piano' };
+
 /** An Instrument's name, as every picker of it shows it. */
 export function instrumentText(instrument: InstrumentName): string {
-  return instrument === 'piano' ? 'Piano' : 'Guitar';
+  return instrumentNames[instrument];
 }
