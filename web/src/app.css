@@ -38,7 +38,9 @@
   /* A piano's white key in a keyboard drawing, as wide as it grows with the
      room, from the narrowest a phone still reads to the widest. Its black
      keys, and its height, follow from it. A drawing shows C3 to C5, which
-     is 15 white keys (lowestKey and highestKey, in piano.ts). */
+     is 15 white keys (lowestKey and highestKey, in piano.ts), but for the
+     Chord Chart's: they draw only the octaves its Chords press, with keys
+     sized by the Chart Size, narrower than these at a small one. */
   --piano-key-narrowest: 1.125rem;
   --piano-key-widest: 1.5rem;
   --piano-white-keys: 15;

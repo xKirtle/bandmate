@@ -8,6 +8,7 @@ import {
   roots,
   strummed,
   voicingPlucks,
+  whiteKeys,
   type PianoVoicing,
 } from './chordFinder';
 
@@ -191,5 +192,12 @@ describe("a key's name, as Name it announces it", () => {
     expect(pianoKeyName(63)).toBe('Eb4');
     expect(pianoKeyName(71)).toBe('B4');
     expect(pianoKeyName(72)).toBe('C5');
+  });
+});
+
+describe('the white keys a keyboard drawing has', () => {
+  it('are 15 from C3 to C5, and 8 over one octave, both Cs drawn', () => {
+    expect(whiteKeys(48, 72)).toBe(15);
+    expect(whiteKeys(60, 72)).toBe(8);
   });
 });

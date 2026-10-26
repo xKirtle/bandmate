@@ -1,24 +1,28 @@
 <script lang="ts">
-  // A keyboard from C3 to C5, the same two octaves on every drawing so they
-  // compare at a glance: each key pressed filled with the accent and marked
+  // A keyboard, from C3 to C5 unless given a shorter stretch, the same keys
+  // on every drawing that's compared, so they compare at a glance: each key
+  // pressed filled with the accent and marked
   // with a dot, so it's told by its mark and not by colour alone (no accent
   // reaches 3:1 against both key colours in every Palette), and each C
   // named, middle C among them. A white key is 1 wide to 4.5 tall whatever
   // the room, so the height follows the width, which grows with the room up
-  // to the widest key; where the room is narrower than the keyboard at its
+  // to the widest key (--piano-key, where it's set, else --piano-key-widest);
+  // where the room is narrower than the keyboard at its
   // narrowest key (a phone under about 340px), it shrinks to fit. Unlike a
   // Chord diagram, it's never mirrored for a left-handed player: a piano's
-  // low notes are on the left either way. The Chord Finder draws a piano
-  // Voicing with it, and Name it plays it: given ontoggle, tapping a key
-  // presses it or lets it go, and it's one tab stop, ← and → moving a
-  // semitone, Home and End to the ends.
+  // low notes are on the left either way. The Chord Finder and the Chord
+  // Chart draw a piano Voicing with it, and Name it plays it: given ontoggle,
+  // tapping a key presses it or lets it go, and it's one tab stop, ← and →
+  // moving a semitone, Home and End to the ends.
   import { tick } from 'svelte';
-  import { highestKey, isBlackKey, lowestKey, middleC, pianoKeyName, type PianoKeys } from './piano';
+  import { highestKey, isBlackKey, lowestKey, middleC, pianoKeyName, whiteKeys, type PianoKeys } from './piano';
 
   let {
     pressed,
     label,
     ontoggle,
+    lowest = lowestKey,
+    highest = highestKey,
   }: {
     /** The keys pressed, as MIDI note numbers. */
     pressed: PianoKeys;
@@ -26,11 +30,15 @@
     label?: string;
     /** Makes it playable: a key tapped is pressed, or let go if it was pressed. */
     ontoggle?: (key: number) => void;
+    /** The lowest key drawn, a C: C3 unless given. */
+    lowest?: number;
+    /** The highest key drawn, a C: C5 unless given. */
+    highest?: number;
   } = $props();
 
-  const keys = Array.from({ length: highestKey - lowestKey + 1 }, (_, i) => lowestKey + i);
-  const whites = keys.filter((k) => !isBlackKey(k));
-  const blacks = keys.filter(isBlackKey);
+  const keys = $derived(Array.from({ length: highest - lowest + 1 }, (_, i) => lowest + i));
+  const whites = $derived(keys.filter((k) => !isBlackKey(k)));
+  const blacks = $derived(keys.filter(isBlackKey));
   /** A black key's centre, on the line between the white keys either side, as a share of the keyboard's width. */
   const blackAt = (key: number) => ((whites.indexOf(key - 1) + 1) / whites.length) * 100;
 
@@ -44,13 +52,13 @@
     const moves: Record<string, number> = {
       ArrowLeft: key - 1,
       ArrowRight: key + 1,
-      Home: lowestKey,
-      End: highestKey,
+      Home: lowest,
+      End: highest,
     };
     const to = moves[e.key];
     if (to === undefined) return;
     e.preventDefault();
-    focused = Math.max(lowestKey, Math.min(highestKey, to));
+    focused = Math.max(lowest, Math.min(highest, to));
     await tick();
     drawn.querySelector<HTMLButtonElement>('[tabindex="0"]')?.focus();
   }
@@ -87,18 +95,24 @@
   {/if}
 {/snippet}
 
-<div bind:this={drawn} class="piano" role={ontoggle ? 'group' : 'img'} aria-label={ontoggle ? 'Piano' : label}>
+<div
+  bind:this={drawn}
+  class="piano"
+  style:--white-keys={whites.length}
+  role={ontoggle ? 'group' : 'img'}
+  aria-label={ontoggle ? 'Piano' : label}
+>
   {#each whites as key (key)}{@render pianoKey(key)}{/each}
   {#each blacks as key (key)}{@render pianoKey(key)}{/each}
 </div>
 
 <style>
-  /* Its white keys, each 1 wide to 4.5 tall. */
+  /* Its white keys (--white-keys of them, set on it), each 1 wide to 4.5 tall. */
   .piano {
     position: relative;
     display: flex;
-    width: min(100%, calc(var(--piano-white-keys) * var(--piano-key-widest)));
-    aspect-ratio: calc(var(--piano-white-keys) / 4.5);
+    width: min(100%, calc(var(--white-keys) * var(--piano-key, var(--piano-key-widest))));
+    aspect-ratio: calc(var(--white-keys) / 4.5);
     margin-inline: auto;
   }
   .white,
@@ -126,7 +140,7 @@
   .black {
     position: absolute;
     top: 0;
-    width: calc(100% / var(--piano-white-keys) * 0.6);
+    width: calc(100% / var(--white-keys) * 0.6);
     height: 60%;
     background: var(--piano-black);
     transform: translateX(-50%);

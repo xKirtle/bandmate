@@ -2,23 +2,18 @@
   // The Chord Finder's own page, the one place it's offered: the user picks
   // the Instrument, the guitar until picked, and on the guitar the tuning,
   // standard tuning until picked, and the Key Suggest suggests from, C major
-  // until picked. The last ones picked are kept on this device. The piano
-  // has no tuning, so the field hides while it's picked.
+  // until picked. The last ones picked are kept on this device. The
+  // Instrument is the device's, so the Chord Chart draws the one picked here.
+  // The piano has no tuning, so the field hides while it's picked.
   import ChordFinder from '../lib/ChordFinder.svelte';
   import { instruments, readTuning, standard, type FinderContext, type InstrumentName } from '../lib/chordFinder';
   import { deviceStorage } from '../lib/deviceStorage';
-  import {
-    readFinderInstrument,
-    readFinderKey,
-    readFinderTuning,
-    storeFinderInstrument,
-    storeFinderKey,
-    storeFinderTuning,
-  } from '../lib/finderSetup';
+  import { readFinderKey, readFinderTuning, storeFinderKey, storeFinderTuning } from '../lib/finderSetup';
   import Picker from '../lib/Picker.svelte';
+  import { instrument as deviceInstrument } from '../lib/sharedInstrument.svelte';
   import TuningField from '../lib/TuningField.svelte';
 
-  let instrument = $state(readFinderInstrument(deviceStorage()));
+  const instrument = $derived(deviceInstrument.value);
   let tuning = $state(readFinderTuning(deviceStorage()));
   let tuningError = $state('');
   let suggestKey = $state(readFinderKey(deviceStorage()));
@@ -28,11 +23,6 @@
   );
 
   const instrumentLabel = (i: InstrumentName) => (i === 'piano' ? 'Piano' : 'Guitar');
-
-  function pickInstrument(picked: InstrumentName) {
-    instrument = picked;
-    storeFinderInstrument(deviceStorage(), picked);
-  }
 
   function keep() {
     tuningError = '';
@@ -54,7 +44,7 @@
         options={instruments}
         value={instrument}
         text={instrumentLabel}
-        onpick={pickInstrument}
+        onpick={(picked) => deviceInstrument.set(picked)}
       />
     </div>
     {#if instrument === 'guitar'}
