@@ -9,21 +9,16 @@ import type { SampleSet } from './samples';
 
 /** How an Instrument sounds when a Voicing on it is heard. Not a Song's Sound, an audio file. */
 export interface InstrumentSound {
-  /**
-   * The recorded samples it plays (ADR 0030), or the guitar's synthesised
-   * pluck, which it plays until it has samples of its own.
-   */
-  samples: SampleSet | 'pluck';
+  /** The recorded samples it plays (ADR 0030). */
+  samples: SampleSet;
   /** Whether Hear strums its notes, low to high, as a guitar's strings are, rather than sounding them together, as a piano's keys are. */
   strummed: boolean;
 }
 
-/** One note heard: which note, and, on the guitar, how bright it sounds. */
+/** One note heard. */
 export interface HeardNote {
   /** Its MIDI note number. */
   midi: number;
-  /** From dark, near 0, to bright, 1: the guitar's open top string. Only the guitar's pluck reads it; samples sound as recorded. */
-  brightness?: number;
 }
 
 /**
@@ -38,7 +33,7 @@ export interface Instrument<Voicing, Placement, Preference> {
   placement(voicing: Voicing): Placement;
   /** What the notes placed on it sound, low to high: what hearing them plays. */
   heardNotes(placement: Placement): HeardNote[];
-  /** How it sounds. Hear strums a plucked sound's notes, low to high, as a guitar's strings are, and sounds a struck one's together, as a piano's keys are. */
+  /** How it sounds: its samples, and whether Hear strums its notes, low to high, as a guitar's strings are, or sounds them together, as a piano's keys are. */
   sound: InstrumentSound;
   /** Where its preferred Voicings are kept on this device. */
   preferredStorageKey: string;

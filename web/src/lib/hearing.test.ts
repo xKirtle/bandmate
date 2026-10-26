@@ -9,8 +9,9 @@ import type { SampleSet } from './samples';
 
 const piano: SampleSet = { name: 'Piano', notes: [60, 63], url: (n) => `/piano/${n}.mp3`, gain: 0.55 };
 const struck: InstrumentSound = { samples: piano, strummed: false };
-const plucked: InstrumentSound = { samples: 'pluck', strummed: true };
-const notes = (...midi: number[]): HeardNote[] => midi.map((m) => ({ midi: m, brightness: 0.5 }));
+const guitar: SampleSet = { name: 'Guitar', notes: [40, 42], url: (n) => `/guitar/${n}.mp3`, gain: 0.23 };
+const strummed: InstrumentSound = { samples: guitar, strummed: true };
+const notes = (...midi: number[]): HeardNote[] => midi.map((m) => ({ midi: m }));
 
 /** A sample load held until the test lets it arrive, or fail. */
 interface Pending {
@@ -66,8 +67,8 @@ describe("the piano's samples", () => {
     const [{ notes: heard, gap, sound }] = played;
     expect(heard.map((n) => n.midi)).toEqual([60, 64, 67]);
     expect(gap).toBe(0);
-    expect(sound !== 'pluck' && sound.set).toBe(piano);
-    expect(sound !== 'pluck' && [...sound.samples]).toEqual([
+    expect(sound.set).toBe(piano);
+    expect([...sound.samples]).toEqual([
       [60, '/piano/60.mp3'],
       [63, '/piano/63.mp3'],
     ]);
@@ -103,9 +104,9 @@ describe('a press before the samples arrive', () => {
   it("doesn't play if the guitar was pressed since", async () => {
     const { player, played, settle } = setUp();
     player.hear(notes(60, 64), struck);
-    player.hear(notes(40, 47), plucked);
+    player.hear(notes(40, 47), strummed);
     await settle();
-    expect(played.map((p) => p.sound)).toEqual(['pluck']);
+    expect(played.map((p) => p.sound.set)).toEqual([guitar]);
   });
 });
 
@@ -133,23 +134,32 @@ describe("samples that can't load", () => {
     expect(pending).toHaveLength(2);
   });
 
-  it('say nothing for a press something else was pressed since', async () => {
+  it('speak only for the last press, not one something else was pressed since', async () => {
     const { player, toasts, settle } = setUp();
     player.hear(notes(60), struck);
-    player.hear(notes(40), plucked);
+    player.hear(notes(40), strummed);
     await settle('fail');
-    expect(toasts).toEqual([]);
+    expect(toasts).toEqual(['Guitar unheard']);
   });
 });
 
-describe("the guitar's pluck", () => {
-  it('is strummed at once, with nothing to load', () => {
-    const { player, pending, events, played } = setUp();
-    player.prepare(plucked);
-    player.hear(notes(40, 47, 52), plucked);
-    expect(pending).toEqual([]);
-    expect(events).toEqual(['cut off', 'play']);
-    expect(played[0].sound).toBe('pluck');
+describe("the guitar's samples", () => {
+  it("load apart from the piano's, and strum low to high once loaded", async () => {
+    const { player, pending, played, settle } = setUp();
+    player.prepare(strummed);
+    expect(pending.map((p) => p.url)).toEqual(['/guitar/40.mp3', '/guitar/42.mp3']);
+    await settle();
+    player.hear(notes(40, 47, 52), strummed);
+    expect(played[0].sound.set).toBe(guitar);
+    expect(played[0].notes.map((n) => n.midi)).toEqual([40, 47, 52]);
     expect(played[0].gap).toBeGreaterThan(0);
+    expect(played[0].gap).toBeLessThan(0.1);
+  });
+
+  it("say the guitar couldn't be heard if they can't load", async () => {
+    const { player, toasts, settle } = setUp();
+    player.arpeggiate(notes(40, 47), strummed);
+    await settle('fail');
+    expect(toasts).toEqual(['Guitar unheard']);
   });
 });

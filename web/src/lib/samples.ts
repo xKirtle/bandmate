@@ -12,7 +12,7 @@ export interface SampleSet {
   notes: readonly number[];
   /** Where a sample is served, by its note. */
   url(note: number): string;
-  /** How loud its samples play: matched to the guitar's strum, with no Voicing clipping. */
+  /** How loud its samples play: matched to the guitar's synthesised strum they replaced (#1205), with no Voicing clipping. */
   gain: number;
 }
 

@@ -4,8 +4,7 @@
 // Instrument's samples load once, all of them, when first asked for, by a
 // press or ahead of one; a press made before they arrive plays when they do,
 // unless something else was pressed since. If they can't load, it's said
-// the Instrument couldn't be heard, and the next press tries again. The
-// guitar's pluck, synthesised, has nothing to load.
+// the Instrument couldn't be heard, and the next press tries again.
 //
 // The playing itself, on Web Audio, is hear.ts's, so these rules can be
 // tested without it.
@@ -18,11 +17,11 @@ const strumGap = 0.03;
 /** The gap between one note and the next in an arpeggio, in seconds: slow enough to hear each one. */
 const arpeggioGap = 0.175;
 
-/** What a press plays: its notes, lowest first, `gap` seconds apart, from an Instrument's samples or the pluck. */
+/** What a press plays: its notes, lowest first, `gap` seconds apart, from an Instrument's samples. */
 export interface Played<Sample> {
   notes: readonly HeardNote[];
   gap: number;
-  sound: 'pluck' | { set: SampleSet; samples: ReadonlyMap<number, Sample> };
+  sound: { set: SampleSet; samples: ReadonlyMap<number, Sample> };
 }
 
 /** What hearing needs done: loading a sample, playing and cutting off, and saying when an Instrument can't be heard. */
@@ -80,7 +79,6 @@ export function hearing<Sample>(deps: HearingDeps<Sample>): Hearing {
     deps.cutOff();
     if (notes.length === 0) return;
     const { samples: set } = sound;
-    if (set === 'pluck') return deps.play({ notes, gap, sound: 'pluck' });
     const samples = loaded.get(set);
     if (samples) return deps.play({ notes, gap, sound: { set, samples } });
     load(set).then(
@@ -95,7 +93,7 @@ export function hearing<Sample>(deps: HearingDeps<Sample>): Hearing {
 
   return {
     prepare({ samples: set }) {
-      if (set !== 'pluck') load(set).catch(() => {});
+      load(set).catch(() => {});
     },
     hear: (notes, sound) => press(notes, sound, sound.strummed ? strumGap : 0),
     arpeggiate: (notes, sound) => press(notes, sound, arpeggioGap),

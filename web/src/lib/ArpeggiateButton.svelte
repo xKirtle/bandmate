@@ -14,7 +14,7 @@
     chord: string;
     /** What to sound, low to high: the Chord Finder's heardNotes. With none, as in Name it with nothing placed, it's disabled. */
     notes: readonly HeardNote[];
-    /** How the Instrument sounds: which samples it plays, or the guitar's pluck. */
+    /** How the Instrument sounds: which samples it plays. */
     sound: InstrumentSound;
   } = $props();
 </script>

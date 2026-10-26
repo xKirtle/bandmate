@@ -5,6 +5,7 @@
 
 import type { Chord } from './chordTheory';
 import type { HeardNote, Instrument } from './instrument';
+import { samplesIn, type SampleSet } from './samples';
 
 /** The frets placed on a guitar, low string to high: 0 for open, null for muted. */
 export type Frets = readonly (number | null)[];
@@ -151,32 +152,34 @@ export function diagramStartFret(voicing: GuitarVoicing, rows: number): number {
   return fretted.length === 0 || Math.max(...fretted) <= rows ? 1 : Math.min(...fretted);
 }
 
-/** How much darker a string sounds an octave up the neck: a shorter length rings with fewer overtones. */
-const octaveUpDarkens = 0.5;
-
-/**
- * What strumming frets on a guitar plays, low string to high, muted
- * strings skipped: each string's MIDI note number, and how bright it
- * sounds. A thicker string sounds darker than a thinner one, and a string
- * darker the higher up the neck it's fretted, so the same note sounds
- * warmer on a thicker string up the neck than open on a thin one.
- */
+/** What strumming frets on a guitar plays, low string to high, muted strings skipped: each string's MIDI note number. */
 function guitarHeardNotes(frets: Frets, tuning: readonly number[]): HeardNote[] {
-  const thinnest = Math.max(1, tuning.length - 1);
-  return frets.flatMap((fret, string) => {
-    if (fret === null) return [];
-    // The thickest string at 0.4, the thinnest at 1.
-    const byString = 0.4 + 0.6 * (string / thinnest);
-    return [{ midi: tuning[string] + fret, brightness: byString * octaveUpDarkens ** (fret / 12) }];
-  });
+  return frets.flatMap((fret, string) => (fret === null ? [] : [{ midi: tuning[string] + fret }]));
 }
 
 /**
+ * The guitar's recorded samples: a steel-string acoustic from the University
+ * of Iowa Electronic Music Studios, packaged by Nicholaus Brosowsky
+ * (tonejs-instruments, CC BY 3.0), every 2 semitones from D2 to D5, so
+ * standard tuning's open low E, D and high E play as recorded. There's none
+ * below D2 or above D5: Drop C's low C and the top string's 12th fret play
+ * from an end, 2 semitones away. Its gain matches the strum of C to the
+ * synthesised one it replaced, leaving every Voicing measured, six strings
+ * too, at least 8 dB from clipping (#1205).
+ */
+export const guitarSamples: SampleSet = {
+  name: 'Guitar',
+  notes: [38, 40, 42, 44, 46, 48, 50, 52, 54, 56, 58, 60, 62, 64, 66, 68, 70, 72, 74],
+  url: samplesIn('guitar'),
+  gain: 0.23,
+};
+
+/**
  * The guitar in a tuning, its strings' pitches low to high as MIDI note
- * numbers. It sounds as a synthesised pluck, which Hear strums, until it
- * has recorded samples of its own. The notes placed on it are its frets, and
- * a preferred Voicing is kept by its frets, per tuning: a Voicing preferred
- * in standard tuning doesn't pick a wrong one in Drop D. The tuning is kept by its pitches, so
+ * numbers. It plays its recorded samples, which Hear strums, low string to
+ * high. The notes placed on it are its frets, and a preferred Voicing is
+ * kept by its frets, per tuning: a Voicing preferred in standard tuning
+ * doesn't pick a wrong one in Drop D. The tuning is kept by its pitches, so
  * "Drop D" and "D A D G B E" share.
  */
 export function guitar(tuning: readonly number[]): Instrument<GuitarVoicing, Frets, Frets> {
@@ -184,7 +187,7 @@ export function guitar(tuning: readonly number[]): Instrument<GuitarVoicing, Fre
     voicings: (chord) => guitarVoicings(chord, tuning),
     placement: (voicing) => voicing.frets,
     heardNotes: (frets) => guitarHeardNotes(frets, tuning),
-    sound: { samples: 'pluck', strummed: true },
+    sound: { samples: guitarSamples, strummed: true },
     preferredStorageKey: `bandmate.preferredVoicings.guitar.${tuning.join('-')}`,
     preference: (voicing) => voicing.frets,
     prefers: (voicing, frets) => voicing.frets.length === frets.length && voicing.frets.every((f, i) => f === frets[i]),
