@@ -42,7 +42,7 @@
   import SnapshotsDialog from '../lib/SnapshotsDialog.svelte';
   import { inTextField } from '../lib/textField';
   import { opensShortcuts, undoKey } from '../lib/songKeys';
-  import { detailsSummary, openingMode, sideParts, type Mode, type SidePart } from '../lib/songMode';
+  import { detailsSummary, openingMode, printedDetails, sideParts, type Mode, type SidePart } from '../lib/songMode';
   import { chordsInRead } from '../lib/chordChart';
   import { songChordsShown } from '../lib/chordsShown';
   import { songTranspose } from '../lib/sharedTranspose.svelte';
@@ -157,15 +157,15 @@
       rhymingDictionaries.loading(languages),
     ),
   );
-  // The Details as Read mode shows them, with the key the Chords are shown in.
-  const summary = $derived(
+  // The Details as Read mode shows them, with the key the Chords are shown in,
+  // and as Read mode prints them, with the Key as written.
+  const shownDetails = $derived(
     details
-      ? detailsSummary(
-          { key: details.key.shown, bpm: details.bpm.shown, capo: details.capo.shown, tuning: details.tuning.shown },
-          transpose,
-        )
-      : '',
+      ? { key: details.key.shown, bpm: details.bpm.shown, capo: details.capo.shown, tuning: details.tuning.shown }
+      : null,
   );
+  const summary = $derived(shownDetails ? detailsSummary(shownDetails, transpose) : '');
+  const printed = $derived(shownDetails ? printedDetails(shownDetails, transpose) : '');
   const notes = $derived(details?.notes.shown ?? '');
   const hasNotes = $derived(notes.trim() !== '');
 
@@ -670,6 +670,9 @@
               <p class="summary" class:muted={!summary}>{summary || 'No Details yet.'}</p>
               {#if hasNotes}{@render notesToggle()}{/if}
             </div>
+            {#if printed}
+              <p class="print-details">{printed}</p>
+            {/if}
             {#if tags.length > 0}
               <div class="read-tags"><TagChips {tags} /></div>
             {/if}
@@ -1054,6 +1057,12 @@
     white-space: pre-wrap;
     overflow-wrap: anywhere;
   }
+  /* The Details as they print, with the Key as written: on paper only. */
+  .print-details {
+    display: none;
+    margin: 0;
+    font-size: var(--text-md);
+  }
 
   /* A phone: the Cover beside just the title and Status, the mode switch
      on a row of its own across the page, and the Details filling the width
@@ -1229,6 +1238,47 @@
       margin: 0;
       padding: 0;
       border: 0;
+    }
+  }
+
+  /* A Print: the title, the Details line as it prints, then the Lyric
+     Sheet, in one column across the paper. The Cover, the Status and when
+     it was edited, the head's tools and mode switch, the Details as shown
+     with the Tags and Notes, the side column and Delete are left off. */
+  @media print {
+    .page {
+      max-width: none;
+      min-height: 0;
+      padding: 0;
+    }
+    .song {
+      display: block;
+    }
+    .head {
+      display: block;
+      margin: 0;
+    }
+    .head > :global(:not(.head-main)),
+    .meta,
+    .head-tools,
+    .details > :not(.print-details),
+    .stale,
+    .side,
+    .delete {
+      display: none;
+    }
+    .title {
+      width: auto;
+      min-height: 0;
+      margin: 0 0 var(--space-1);
+      padding: 0;
+      font-size: var(--text-2xl);
+    }
+    .details {
+      margin: 0 0 var(--space-6);
+    }
+    .print-details {
+      display: block;
     }
   }
 </style>

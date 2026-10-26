@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { detailsSummary, openingMode, sideParts } from './songMode';
+import { detailsSummary, openingMode, printedDetails, sideParts } from './songMode';
 
 describe('openingMode', () => {
   it('opens a Finished Song in Read mode', () => {
@@ -65,5 +65,29 @@ describe('sideParts', () => {
 
   it('never shows Rhymes in Read mode', () => {
     expect(sideParts('read', { rhymes: true })).toEqual([{ part: 'masters', open: true }]);
+  });
+});
+
+describe('printedDetails', () => {
+  const none = { key: '', bpm: '', capo: '', tuning: '' };
+
+  it('joins the Details that are set, the instrument set up before the BPM', () => {
+    expect(printedDetails({ key: 'C#m', bpm: '92', capo: '2', tuning: 'Drop D' })).toBe(
+      'C#m · Capo 2 · Drop D · 92 BPM',
+    );
+    expect(printedDetails({ ...none, key: ' Am ', bpm: '92', capo: '  ' })).toBe('Am · 92 BPM');
+    expect(printedDetails(none)).toBe('');
+  });
+
+  it('keeps the Key as written, with how far the Chords are transposed beside it', () => {
+    expect(printedDetails({ key: 'G', bpm: '92', capo: '2', tuning: '' }, 2)).toBe(
+      'G · transposed +2 · Capo 2 · 92 BPM',
+    );
+    expect(printedDetails({ ...none, key: 'Sol' }, -3)).toBe('Sol · transposed −3');
+    expect(printedDetails({ ...none, key: 'G' }, 0)).toBe('G');
+  });
+
+  it('still says the Chords are transposed when there is no Key', () => {
+    expect(printedDetails({ ...none, bpm: '92' }, 2)).toBe('Transposed +2 · 92 BPM');
   });
 });

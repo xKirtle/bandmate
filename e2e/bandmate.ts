@@ -141,6 +141,14 @@ export class Bandmate {
     return json<Song>(this.api.patch(`/api/songs/${id}`, { data: { tuning } }));
   }
 
+  /** Sets a Song's Details and Notes, as typing them into the Details does. */
+  setDetails(
+    id: number,
+    details: { key?: string; bpm?: number; capo?: number; tuning?: string; notes?: string },
+  ): Promise<Song> {
+    return json<Song>(this.api.patch(`/api/songs/${id}`, { data: details }));
+  }
+
   /** Adds a Section to the end of a Song's Lyric Sheet, or of its Scrapbook, as Add Section does. */
   addSection(songId: number, label: string, to: 'arrangement' | 'scrapbook' = 'arrangement'): Promise<Sheet> {
     const path = to === 'arrangement' ? 'sections' : 'scrapbook';

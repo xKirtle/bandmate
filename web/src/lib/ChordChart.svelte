@@ -211,4 +211,23 @@
   .piano .empty {
     aspect-ratio: calc(var(--chart-white-keys) / 4.5);
   }
+  /* On paper, pinned or not, it's at the top of the Lyric Sheet, its
+     diagrams wrapping onto as many rows as they need, kept together. A
+     piano's keys are filled, so they print however the browser is set to
+     print backgrounds. */
+  @media print {
+    .chart {
+      break-inside: avoid;
+      print-color-adjust: exact;
+    }
+    .pinned {
+      position: static;
+      padding: 0;
+      border: 0;
+    }
+    .row {
+      flex-wrap: wrap;
+      overflow: visible;
+    }
+  }
 </style>

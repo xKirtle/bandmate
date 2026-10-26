@@ -3284,4 +3284,10 @@
       min-height: 0;
     }
   }
+  /* The Timeline never prints: a Print is the Lyric Sheet. */
+  @media print {
+    .timeline {
+      display: none;
+    }
+  }
 </style>
