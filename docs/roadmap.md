@@ -29,10 +29,6 @@ Each feature gets a spec, as an issue, before it's built. Using a new feature fo
 - Slow the Timeline down, or speed it up, without changing its pitch, for learning a part, especially over a Loop.
 - Whether Masters and Beat previews get it too is for the spec.
 
-## Printing a Song
-
-- A print layout for the Lyric Sheet, with its Chords, for a music stand.
-
 ## Track colours
 
 - Each Track gets a muted colour of its own, assigned automatically from a small palette in the visual identity's tokens, so Clips on different Tracks can be told apart at a glance. Today every Clip is in the one accent colour.
