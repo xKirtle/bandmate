@@ -117,4 +117,10 @@
       margin-top: auto;
     }
   }
+  /* The navigation isn't the Song's, so it never prints. */
+  @media print {
+    nav {
+      display: none;
+    }
+  }
 </style>

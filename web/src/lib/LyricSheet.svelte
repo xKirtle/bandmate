@@ -363,7 +363,9 @@
   {#if song.arrangement.length === 0}
     <p class="muted">
       No Sections here yet.{#if mode === 'write'}
-        Add one to start writing{song.scrapbook.length > 0 ? ', or put one back from the Scrapbook' : ''}.{/if}
+        <span class="to-start"
+          >Add one to start writing{song.scrapbook.length > 0 ? ', or put one back from the Scrapbook' : ''}.</span
+        >{/if}
     </p>
   {/if}
 
@@ -461,6 +463,11 @@
       {/if}
     </div>
     <p class="hint muted">Put Chords in brackets where they fall: <code>Hel[Am]lo</code>.</p>
+    <!-- What a Print shows in place of the editors: the Lyric Sheet as
+         written, laid out as Read mode prints it, with its Chords. -->
+    <div class="print-view">
+      <LyricSheetView {song} showChords />
+    </div>
   {/if}
 </section>
 
@@ -585,5 +592,27 @@
   }
   .duplicate :global(.button) {
     width: 100%;
+  }
+  /* Only a Print shows Write mode's Lyric Sheet as Read mode lays it out. */
+  .print-view {
+    display: none;
+  }
+  /* A Print leaves off the header's tools (Auto-scroll and the Reading menu,
+     or Write mode's), and Write mode's editors, for the Lyric Sheet as
+     written. */
+  @media print {
+    .sheet {
+      margin: 0;
+    }
+    .head,
+    .arrangement,
+    .add-row,
+    .hint,
+    .to-start {
+      display: none;
+    }
+    .print-view {
+      display: block;
+    }
   }
 </style>
