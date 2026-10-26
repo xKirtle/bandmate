@@ -1,7 +1,8 @@
 // The Reading menu, in Read mode's header: the Lyric Size, Transpose,
-// whether the Chords show, the Chord Chart and its Chart Size, and
-// Auto-scroll's speed, gathered behind one button. Its rows stay in place for every Song,
-// a Chord row disabled where it can't apply.
+// whether the Chords show, the Chord Chart and its Chart Size, the device's
+// Instrument, and Auto-scroll's speed, gathered behind one button. Its rows
+// stay in place for every Song, a Chord row disabled where it can't apply;
+// the Instrument, the device's whatever the Song, never is.
 
 import type { ChordsInRead } from './chordChart';
 import { transposeText } from './transposeAmount';
