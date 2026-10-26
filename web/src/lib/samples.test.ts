@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { guitarSamples } from './guitar';
 import { pianoSamples } from './piano';
 import { fromOnset, sampleFor, type SampleSet } from './samples';
 
@@ -39,6 +40,55 @@ describe("the piano's samples", () => {
   it('play a note below or above them from the nearest end', () => {
     expect(sampleFor(pianoSamples, 40)).toEqual({ sample: 42, rate: expect.closeTo(1 / semitone ** 2, 12) });
     expect(sampleFor(pianoSamples, 74)).toEqual({ sample: 72, rate: expect.closeTo(semitone ** 2, 12) });
+  });
+});
+
+describe("the guitar's samples", () => {
+  it('are the 19 shipped, every 2 semitones from D2 to D5, served by Bandmate itself', () => {
+    expect(guitarSamples.notes.map((n) => guitarSamples.url(n))).toEqual(
+      [
+        'D2',
+        'E2',
+        'Fs2',
+        'Gs2',
+        'As2',
+        'C3',
+        'D3',
+        'E3',
+        'Fs3',
+        'Gs3',
+        'As3',
+        'C4',
+        'D4',
+        'E4',
+        'Fs4',
+        'Gs4',
+        'As4',
+        'C5',
+        'D5',
+      ].map((name) => `/samples/guitar/${name}.mp3`),
+    );
+  });
+
+  it("play standard tuning's open low E, D and high E as recorded", () => {
+    expect(sampleFor(guitarSamples, 40)).toEqual({ sample: 40, rate: 1 });
+    expect(sampleFor(guitarSamples, 50)).toEqual({ sample: 50, rate: 1 });
+    expect(sampleFor(guitarSamples, 64)).toEqual({ sample: 64, rate: 1 });
+  });
+
+  it('play an odd note from the sample a semitone under it, in tune', () => {
+    // The open A string, A2, is 110 Hz, from G#2 a semitone up.
+    const a = sampleFor(guitarSamples, 45);
+    expect(a.sample).toBe(44);
+    expect(103.83 * a.rate).toBeCloseTo(110, 1);
+    // The open G and B strings, G3 and B3, likewise.
+    expect(sampleFor(guitarSamples, 55)).toEqual({ sample: 54, rate: expect.closeTo(semitone, 12) });
+    expect(sampleFor(guitarSamples, 59)).toEqual({ sample: 58, rate: expect.closeTo(semitone, 12) });
+  });
+
+  it('play a note below D2 or above D5 from the nearest end: Drop C, and the top string at the 12th fret', () => {
+    expect(sampleFor(guitarSamples, 36)).toEqual({ sample: 38, rate: expect.closeTo(1 / semitone ** 2, 12) });
+    expect(sampleFor(guitarSamples, 76)).toEqual({ sample: 74, rate: expect.closeTo(semitone ** 2, 12) });
   });
 });
 

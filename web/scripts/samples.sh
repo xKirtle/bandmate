@@ -38,4 +38,16 @@ make_set piano \
   6 5.5 0.5 \
   Fs2 A2 C3 Ds3 Fs3 A3 C4 Ds4 Fs4 A4 C5
 
+# The guitar: a steel-string acoustic from the University of Iowa Electronic
+# Music Studios' Musical Instrument Samples, as Nicholaus Brosowsky's
+# tonejs-instruments packages them (CC-BY 3.0;
+# https://github.com/nbrosowsky/tonejs-instruments, samples/guitar-acoustic/,
+# the same files nbrosowsky.github.io/tonejs-instruments/samples/ serves),
+# every 2 semitones from D2 to D5. 4.5 s each, fading out over the last
+# 0.3 s.
+make_set guitar \
+  "https://raw.githubusercontent.com/nbrosowsky/tonejs-instruments/622c2f1c32c8cfce4158ddc3eb26e518ddef37e5/samples/guitar-acoustic" \
+  4.5 4.2 0.3 \
+  D2 E2 Fs2 Gs2 As2 C3 D3 E3 Fs3 Gs3 As3 C4 D4 E4 Fs4 Gs4 As4 C5 D5
+
 du -ch "$public"/samples/*/*.mp3 | tail -1

@@ -19,4 +19,18 @@ var sampleCredits = []build.Dependency{
 			{Text: ", trimmed and re-encoded."},
 		},
 	},
+	{
+		Name:    "University of Iowa Musical Instrument Samples",
+		Version: "622c2f1",
+		License: "CC-BY-3.0",
+		Credit: []build.Link{
+			{Text: "The guitar's samples: "},
+			{Text: "University of Iowa Electronic Music Studios", URL: "https://theremin.music.uiowa.edu/MIS.html"},
+			{Text: "; packaged by Nicholaus Brosowsky ("},
+			{Text: "tonejs-instruments", URL: "https://github.com/nbrosowsky/tonejs-instruments"},
+			{Text: "), "},
+			{Text: "CC-BY 3.0", URL: "https://creativecommons.org/licenses/by/3.0/"},
+			{Text: ", trimmed and re-encoded."},
+		},
+	},
 }

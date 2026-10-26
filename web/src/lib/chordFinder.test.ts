@@ -601,9 +601,6 @@ function palette(key: string): string[] | null {
 /** The MIDI note numbers hearing a shape plays, low string to high. */
 const midis = (written: string, ctx: GuitarContext = context) => heardNotes(shape(written), ctx).map((n) => n.midi);
 
-/** How bright each string sounds when a shape is heard, low string to high: NaN, failing every check, for one without. */
-const brightness = (written: string) => heardNotes(shape(written), context).map((n) => n.brightness ?? NaN);
-
 describe('what hearing a Voicing plays', () => {
   it("is its strings' MIDI note numbers in the tuning, low string to high", () => {
     // E major: E2 B2 E3 G#3 B3 E4.
@@ -626,41 +623,6 @@ describe('what hearing a Voicing plays', () => {
   it('follows the tuning in use', () => {
     // D5 in Drop D: D2 A2 D3.
     expect(midis('000xxx', { tuning: readTuning('Drop D')! })).toEqual([38, 45, 50]);
-  });
-
-  it('sounds each string between dark, 0, and bright, 1', () => {
-    for (const written of ['000000', '022100', '999999', 'x32010']) {
-      for (const b of brightness(written)) {
-        expect(b).toBeGreaterThan(0);
-        expect(b).toBeLessThanOrEqual(1);
-      }
-    }
-  });
-
-  it('sounds a thicker string darker, at the same fret', () => {
-    const open = brightness('000000');
-    for (let s = 1; s < open.length; s++) expect(open[s - 1]).toBeLessThan(open[s]);
-    const fifth = brightness('555555');
-    for (let s = 1; s < fifth.length; s++) expect(fifth[s - 1]).toBeLessThan(fifth[s]);
-  });
-
-  it('sounds a string darker the higher up the neck it is fretted', () => {
-    const [open] = brightness('0xxxxx');
-    const [third] = brightness('3xxxxx');
-    const [seventh] = brightness('7xxxxx');
-    expect(third).toBeLessThan(open);
-    expect(seventh).toBeLessThan(third);
-  });
-
-  it('sounds the same note darker on a thicker string, higher up the neck', () => {
-    // E4: the open 1st string, the 2nd at the 5th fret, the 3rd at the 9th.
-    const [onFirst] = brightness('xxxxx0');
-    const [onSecond] = brightness('xxxx5x');
-    const [onThird] = brightness('xxx9xx');
-    expect(onSecond).toBeLessThan(onFirst);
-    expect(onThird).toBeLessThan(onSecond);
-    // C3 in x32010, on the 5th string, is brighter than in 87555x, on the 6th at the 8th fret.
-    expect(brightness('8xxxxx')[0]).toBeLessThan(brightness('x3xxxx')[0]);
   });
 });
 

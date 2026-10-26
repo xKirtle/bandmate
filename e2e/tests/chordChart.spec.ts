@@ -118,7 +118,7 @@ test("a Chord's popover on the piano loads its samples as it first opens, and sa
   const song = await songWith(bandmate, ['C']);
   let loaded = 0;
   page.on('requestfinished', (r) => {
-    if (r.url().endsWith('.mp3')) loaded++;
+    if (r.url().includes('/samples/piano/')) loaded++;
   });
   await pickInstrument(page, 'Piano');
   await expect.poll(() => loaded).toBe(11);

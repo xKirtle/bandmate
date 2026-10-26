@@ -224,7 +224,7 @@ export function heardNotes(placement: Placement, context: FinderContext): HeardN
   return finderInstrument(context).heardNotes(placement);
 }
 
-/** How the Finder's Instrument sounds: which samples it plays, or the guitar's pluck, and whether Hear strums them, as on the guitar, or sounds them together, as on the piano. */
+/** How the Finder's Instrument sounds: which samples it plays, and whether Hear strums them, as on the guitar, or sounds them together, as on the piano. */
 export function instrumentSound(context: FinderContext): InstrumentSound {
   return finderInstrument(context).sound;
 }
