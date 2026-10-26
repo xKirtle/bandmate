@@ -136,6 +136,11 @@ export class Bandmate {
     return json<Song>(this.api.patch(`/api/songs/${id}`, { data: { title } }));
   }
 
+  /** Sets a Song's tuning, as its Details do: blank for Standard. */
+  tune(id: number, tuning: string): Promise<Song> {
+    return json<Song>(this.api.patch(`/api/songs/${id}`, { data: { tuning } }));
+  }
+
   /** Adds a Section to the end of a Song's Lyric Sheet, or of its Scrapbook, as Add Section does. */
   addSection(songId: number, label: string, to: 'arrangement' | 'scrapbook' = 'arrangement'): Promise<Sheet> {
     const path = to === 'arrangement' ? 'sections' : 'scrapbook';

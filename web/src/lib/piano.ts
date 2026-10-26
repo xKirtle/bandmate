@@ -33,6 +33,13 @@ export type PianoKeys = readonly number[];
 /** Whether a key is a black one. */
 export const isBlackKey = (key: number) => [1, 3, 6, 8, 10].includes(pitchClass(key));
 
+/** How many white keys a keyboard has from one key to another, both drawn. */
+export function whiteKeys(lowest: number, highest: number): number {
+  let count = 0;
+  for (let key = lowest; key <= highest; key++) if (!isBlackKey(key)) count++;
+  return count;
+}
+
 /** A key's note, spelled the common way, as notes no Chord spells are, with its octave: middle C is C4, the key above it C#4. */
 export const pianoKeyName = (key: number) => commonNote(key) + (Math.floor(key / 12) - 1);
 

@@ -127,7 +127,7 @@ A word whose ending sounds like another's: perfect when its last stressed vowel 
 _Avoid_: Slant rhyme (say near Rhyme)
 
 **Chord Finder**:
-A built-in reference for Chords: look up how to play one, name one from the notes placed on an Instrument, and get Chords that go well with a Chord or a Key. A Voicing can be heard there, its notes together (strummed, on the guitar) or one at a time. It has its own page and isn't opened from a Song. The user picks the Instrument, and on the guitar the tuning, and the last ones picked are kept on each device. It has no capo: a Chord names the shape fingered, so a capo changes nothing about how it is played. It holds nothing of the user's. The app titles its page and navigation label Chords.
+A built-in reference for Chords: look up how to play one, name one from the notes placed on an Instrument, and get Chords that go well with a Chord or a Key. A Voicing can be heard there, its notes together (strummed, on the guitar) or one at a time. It has its own page and isn't opened from a Song. The user picks the Instrument, the same one the Chord Chart draws, and on the guitar the tuning; the last ones picked are kept on each device. It has no capo: a Chord names the shape fingered, so a capo changes nothing about how it is played. It holds nothing of the user's. The app titles its page and navigation label Chords.
 _Avoid_: Chord Library (a library holds the user's things, like the Beat Library)
 
 **Voicing**:
@@ -135,11 +135,11 @@ One way to play a Chord on an Instrument: which strings and frets on a guitar, w
 _Avoid_: Shape, fingering, chord diagram (a diagram draws a Voicing)
 
 **Chord Chart**:
-How to play the Chords a Song shows, in Read mode: a diagram of a Voicing for each Chord in the Arrangement's active Alternates, as written or transposed, in the order they first appear, drawn for the Song's tuning. The user can hide or show it, and separately pin it so it stays at the top as the Lyric Sheet scrolls; a pinned Chart that's hidden comes back pinned when shown. Both choices are kept on each device, not on the Song, and hold for every Song. How large its diagrams show is the Chart Size. Hiding the Chords hides it too, whatever those choices. A Chord whose name or tuning can't be read gets no diagram rather than a guess.
+How to play the Chords a Song shows, in Read mode: a diagram of a Voicing for each Chord in the Arrangement's active Alternates, as written or transposed, in the order they first appear, on the device's Instrument, and on the guitar drawn for the Song's tuning. The user can hide or show it, and separately pin it so it stays at the top as the Lyric Sheet scrolls; a pinned Chart that's hidden comes back pinned when shown. Both choices are kept on each device, not on the Song, and hold for every Song. How large its diagrams show is the Chart Size. Hiding the Chords hides it too, whatever those choices. A Chord whose name can't be read, or on the guitar whose tuning can't be, gets no diagram rather than a guess.
 _Avoid_: Chord strip, chord diagrams, chords used
 
 **Instrument**:
-What a Voicing is played on: the guitar or the piano. The Chord Finder offers both; the Chord Chart draws only the guitar.
+What a Voicing is played on: the guitar or the piano. Each device plays one, the guitar until another is picked, and both the Chord Finder and the Chord Chart show it; changing it in either changes it for both.
 _Avoid_: Keyboard (say piano)
 
 **Snapshot**:
@@ -278,7 +278,7 @@ The browser, on a computer or phone, that Bandmate is opened in. What's kept "on
 _Avoid_: Browser (in the UI), machine
 
 **Device Setting**:
-A choice the user makes on purpose about how Bandmate works on this Device, whatever the Song: the Palette, light or dark, the Input, each Input's Latency Offset, the rhyming dictionaries downloaded, left-handed Chord diagrams and the Shortcuts' keys. Every one is listed together in Settings' This device, even when it's also changed where it's used, except the Shortcuts' keys, which are listed in Settings' Shortcuts tab. What's simply remembered from last time, like a volume, a step or a Song's Transpose, isn't one.
+A choice the user makes on purpose about how Bandmate works on this Device, whatever the Song: the Palette, light or dark, the Input, each Input's Latency Offset, the rhyming dictionaries downloaded, the Instrument, left-handed Chord diagrams and the Shortcuts' keys. Every one is listed together in Settings' This device, even when it's also changed where it's used, except the Shortcuts' keys, which are listed in Settings' Shortcuts tab. What's simply remembered from last time, like a volume, a step or a Song's Transpose, isn't one.
 _Avoid_: Preference, local setting
 
 **Palette**:

@@ -1,20 +1,27 @@
 <script lang="ts">
   // The Chord Chart, above the Lyric Sheet in Read mode: a diagram of a
-  // Voicing for each Chord the Song shows, in one row that scrolls sideways.
-  // Each draws the preferred Voicing for the Chord and the Song's tuning, or
-  // the top-ranked one, as the Chord Finder would. A Chord that can't be read,
-  // or has no Voicing, keeps its place as its name over an empty frame; a
-  // tuning that can't be read gets no diagrams at all, rather than a guess.
+  // Voicing for each Chord the Song shows, in one row that scrolls sideways,
+  // on the device's Instrument, the one the Chord Finder plays. Each draws
+  // the preferred Voicing for the Chord (on the guitar, in the Song's
+  // tuning), or the top-ranked one, as the Chord Finder would. On the piano,
+  // every card draws the same keys, the whole octaves just covering every
+  // key any of them presses, so they line up. A Chord that can't be read, or
+  // has no Voicing, keeps its place as its name over an empty frame; on the
+  // guitar, a tuning that can't be read gets no diagrams at all, rather than
+  // a guess, while the piano has no tuning, so the Song's doesn't matter.
   // Hidden, it isn't drawn at all; it's hidden, shown and pinned to the top
   // of the window from the Reading menu, for every Song on this device, and
-  // sized there by the Chart Size.
+  // sized there by the Chart Size, one size for both Instruments.
   // Clicking a diagram opens the Chord's popover.
   import type { Song } from './api';
   import ChordDiagram from './ChordDiagram.svelte';
   import type { ChordOpener } from './ChordPopover.svelte';
-  import { chartChords, chartInstrument, chartTuning, chartVoicing } from './chordChart';
+  import { chartChords, chartContext, chartKeyRange, chartVoicing } from './chordChart';
+  import { isPianoVoicing, whiteKeys } from './chordFinder';
+  import PianoDiagram from './PianoDiagram.svelte';
   import { chartSize } from './sharedChartSize.svelte';
   import { chordChartState } from './sharedChordChartState.svelte';
+  import { instrument } from './sharedInstrument.svelte';
   import { preferredVoicings } from './sharedPreferredVoicings.svelte';
 
   let {
@@ -29,15 +36,20 @@
   } = $props();
 
   const names = $derived(chartChords(song, transpose));
-  const tuning = $derived(chartTuning(song.tuning));
+  const context = $derived(chartContext(instrument.value, song.tuning));
+  const piano = $derived(context?.instrument === 'piano');
   const chords = $derived.by(() => {
-    if (!tuning) return [];
-    const preferred = preferredVoicings.of(chartInstrument(tuning));
+    if (!context) return [];
+    const preferring = preferredVoicings.preferring(context);
     return names.map((name) => {
-      const drawn = chartVoicing(name, tuning, preferred);
+      const drawn = chartVoicing(name, preferring);
       return { name, voicing: drawn.kind === 'voicing' ? drawn.voicing : null };
     });
   });
+  // The keys every piano card draws, worked out again as the Chords change.
+  const range = $derived(
+    chartKeyRange(chords.flatMap((c) => (c.voicing && isPianoVoicing(c.voicing) ? [c.voicing] : []))),
+  );
 
   // The Chart Size, set on the page as a fraction, as the Lyric Size is: every
   // diagram and its Chord's name (--chart-read-name) scale by it.
@@ -65,12 +77,15 @@
 
 {#if names.length > 0 && shown}
   <section class={['chart', { pinned }]} aria-label="Chord Chart" bind:this={chart} bind:clientHeight={height}>
-    {#if !tuning}
+    {#if !context}
       <p class="muted note">
         The Song's tuning, “{song.tuning.trim()}”, can't be read, so the Chord Chart has no diagrams.
       </p>
     {:else}
-      <ul class="row">
+      <ul
+        class={['row', { piano }]}
+        style:--chart-white-keys={piano ? whiteKeys(range.lowest, range.highest) : undefined}
+      >
         {#each chords as chord (chord.name)}
           <li>
             <button
@@ -81,7 +96,15 @@
               onclick={(e) => opener?.press(chord.name, e.currentTarget)}
             >
               <span class="name" title={chord.name}>{chord.name}</span>
-              {#if chord.voicing}
+              {#if chord.voicing && isPianoVoicing(chord.voicing)}
+                <!-- Read out low to high, e.g. "B7 on the piano: B3 D#4 F#4 A4". -->
+                <PianoDiagram
+                  pressed={chord.voicing.keys}
+                  lowest={range.lowest}
+                  highest={range.highest}
+                  label="{chord.name} on the piano: {chord.voicing.notes.join(' ')}"
+                />
+              {:else if chord.voicing}
                 <ChordDiagram voicing={chord.voicing} name={chord.name} />
               {:else}
                 <span
@@ -135,7 +158,19 @@
      diagram, its starting fret drawn in its own units, scales with the
      width. */
   .row li {
-    flex: 0 0 calc(6.5rem * var(--chart-size));
+    flex: 0 0 var(--chart-chord);
+  }
+  /* On the piano, a white key (1 wide to 4.5 tall) makes the keyboard as
+     tall as a guitar diagram at the same Chart Size: that diagram's width
+     inside the card's padding, at ChordDiagram's viewBox for five frets,
+     128 wide to 126 tall, as .empty is. At a small Chart Size it's narrower
+     than --piano-key-narrowest, as the user chose. Each card is the
+     keyboard's width, --chart-white-keys keys, with its padding. */
+  .row.piano {
+    --piano-key: calc((var(--chart-chord) - 2 * var(--space-1)) * 126 / 128 / 4.5);
+  }
+  .row.piano li {
+    flex-basis: calc(var(--chart-white-keys) * var(--piano-key) + 2 * var(--space-1));
   }
   /* A diagram under its Chord's name, which opens its popover. */
   .chord {
@@ -165,12 +200,15 @@
     white-space: nowrap;
   }
   /* The size of a diagram, so a Chord without one still holds its place:
-     ChordDiagram's viewBox for six strings. */
+     ChordDiagram's viewBox for six strings, or on the piano the keyboard. */
   .empty {
     box-sizing: border-box;
     width: 100%;
     aspect-ratio: 128 / 126;
     border: 1px dashed var(--border);
     border-radius: var(--radius-sm);
+  }
+  .piano .empty {
+    aspect-ratio: calc(var(--chart-white-keys) / 4.5);
   }
 </style>

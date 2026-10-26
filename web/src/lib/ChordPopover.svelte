@@ -12,15 +12,19 @@
 
 <script lang="ts">
   // A Chord's diagram, in a popover over the Lyric Sheet in Read mode: the
-  // Voicing the Chord Chart draws for it, for the Chord as shown and the
-  // Song's tuning, stepping forwards and backwards through its other Voicings. Prefer
-  // makes the one showing the Chord's preferred Voicing in the tuning, and
+  // Voicing the Chord Chart draws for it, for the Chord as shown, on the
+  // device's Instrument (on the guitar, in the Song's tuning), stepping
+  // forwards and backwards through its other Voicings. On the piano it draws
+  // the Chord Finder's C3 to C5 whichever Voicing shows, so stepping never
+  // resizes it. Prefer makes the one showing the Chord's preferred Voicing
+  // (on the guitar in the tuning, on the piano kept as its inversion), and
   // Clear goes back to the top-ranked one: the device's preference the Chord
   // Finder keeps, so the Chart and the Chord Finder follow at once. That's
   // allowed in Read mode, as it's a device setting, not an edit to the Song.
   // Hear, beside it, strums the one showing in the Song's tuning, as the Chart
-  // draws it: the capo changes nothing, as a Chord names the shape fingered.
-  // A Chord or tuning that can't be read says so instead.
+  // draws it, or on the piano sounds its keys together: the capo changes
+  // nothing, as a Chord names the shape fingered. A Chord that can't be read,
+  // or on the guitar a tuning that can't be, says so instead.
   // Opened by hovering a Chord in a Line with a pointer, tapping it on a touch
   // screen, or clicking a diagram in the Chart. It opens over the Line, on
   // the Lines already played, or under it when there's no room above, so the
@@ -31,10 +35,12 @@
   import { tick } from 'svelte';
   import type { Song } from './api';
   import ChordDiagram from './ChordDiagram.svelte';
-  import { chartInstrument, chartTuning, chartVoicings } from './chordChart';
-  import { voicingPlucks } from './chordFinder';
+  import { chartContext, chartVoicings } from './chordChart';
+  import { finderInstrument, isPianoVoicing, strummed, voicingPlucks } from './chordFinder';
   import HearButton from './HearButton.svelte';
+  import PianoDiagram from './PianoDiagram.svelte';
   import { following, popoverLeft, popoverTop } from './popover';
+  import { instrument } from './sharedInstrument.svelte';
   import { preferredVoicings } from './sharedPreferredVoicings.svelte';
 
   let { song }: { song: Song } = $props();
@@ -56,10 +62,9 @@
   let leaveTimer: ReturnType<typeof setTimeout> | undefined;
   $effect(() => () => clearTimeout(leaveTimer));
 
-  const tuning = $derived(chartTuning(song.tuning));
-  const found = $derived(
-    opened && chartVoicings(opened.name, tuning, tuning ? preferredVoicings.of(chartInstrument(tuning)) : undefined),
-  );
+  const context = $derived(chartContext(instrument.value, song.tuning));
+  const piano = $derived(context?.instrument === 'piano');
+  const found = $derived(opened && chartVoicings(opened.name, context && preferredVoicings.preferring(context)));
   const voicings = $derived(found?.kind === 'voicings' ? found.voicings : []);
   // Which of them shows: 0, the preferred or top-ranked one, when it opens.
   let at = $state(0);
@@ -76,9 +81,9 @@
   // Preferring the Voicing showing moves it first, so it stays showing;
   // clearing the preference shows the top-ranked one.
   function prefer() {
-    if (found?.kind !== 'voicings' || !tuning || !voicing) return;
-    const instrument = chartInstrument(tuning);
-    preferredVoicings.set(instrument, found.chord, isPreferred ? null : instrument.preference(voicing));
+    if (found?.kind !== 'voicings' || !context || !voicing) return;
+    const on = finderInstrument(context);
+    preferredVoicings.set(on, found.chord, isPreferred ? null : on.preference(voicing));
     at = 0;
   }
 
@@ -168,8 +173,13 @@
   >
     <span class="name">{opened.name}</span>
     {#if voicing}
-      <div class="diagram">
-        <ChordDiagram {voicing} name={opened.name} />
+      <div class={['diagram', { piano }]}>
+        {#if isPianoVoicing(voicing)}
+          <!-- C3 to C5, whichever Voicing shows. Read out low to high, e.g. "B7 on the piano: B3 D#4 F#4 A4". -->
+          <PianoDiagram pressed={voicing.keys} label="{opened.name} on the piano: {voicing.notes.join(' ')}" />
+        {:else}
+          <ChordDiagram {voicing} name={opened.name} />
+        {/if}
       </div>
       <div class="stepper">
         <button
@@ -187,8 +197,8 @@
         >
       </div>
       <div class="actions">
-        {#if tuning}
-          <HearButton chord={opened.name} plucks={voicingPlucks(voicing, { tuning })} />
+        {#if context}
+          <HearButton chord={opened.name} plucks={voicingPlucks(voicing, context)} strummed={strummed(context)} />
         {/if}
         <!-- One button, so focus stays on it as Prefer turns to Clear. -->
         <button
@@ -196,7 +206,7 @@
           class="button prefer"
           title={isPreferred
             ? 'Stop preferring this Voicing, putting the top-ranked one first again'
-            : `Show this Voicing of ${opened.name} first in this tuning, here and on the Chords page`}
+            : `Show this Voicing of ${opened.name} first ${piano ? 'on the piano' : 'in this tuning'}, here and on the Chords page`}
           onclick={prefer}>{isPreferred ? 'Clear' : 'Prefer'}</button
         >
       </div>
@@ -207,7 +217,7 @@
         {:else if found.kind === 'unreadable-chord'}
           Bandmate can't read this Chord, so there's no diagram.
         {:else}
-          Bandmate can't find a Voicing of this Chord in the Song's tuning.
+          Bandmate can't find a Voicing of this Chord {piano ? 'on the piano' : "in the Song's tuning"}.
         {/if}
       </p>
     {/if}
@@ -229,6 +239,10 @@
   }
   .diagram {
     width: 7.5rem;
+  }
+  /* The keyboard at its narrowest keys, C3 to C5: about 270px, which fits the narrowest phone with the popover's padding. */
+  .diagram.piano {
+    width: calc(var(--piano-white-keys) * var(--piano-key-narrowest));
   }
   /* Previous, where it is among the Voicings, and Next. */
   .stepper {

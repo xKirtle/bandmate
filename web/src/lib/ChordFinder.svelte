@@ -78,15 +78,9 @@
   let name = $state('C');
   let picked = $state<{ root: string; quality: string; bass: string | null }>({ root: 'C', quality: '', bass: null });
   // The Finder's context with the user's preferred Voicings on its
-  // Instrument: what Look up lists first, and what Suggest draws. The two
-  // branches read alike, but each narrows the context to one Instrument, so
-  // its preferences are that Instrument's kind.
+  // Instrument: what Look up lists first, and what Suggest draws.
   const piano = $derived(context.instrument === 'piano');
-  const finderContext = $derived.by((): FinderContext =>
-    context.instrument === 'piano'
-      ? { ...context, preferred: preferredVoicings.of(finderInstrument(context)) }
-      : { ...context, preferred: preferredVoicings.of(finderInstrument(context)) },
-  );
+  const finderContext = $derived(preferredVoicings.preferring(context));
   const found = $derived(lookUp(name, finderContext));
   const hearStrummed = $derived(strummed(context));
 

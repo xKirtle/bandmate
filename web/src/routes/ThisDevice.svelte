@@ -11,7 +11,10 @@
   import InputList from '../lib/InputList.svelte';
   import type { InputChoice } from '../lib/inputSettings';
   import SettingsPage from '../lib/SettingsPage.svelte';
+  import { instruments } from '../lib/chordFinder';
+  import { instrumentText } from '../lib/deviceInstrument';
   import { appearance } from '../lib/sharedAppearance.svelte';
+  import { instrument } from '../lib/sharedInstrument.svelte';
   import { leftHanded } from '../lib/sharedLeftHanded.svelte';
 
   // Recording is offered only as wide as the Timeline offers editing, so
@@ -80,8 +83,26 @@
       <DictionaryList />
     </section>
 
-    <section class="card" aria-labelledby="chord-diagrams-heading">
-      <h2 id="chord-diagrams-heading">Chord diagrams</h2>
+    <section class="card" aria-labelledby="chords-heading">
+      <h2 id="chords-heading">Chords</h2>
+      <fieldset class="choice-group">
+        <legend>Instrument</legend>
+        {#each instruments as choice (choice)}
+          <label class="choice-row">
+            <input
+              type="radio"
+              name="instrument"
+              checked={instrument.value === choice}
+              onchange={() => instrument.set(choice)}
+              aria-describedby="instrument-note"
+            />
+            <span>{instrumentText(choice)}</span>
+          </label>
+        {/each}
+        <p id="instrument-note" class="choice-under hint">
+          What the Chords page plays and Read mode's Chord Chart draws Chords on.
+        </p>
+      </fieldset>
       <fieldset class="choice-group">
         <label class="choice-row">
           <input
