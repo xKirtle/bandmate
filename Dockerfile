@@ -6,7 +6,7 @@
 # or downloaded for the same Debian as the runtime image, so the glibc they
 # link against is there. Their versions are also recorded in programs.json,
 # for the About page, and their licenses ship beside it.
-ARG YT_DLP_VERSION=2026.08.19
+ARG YT_DLP_VERSION=2026.10.21
 ARG FFMPEG_VERSION=8.1.3
 ARG QUICKJS_VERSION=2026-06-04
 
@@ -60,8 +60,8 @@ WORKDIR /src
 FROM fetch AS yt-dlp
 ARG TARGETARCH
 ARG YT_DLP_VERSION
-ARG YT_DLP_SHA256_AMD64=58162f9bfdc27458ea47bfcb311cf47028f17d8154a8bf7d689861d46399230a
-ARG YT_DLP_SHA256_ARM64=b16e4dab368a816cd05d477d698a605a6ae87ccee1c8ffd38fa21d7254141fcc
+ARG YT_DLP_SHA256_AMD64=d8bd33fca9d5b23bd5b9952b3fca36db5c46331933fda9f598a3da14ce2c243f
+ARG YT_DLP_SHA256_ARM64=e137c2171b0b8ef648e6136e86aa70c65923e93e434f01c93901d64744b190aa
 RUN case "$TARGETARCH" in \
       amd64) asset=yt-dlp_linux sum=$YT_DLP_SHA256_AMD64 ;; \
       arm64) asset=yt-dlp_linux_aarch64 sum=$YT_DLP_SHA256_ARM64 ;; \
