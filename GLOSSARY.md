@@ -131,7 +131,7 @@ A word whose ending sounds like another's: perfect when its last stressed vowel 
 _Avoid_: Slant rhyme (say near Rhyme)
 
 **Chord Finder**:
-A built-in reference for Chords: look up how to play one, name one from the notes placed on an Instrument, and get Chords that go well with a Chord or a Key. A Voicing can be heard there, its notes together (strummed, on the guitar) or one at a time. It has its own page and isn't opened from a Song. The user picks the Instrument, the same one the Chord Chart draws, and on the guitar the tuning; the last ones picked are kept on each device. It has no capo: a Chord names the shape fingered, so a capo changes nothing about how it is played. It holds nothing of the user's. The app titles its page and navigation label Chords.
+A built-in reference for Chords: look up how to play one, name one from the notes placed on an Instrument, and get Chords that go well with a Chord or a Key. A Voicing can be heard there, its notes together (strummed, on the guitar) or one at a time. A guitar Voicing found there can be copied, to write it with a Chord as a Song Voicing. It has its own page and isn't opened from a Song. The user picks the Instrument, the same one the Chord Chart draws, and on the guitar the tuning; the last ones picked are kept on each device. It has no capo: a Chord names the shape fingered, so a capo changes nothing about how it is played. It holds nothing of the user's. The app titles its page and navigation label Chords.
 _Avoid_: Chord Library (a library holds the user's things, like the Beat Library)
 
 **Voicing**:
