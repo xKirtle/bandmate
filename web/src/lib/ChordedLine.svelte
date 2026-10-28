@@ -5,13 +5,14 @@
   // tool, such as the Snapshots dialog.
   import type { Attachment } from 'svelte/attachments';
   import type { Line } from './api';
-  import { layoutLine } from './chords';
+  import { layoutLine, type ChordNames, type ShownChord } from './chords';
 
   let {
     line,
     showChords = true,
     transpose = 0,
     songKey = '',
+    chordNames = 'as-shown',
     chord,
     sizes = 'read',
   }: {
@@ -20,8 +21,10 @@
     /** How far to transpose the Chords shown, in semitones, spelled from the Song's key. */
     transpose?: number;
     songKey?: string;
+    /** How the Chords are named: as Read mode shows them, or as typed between their brackets. */
+    chordNames?: ChordNames;
     /** Given, attached to each Chord's name, e.g. to open its diagram. */
-    chord?: (name: string) => Attachment<HTMLElement>;
+    chord?: (chord: ShownChord) => Attachment<HTMLElement>;
     /** Read mode's lyric sizes, or body text's. */
     sizes?: 'read' | 'body';
   } = $props();
@@ -31,13 +34,13 @@
 
 {#if showChords && line.chords.length > 0}
   <div class="line" class:body={sizes === 'body'} class:chord-line={line.chordLine}>
-    {#each layoutLine(line, transpose, songKey) as word, w (w)}
+    {#each layoutLine(line, transpose, songKey, chordNames) as word, w (w)}
       <span class="word">
         {#each word as piece, p (p)}
           <span class="piece" class:snug={piece.snug}>
             <span class="chord"
-              >{#each piece.chords as name, c (c)}{#if c > 0}{' '}{/if}<span {@attach chord ? chord(name) : none}
-                  >{name}</span
+              >{#each piece.chords as shown, c (c)}{#if c > 0}{' '}{/if}<span {@attach chord ? chord(shown) : none}
+                  >{shown.written ?? shown.name}</span
                 >{/each}</span
             >
             <span class="lyric">{piece.text || ' '}</span>

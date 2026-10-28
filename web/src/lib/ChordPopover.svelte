@@ -1,12 +1,14 @@
 <script lang="ts" module>
+  import { chordKey, type ShownChord } from './chords';
+
   /** Opens a Chord's popover, from a Chord in a Line or a diagram in the Chord Chart. */
   export interface ChordOpener {
     /** A pointer came over a Chord: opens it until the pointer leaves it and the popover, unless a press has one open. */
-    hover(name: string, anchor: HTMLElement, line?: HTMLElement | null): void;
+    hover(chord: ShownChord, anchor: HTMLElement, line?: HTMLElement | null): void;
     /** The pointer left the Chord it hovered. */
     leave(): void;
     /** A tap or click on a Chord: opens it until a tap or click elsewhere, or closes it if it's open. */
-    press(name: string, anchor: HTMLElement, line?: HTMLElement | null): void;
+    press(chord: ShownChord, anchor: HTMLElement, line?: HTMLElement | null): void;
   }
 </script>
 
@@ -14,7 +16,9 @@
   // A Chord's diagram, in a popover over the Lyric Sheet in Read mode: the
   // Voicing the Chord Chart draws for it, for the Chord as shown, on the
   // device's Instrument (on the guitar, in the Song's tuning), stepping
-  // forwards and backwards through its other Voicings. On the piano it draws
+  // forwards and backwards through its other Voicings. On the guitar,
+  // untransposed, a Chord with a Song Voicing opens on that, the Song's, which
+  // can't be preferred, before the Chord's own. On the piano it draws
   // the Chord Finder's C3 to C5 whichever Voicing shows, so stepping never
   // resizes it. Prefer makes the one showing the Chord's preferred Voicing
   // (on the guitar in the tuning, on the piano kept as its inversion), and
@@ -48,7 +52,7 @@
   let { song }: { song: Song } = $props();
 
   type Opened = {
-    name: string;
+    chord: ShownChord;
     anchor: HTMLElement;
     /** The Line the Chord is in, kept clear; none for the Chart's diagrams. */
     line: HTMLElement | null;
@@ -66,13 +70,16 @@
 
   const context = $derived(chartContext(instrument.value, song.tuning));
   const piano = $derived(context?.instrument === 'piano');
-  const found = $derived(opened && chartVoicings(opened.name, context && preferredVoicings.preferring(context)));
+  const found = $derived(opened && chartVoicings(opened.chord, context && preferredVoicings.preferring(context)));
   const voicings = $derived(found?.kind === 'voicings' ? found.voicings : []);
-  // Which of them shows: 0, the preferred or top-ranked one, when it opens.
+  // Which of them shows: 0, the Song Voicing, preferred or top-ranked one, when it opens.
   let at = $state(0);
   const showing = $derived(Math.min(at, voicings.length - 1));
   const voicing = $derived(voicings[showing]);
-  const isPreferred = $derived(found?.kind === 'voicings' && found.preferred && showing === 0);
+  const isSongVoicing = $derived(found?.kind === 'voicings' && found.songVoicing && showing === 0);
+  // Where the Chord's own Voicings start: after the Song Voicing, if it has one.
+  const ownFrom = $derived(found?.kind === 'voicings' && found.songVoicing ? 1 : 0);
+  const isPreferred = $derived(found?.kind === 'voicings' && found.preferred && showing === ownFrom);
   // The Instrument's samples load as the popover first opens, and as another
   // is picked while it's open, so a Hear plays at once.
   $effect(() => {
@@ -85,13 +92,13 @@
     at = (showing + by + voicings.length) % voicings.length;
   }
 
-  // Preferring the Voicing showing moves it first, so it stays showing;
-  // clearing the preference shows the top-ranked one.
+  // Preferring the Voicing showing moves it first among the Chord's own, so
+  // it stays showing; clearing the preference shows the top-ranked one.
   function prefer() {
     if (found?.kind !== 'voicings' || !context || !voicing) return;
     const on = finderInstrument(context);
     preferredVoicings.set(on, found.chord, isPreferred ? null : on.preference(voicing));
-    at = 0;
+    at = ownFrom;
   }
 
   // Arrow keys step through the Voicings too, as the buttons do.
@@ -102,10 +109,10 @@
     step(by);
   }
 
-  async function open(name: string, anchor: HTMLElement, line: HTMLElement | null, by: Opened['by']) {
+  async function open(chord: ShownChord, anchor: HTMLElement, line: HTMLElement | null, by: Opened['by']) {
     clearTimeout(leaveTimer);
-    if (opened?.name !== name) at = 0;
-    opened = { name, anchor, line, by };
+    if (!opened || chordKey(opened.chord) !== chordKey(chord)) at = 0;
+    opened = { chord, anchor, line, by };
     await tick();
     if (box && !box.matches(':popover-open')) box.showPopover();
     place();
@@ -122,17 +129,17 @@
   }
 
   export const opener: ChordOpener = {
-    hover(name, anchor, line = null) {
+    hover(chord, anchor, line = null) {
       // One opened by a press stays open until a press elsewhere closes it.
       if (opened?.by === 'press') return;
-      open(name, anchor, line, 'hover');
+      open(chord, anchor, line, 'hover');
     },
     leave() {
       if (opened?.by === 'hover') leaveSoon();
     },
-    press(name, anchor, line = null) {
+    press(chord, anchor, line = null) {
       if (opened?.by === 'press' && opened.anchor === anchor) close();
-      else open(name, anchor, line, 'press');
+      else open(chord, anchor, line, 'press');
     },
   };
 
@@ -170,7 +177,7 @@
     class="popover chord-popover"
     role="dialog"
     tabindex="-1"
-    aria-label="{opened.name} diagram"
+    aria-label="{opened.chord.name} diagram"
     popover="manual"
     bind:this={box}
     {@attach following(place)}
@@ -178,14 +185,14 @@
     onpointerleave={(e) => e.pointerType !== 'touch' && opener.leave()}
     onkeydown={stepKey}
   >
-    <span class="name">{opened.name}</span>
+    <span class="name">{opened.chord.name}</span>
     {#if voicing}
       <div class={['diagram', { piano }]}>
         {#if isPianoVoicing(voicing)}
           <!-- C3 to C5, whichever Voicing shows. Read out low to high, e.g. "B7 on the piano: B3 D#4 F#4 A4". -->
-          <PianoDiagram pressed={voicing.keys} label="{opened.name} on the piano: {voicing.notes.join(' ')}" />
+          <PianoDiagram pressed={voicing.keys} label="{opened.chord.name} on the piano: {voicing.notes.join(' ')}" />
         {:else}
-          <ChordDiagram {voicing} name={opened.name} />
+          <ChordDiagram {voicing} name={opened.chord.name} />
         {/if}
       </div>
       <div class="stepper">
@@ -196,8 +203,8 @@
           title="Previous Voicing"
           onclick={() => step(-1)}><ChevronLeft /></button
         >
-        <span class={['place', { preferred: isPreferred }]} aria-live="polite">
-          {isPreferred ? 'Preferred' : `${showing + 1} of ${voicings.length}`}
+        <span class={['place', { preferred: isPreferred || isSongVoicing }]} aria-live="polite">
+          {isSongVoicing ? 'This Song’s' : isPreferred ? 'Preferred' : `${showing + 1} of ${voicings.length}`}
         </span>
         <button type="button" class="button step" aria-label="Next Voicing" title="Next Voicing" onclick={() => step(1)}
           ><ChevronRight /></button
@@ -205,17 +212,24 @@
       </div>
       <div class="actions">
         {#if context}
-          <HearButton chord={opened.name} notes={heardVoicing(voicing, context)} sound={instrumentSound(context)} />
+          <HearButton
+            chord={opened.chord.name}
+            notes={heardVoicing(voicing, context)}
+            sound={instrumentSound(context)}
+          />
         {/if}
-        <!-- One button, so focus stays on it as Prefer turns to Clear. -->
-        <button
-          type="button"
-          class="button prefer"
-          title={isPreferred
-            ? 'Stop preferring this Voicing, putting the top-ranked one first again'
-            : `Show this Voicing of ${opened.name} first ${piano ? 'on the piano' : 'in this tuning'}, here and on the Chords page`}
-          onclick={prefer}>{isPreferred ? 'Clear' : 'Prefer'}</button
-        >
+        <!-- One button, so focus stays on it as Prefer turns to Clear. The Song Voicing is the Song's, not a
+             Voicing this device can prefer, so it has none. -->
+        {#if !isSongVoicing}
+          <button
+            type="button"
+            class="button prefer"
+            title={isPreferred
+              ? 'Stop preferring this Voicing, putting the top-ranked one first again'
+              : `Show this Voicing of ${opened.chord.name} first ${piano ? 'on the piano' : 'in this tuning'}, here and on the Chords page`}
+            onclick={prefer}>{isPreferred ? 'Clear' : 'Prefer'}</button
+          >
+        {/if}
       </div>
     {:else}
       <p class="muted note">
@@ -223,6 +237,9 @@
           The Song's tuning, “{song.tuning.trim()}”, can't be read, so there's no diagram.
         {:else if found.kind === 'unreadable-chord'}
           Bandmate can't read this Chord, so there's no diagram.
+        {:else if found.kind === 'song-voicing-strings'}
+          This Chord's Song Voicing has {found.strings} strings, and the Song's tuning {found.tuningStrings}, so there's
+          no diagram.
         {:else}
           Bandmate can't find a Voicing of this Chord {piano ? 'on the piano' : "in the Song's tuning"}.
         {/if}

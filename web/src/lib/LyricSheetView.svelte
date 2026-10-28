@@ -3,6 +3,7 @@
   import type { Section, Song } from './api';
   import type { ChordOpener } from './ChordPopover.svelte';
   import ChordedLine from './ChordedLine.svelte';
+  import type { ChordNames, ShownChord } from './chords';
   import type { Position } from './cues';
   import { follower, lineKey, sectionKey, topLine } from './follow';
   import { usualLyricSize } from './lyricSize';
@@ -12,6 +13,7 @@
     song,
     showChords,
     transpose = 0,
+    chordNames = 'as-shown',
     size = usualLyricSize,
     current = null,
     play,
@@ -21,6 +23,8 @@
     showChords: boolean;
     /** How far to transpose the Chords shown, in semitones. */
     transpose?: number;
+    /** How the Chords are named: as Read mode shows them, or, as Write mode prints them, as typed. */
+    chordNames?: ChordNames;
     /** The Lyric Size, in percent. */
     size?: number;
     /** Where playback is: highlighted and kept in view. */
@@ -82,19 +86,19 @@
    * touch screen, where the tap doesn't also play the Line. Clicked with a
    * mouse, it plays from the Line's Cue as the rest of the Line does.
    */
-  function opens(name: string): Attachment<HTMLElement> {
+  function opens(chord: ShownChord): Attachment<HTMLElement> {
     return (el) => {
-      if (!opener || !name) return;
+      if (!opener || !chord.name) return;
       const popover = opener;
       const line = () => el.closest<HTMLElement>('.line-box');
       let touch = false;
-      const enter = (e: PointerEvent) => e.pointerType !== 'touch' && popover.hover(name, el, line());
+      const enter = (e: PointerEvent) => e.pointerType !== 'touch' && popover.hover(chord, el, line());
       const leave = (e: PointerEvent) => e.pointerType !== 'touch' && popover.leave();
       const down = (e: PointerEvent) => (touch = e.pointerType === 'touch');
       const click = (e: MouseEvent) => {
         if (!touch) return;
         e.stopPropagation();
-        popover.press(name, el, line());
+        popover.press(chord, el, line());
       };
       el.addEventListener('pointerenter', enter);
       el.addEventListener('pointerleave', leave);
@@ -156,7 +160,7 @@
               title={onClick ? 'Play from here' : undefined}
               onclick={onClick ? () => click(onClick) : undefined}
             >
-              <ChordedLine {line} {showChords} {transpose} songKey={song.key} chord={opens} />
+              <ChordedLine {line} {showChords} {transpose} {chordNames} songKey={song.key} chord={opens} />
             </div>
           </div>
         {/each}

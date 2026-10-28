@@ -464,9 +464,10 @@
     </div>
     <p class="hint muted">Put Chords in brackets where they fall: <code>Hel[Am]lo</code>.</p>
     <!-- What a Print shows in place of the editors: the Lyric Sheet as
-         written, laid out as Read mode prints it, with its Chords. -->
+         written, laid out as Read mode prints it, with its Chords as typed
+         between their brackets, a Song Voicing's frets and all. -->
     <div class="print-view">
-      <LyricSheetView {song} showChords />
+      <LyricSheetView {song} showChords chordNames="as-written" />
     </div>
   {/if}
 </section>

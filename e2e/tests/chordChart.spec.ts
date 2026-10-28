@@ -207,3 +207,41 @@ test("Settings' This device lists the Instrument, and picking it there switches 
   await page.getByRole('option', { name: 'Guitar' }).click();
   await expect(instrument.getByRole('radio', { name: 'Guitar' })).toBeChecked();
 });
+
+test('a Chord written with a Song Voicing shows by its name, and the Chart and its popover draw that Voicing', async ({
+  page,
+  bandmate,
+}) => {
+  const song = await songWith(bandmate, ['Em', 'Em:x-0-9-9-x-x', 'Em:x099xx', 'C:x3201', 'Em:00z']);
+  await page.goto(`/songs/${song.id}`);
+
+  // Only the names show above the lyrics; frets that can't be read stay in them.
+  const sheet = page.getByRole('region', { name: 'Lyric Sheet' });
+  await expect(sheet).not.toContainText('x-0-9-9-x-x');
+  await expect(sheet).toContainText('[Em:00z]la');
+
+  // A diagram for each way Em is played, the Song Voicing as written, and none for one on five strings.
+  const diagrams = chart(page).getByRole('img');
+  await expect(diagrams).toHaveCount(3);
+  await expect(diagrams.nth(0)).toHaveAccessibleName('Em: 0 2 2 0 0 0');
+  await expect(diagrams.nth(1)).toHaveAccessibleName('Em: x 0 9 9 x x, from fret 9');
+  await expect(diagrams.nth(2)).toHaveAccessibleName('C: no diagram');
+
+  // Its popover opens on the Song's Voicing, then steps on to the Chord's own.
+  await chart(page).getByRole('button').nth(1).click();
+  const popover = page.getByRole('dialog', { name: 'Em diagram' });
+  await expect(popover.getByRole('img', { name: 'Em: x 0 9 9 x x, from fret 9' })).toBeVisible();
+  await expect(popover).toContainText('This Song’s');
+  await expect(popover.getByRole('button', { name: 'Prefer' })).toHaveCount(0);
+  await popover.getByRole('button', { name: 'Next Voicing' }).click();
+  await expect(popover.getByRole('img', { name: 'Em: 0 2 2 0 0 0' })).toBeVisible();
+  await popover.getByRole('button', { name: 'Prefer' }).click();
+  await expect(popover.getByRole('img', { name: 'Em: 0 2 2 0 0 0' })).toBeVisible();
+  await expect(popover).toContainText('Preferred');
+  await expect(popover.getByRole('button', { name: 'Clear' })).toBeVisible();
+
+  // On the piano, Em is played one way.
+  await pickInstrument(page, 'Piano');
+  await page.goto(`/songs/${song.id}`);
+  await expect(chart(page).getByRole('img')).toHaveCount(2);
+});

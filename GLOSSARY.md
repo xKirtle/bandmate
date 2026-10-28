@@ -138,8 +138,12 @@ _Avoid_: Chord Library (a library holds the user's things, like the Beat Library
 One way to play a Chord on an Instrument: which strings and frets on a guitar, which keys on a piano. A Chord has many; the user can prefer one per Chord on each Instrument, and on the guitar per tuning too, kept on each device.
 _Avoid_: Shape, fingering, chord diagram (a diagram draws a Voicing)
 
+**Song Voicing**:
+A guitar Voicing written with one Chord in a Song, for how that Chord is played there: its frets count from the capo, on the Song's tuning, and stay as written if the tuning changes. It belongs to that Chord alone: the same name elsewhere in the Song, written without one or with another, is played its own way. It's played in place of the device's preferred Voicing, but only on the guitar and only untransposed: transposed, or on the piano, the Chord is played like any other of its name. One with more or fewer strings than the Song's tuning gets no diagram. Read mode shows only the Chord's name; the Song Voicing shows in the Chord Chart.
+_Avoid_: Custom chord, chord definition, shape, fingering
+
 **Chord Chart**:
-How to play the Chords a Song shows, in Read mode: a diagram of a Voicing for each Chord in the Arrangement's active Alternates, as written or transposed, in the order they first appear, on the device's Instrument, and on the guitar drawn for the Song's tuning. The user can hide or show it, and separately pin it so it stays at the top as the Lyric Sheet scrolls; a pinned Chart that's hidden comes back pinned when shown. Both choices are kept on each device, not on the Song, and hold for every Song. How large its diagrams show is the Chart Size. Hiding the Chords hides it too, whatever those choices. A Chord whose name can't be read, or on the guitar whose tuning can't be, gets no diagram rather than a guess.
+How to play the Chords a Song shows, in Read mode: a diagram of a Voicing for each Chord in the Arrangement's active Alternates, as written or transposed, in the order they first appear, on the device's Instrument, and on the guitar drawn for the Song's tuning. A Chord with a Song Voicing gets a diagram of that, so a name played two ways gets two. The user can hide or show it, and separately pin it so it stays at the top as the Lyric Sheet scrolls; a pinned Chart that's hidden comes back pinned when shown. Both choices are kept on each device, not on the Song, and hold for every Song. How large its diagrams show is the Chart Size. Hiding the Chords hides it too, whatever those choices. A Chord whose name can't be read, or on the guitar whose tuning can't be, gets no diagram rather than a guess.
 _Avoid_: Chord strip, chord diagrams, chords used
 
 **Instrument**:

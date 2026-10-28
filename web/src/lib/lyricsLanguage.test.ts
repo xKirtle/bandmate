@@ -372,4 +372,9 @@ describe('wordAt', () => {
     expect(at('Hel[A|m]lo')).toBe('hello');
     expect(at('ooh-a|ah')).toBe('aah');
   });
+
+  it("leaves out a Chord with its Song Voicing, but not brackets whose frets can't be read", () => {
+    expect(at('Hel[Em:x-0-9-9-x-x]lo|')).toBe('hello');
+    expect(at('Hel[Em:00z]lo|')).toBe('lo');
+  });
 });

@@ -1,9 +1,41 @@
-import type { Line, Song } from './api';
+import type { Chord, Line, Song } from './api';
+import type { Frets } from './guitar';
 import { transposeChord } from './transpose';
+import { writtenChords } from './writtenChord';
+
+/**
+ * A Chord as Read mode shows it: its name, transposed, and the Song Voicing
+ * it's played with, if it's written with one and isn't transposed. Moved to
+ * another key, a Song Voicing falls away.
+ */
+export interface ShownChord {
+  name: string;
+  songVoicing: Frets | null;
+  /** As written, the Chord as typed between its brackets ("Em:00002x"), shown in place of its name. */
+  written?: string;
+}
+
+/** A Chord as shown when transposed by semitones, spelled from the Song's key. */
+export function shownChord(chord: Chord, transpose = 0, key = ''): ShownChord {
+  const songVoicing = transpose === 0 && chord.songVoicing ? chord.songVoicing : null;
+  return { name: transposeChord(chord.name, transpose, key), songVoicing };
+}
+
+/**
+ * A Chord as shown, as a key: the same for two Chords of the same name played
+ * the same way, its Song Voicing written with dashes, as it always can be
+ * ("Em:x-0-9-9-x-x"), or none ("Em:").
+ */
+export function chordKey({ name, songVoicing }: ShownChord): string {
+  return `${name}:${songVoicing?.map((f) => f ?? 'x').join('-') ?? ''}`;
+}
+
+/** How a Line's Chords are named: as Read mode shows them, or as written, typed between their brackets. */
+export type ChordNames = 'as-shown' | 'as-written';
 
 /** A run of lyrics with the Chords (if any) that sit above its first character, in order. */
 export interface Piece {
-  chords: string[];
+  chords: ShownChord[];
   text: string;
   /**
    * The Chords fall between words, and what comes straight after isn't a
@@ -20,19 +52,28 @@ export interface Piece {
  * space falls between words, so its Piece is all the whitespace it falls in,
  * from the word or Chord before it to the word or Chord after. The Chords show
  * transposed by semitones, as written by default, spelled from the Song's key.
+ * Shown as written, as Write mode prints them, each Chord also carries what
+ * was typed between its brackets, its Song Voicing's frets and all
+ * ("Em:00002x"), to show in place of its name.
  */
-export function layoutLine(line: Line, transpose = 0, key = ''): Piece[][] {
+export function layoutLine(line: Line, transpose = 0, key = '', names: ChordNames = 'as-shown'): Piece[][] {
   // Offsets count code points, which Array.from splits on.
   const chars = Array.from(line.lyrics);
   const isSpace = (i: number) => i >= 0 && i < chars.length && /\s/.test(chars[i]);
-  const chordsAt = new Map<number, string[]>();
-  for (const c of line.chords)
-    chordsAt.set(c.offset, [...(chordsAt.get(c.offset) ?? []), transposeChord(c.name, transpose, key)]);
+  const chordsAt = new Map<number, ShownChord[]>();
+  const typed = names === 'as-written' ? writtenChords(line.text) : [];
+  line.chords.forEach((c, i) => {
+    const shown = shownChord(c, transpose, key);
+    // The server finds the same Chords in the text, one for one; as written,
+    // one it somehow didn't would show by its name rather than not at all.
+    const written = typed[i] === undefined ? shown : { ...shown, written: typed[i] };
+    chordsAt.set(c.offset, [...(chordsAt.get(c.offset) ?? []), written]);
+  });
 
   // The Chords whose Piece starts at each character, and whether they fall
   // between words. A Chord Line's Chords sit on spaces too, but it has no
   // words to fall between, so its Chords stay as they are.
-  const chordPieceAt = new Map<number, { chords: string[]; isBetween: boolean }>();
+  const chordPieceAt = new Map<number, { chords: ShownChord[]; isBetween: boolean }>();
   for (const [offset, chords] of chordsAt) {
     const isBetween = !line.chordLine && isSpace(offset);
     let start = offset;

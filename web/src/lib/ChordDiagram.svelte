@@ -10,8 +10,8 @@
 
   let { voicing, name }: { voicing: GuitarVoicing; name: string } = $props();
 
-  /** How many frets the diagram shows. A Voicing spans four at most. */
-  const rows = 5;
+  /** How many frets the diagram shows, at least: a generated Voicing spans four at most. */
+  const fewestRows = 5;
   const stringGap = 16;
   const fretGap = 20;
   /** The starting fret's size, read at a glance even in the Chord Chart's small diagrams. */
@@ -28,10 +28,13 @@
   /** From the low string to the high one. */
   const neckWidth = $derived((strings - 1) * stringGap);
   const width = $derived(left + neckWidth + right);
-  const height = top + rows * fretGap + bottom;
-
   /** The fret the diagram's first row is: a barre's, else 1 under the nut when the Voicing fits there. */
-  const start = $derived(diagramStartFret(voicing, rows));
+  const start = $derived(diagramStartFret(voicing, fewestRows));
+  /** As many more as a Song Voicing written wider reaches, so every finger is on the diagram. */
+  const rows = $derived(
+    Math.max(fewestRows, ...voicing.frets.filter((f): f is number => f !== null).map((f) => f - start + 1)),
+  );
+  const height = $derived(top + rows * fretGap + bottom);
 
   /**
    * Where a string is drawn, counted from the low one: mirrored for a
