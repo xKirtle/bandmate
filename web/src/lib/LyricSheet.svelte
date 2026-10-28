@@ -15,7 +15,7 @@
   import { canShiftCuesEarlier, currentPosition, everyCue, hasCues } from './cues';
   import { follower, lineKey } from './follow';
   import { keyHints } from './keyHints';
-  import { chordsInRead } from './chordChart';
+  import { chartNumbers, chordsInRead } from './chordChart';
   import ChordChart from './ChordChart.svelte';
   import ChordPopover from './ChordPopover.svelte';
   import LyricSheetView from './LyricSheetView.svelte';
@@ -37,6 +37,7 @@
   import type { SyncMode } from './syncMode.svelte';
   import type { RhymeMode } from './rhymeMode.svelte';
   import { songChordsShown } from './chordsShown';
+  import { instrument } from './sharedInstrument.svelte';
   import { lyricSize } from './sharedLyricSize.svelte';
   import { songTranspose } from './sharedTranspose.svelte';
   import type { CaretListener } from './lyricsLanguage';
@@ -232,6 +233,10 @@
   // How far Read mode transposes the Chords, kept on this device for each
   // Song like hiding them, and kept while they're hidden.
   const transpose = $derived(songTranspose.of(songId));
+  // The numbers Read mode's Chords carry, above the lyrics and in the Chord
+  // Chart, where it draws their name more than one way, on this device's
+  // Instrument.
+  const numbers = $derived(chartNumbers(song, transpose, instrument.value));
 
   // How large Read mode shows the lyrics, kept on this device for every Song.
   const size = $derived(lyricSize.value);
@@ -371,7 +376,7 @@
 
   {#if mode === 'read'}
     {#if chordsOnScreen}
-      <ChordChart {song} {transpose} opener={chordPopover?.opener} />
+      <ChordChart {song} {transpose} {numbers} opener={chordPopover?.opener} />
       <!-- Transposing closes it, rather than leave it on a Chord no longer shown. -->
       {#key transpose}
         <ChordPopover {song} bind:this={chordPopover} />
@@ -381,6 +386,7 @@
       {song}
       showChords={chordsOnScreen}
       {transpose}
+      {numbers}
       {size}
       {current}
       play={gutter.play}
@@ -462,11 +468,15 @@
         </div>
       {/if}
     </div>
-    <p class="hint muted">Put Chords in brackets where they fall: <code>Hel[Am]lo</code>.</p>
+    <p class="hint muted">
+      Put Chords in brackets where they fall: <code>Hel[Am]lo</code>, or for guitar, with its frets:
+      <code>Hel[Am:x02210]lo</code>.
+    </p>
     <!-- What a Print shows in place of the editors: the Lyric Sheet as
-         written, laid out as Read mode prints it, with its Chords. -->
+         written, laid out as Read mode prints it, with its Chords as typed
+         between their brackets, a Song Voicing's frets and all. -->
     <div class="print-view">
-      <LyricSheetView {song} showChords />
+      <LyricSheetView {song} showChords chordNames="as-written" />
     </div>
   {/if}
 </section>

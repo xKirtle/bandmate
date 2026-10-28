@@ -8,6 +8,8 @@
 // Rhymes match how words sound, never how they're spelt (ADR 0022): a word
 // none of them has gets no Rhymes.
 
+import { readWrittenChord } from './writtenChord';
+
 /** A Language's data, read from what the binary serves for it. */
 export interface LanguageData {
   /** The Language's BCP 47 code, e.g. "en" or "pt-PT". */
@@ -159,11 +161,6 @@ function trimApostrophes(word: string): string {
   return word.replace(/^'+|'+$/g, '');
 }
 
-// A Chord as the server reads one in a Line's text (internal/song/chords.go).
-const chordNote = '[A-G][#b♯♭]?';
-const chordToken = '(?:maj|min|ma|mi|dim|aug|sus|add|alt|m|M|\\+|-|°|ø|Δ|6/9|[#b♯♭]?[0-9]+)';
-const chordName = new RegExp(`^${chordNote}(?:${chordToken}|\\((?:${chordToken}|,)+\\))*(?:/${chordNote})?$`, 'u');
-
 /**
  * A Line's text without its Chords, and where a place in the text, such as
  * the caret, is in that: inside a Chord is just before it. Bracketed text
@@ -171,8 +168,8 @@ const chordName = new RegExp(`^${chordNote}(?:${chordToken}|\\((?:${chordToken}|
  */
 function lyricsOf(text: string, place = 0): { lyrics: string; place: number } {
   let moved = place;
-  const lyrics = text.replace(/\[([^\]]*)\]/g, (bracketed, name: string, at: number) => {
-    if (!chordName.test(name)) return bracketed;
+  const lyrics = text.replace(/\[([^\]]*)\]/g, (bracketed, written: string, at: number) => {
+    if (!readWrittenChord(written)) return bracketed;
     if (at < place) moved -= Math.min(bracketed.length, place - at);
     return '';
   });

@@ -207,3 +207,89 @@ test("Settings' This device lists the Instrument, and picking it there switches 
   await page.getByRole('option', { name: 'Guitar' }).click();
   await expect(instrument.getByRole('radio', { name: 'Guitar' })).toBeChecked();
 });
+
+test('a Chord written with a Song Voicing shows by its name, and the Chart and its popover draw that Voicing', async ({
+  page,
+  bandmate,
+}) => {
+  const song = await songWith(bandmate, ['Em', 'Em:x-0-9-9-x-x', 'Em:x099xx', 'C:x3201', 'Em:00z']);
+  await page.goto(`/songs/${song.id}`);
+
+  // Only the names show above the lyrics; frets that can't be read stay in them.
+  const sheet = page.getByRole('region', { name: 'Lyric Sheet' });
+  await expect(sheet).not.toContainText('x-0-9-9-x-x');
+  await expect(sheet).toContainText('[Em:00z]la');
+
+  // A diagram for each way Em is played, numbered, the Song Voicing as written, and none for one on five strings.
+  const diagrams = chart(page).getByRole('img');
+  await expect(diagrams).toHaveCount(3);
+  await expect(diagrams.nth(0)).toHaveAccessibleName('Em\u202f¹: 0 2 2 0 0 0');
+  await expect(diagrams.nth(1)).toHaveAccessibleName('Em\u202f²: x 0 9 9 x x, from fret 9');
+  await expect(diagrams.nth(2)).toHaveAccessibleName('C: no diagram');
+
+  // Its popover opens on the Song's Voicing, then steps on to the Chord's own.
+  await chart(page).getByRole('button').nth(1).click();
+  const popover = page.getByRole('dialog', { name: 'Em diagram' });
+  await expect(popover.getByRole('img', { name: 'Em: x 0 9 9 x x, from fret 9' })).toBeVisible();
+  await expect(popover).toContainText('This Song’s');
+  await expect(popover.getByRole('button', { name: 'Prefer' })).toHaveCount(0);
+  await popover.getByRole('button', { name: 'Next Voicing' }).click();
+  await expect(popover.getByRole('img', { name: 'Em: 0 2 2 0 0 0' })).toBeVisible();
+  await popover.getByRole('button', { name: 'Prefer' }).click();
+  await expect(popover.getByRole('img', { name: 'Em: 0 2 2 0 0 0' })).toBeVisible();
+  await expect(popover).toContainText('Preferred');
+  await expect(popover.getByRole('button', { name: 'Clear' })).toBeVisible();
+
+  // On the piano, Em is played one way.
+  await pickInstrument(page, 'Piano');
+  await page.goto(`/songs/${song.id}`);
+  await expect(chart(page).getByRole('img')).toHaveCount(2);
+});
+
+test("Write mode's hint shows a Chord written plain and with a Song Voicing, and the second reads back as one", async ({
+  page,
+  bandmate,
+}) => {
+  const song = await bandmate.song({ title: 'Hinted' });
+  const sheet = await bandmate.addSection(song.id, 'Verse');
+  await page.goto(`/songs/${song.id}`);
+  const examples = page.getByText(/^Put Chords in brackets/).locator('code');
+  await expect(examples).toHaveText(['Hel[Am]lo', 'Hel[Am:x02210]lo']);
+
+  // Written as the hint shows, it reads as Am, and the Chart draws the Song's Voicing.
+  await bandmate.setLines(song.id, sheet.sections[0].alternates[0].id, (await examples.nth(1).textContent())!);
+  await page.reload();
+  await page.getByRole('radio', { name: 'Read' }).check();
+  const verse = page.getByRole('region', { name: 'Lyric Sheet' }).getByRole('region', { name: 'Verse' });
+  await expect(verse.getByText('Am', { exact: true })).toBeVisible();
+  await expect(verse).not.toContainText('[');
+  await expect(verse).not.toContainText('x02210');
+  await expect(chart(page).getByRole('img')).toHaveAccessibleName('Am: x 0 2 2 1 0');
+  await chart(page).getByRole('button').click();
+  await expect(page.getByRole('dialog', { name: 'Am diagram' })).toContainText('This Song’s');
+});
+
+test("a name played two ways numbers its diagrams and its Chords to match, until it's transposed", async ({
+  page,
+  bandmate,
+}) => {
+  const song = await songWith(bandmate, ['Em:x-0-9-9-x-x', 'G', 'Em', 'Em:x099xx']);
+  await page.goto(`/songs/${song.id}`);
+
+  // Em's two ways, in the order they first appear; G, played one way, is unmarked.
+  await expect(chart(page).getByRole('img')).toHaveCount(3);
+  await expect(chart(page).getByText('Em\u202f¹', { exact: true })).toBeVisible();
+  await expect(chart(page).getByText('G', { exact: true })).toBeVisible();
+  await expect(chart(page).getByText('Em\u202f²', { exact: true })).toBeVisible();
+  const verse = page.getByRole('region', { name: 'Lyric Sheet' }).getByRole('region', { name: 'Verse' });
+  await expect(verse.getByText('Em\u202f¹', { exact: true })).toHaveCount(2);
+  await expect(verse.getByText('Em\u202f²', { exact: true })).toHaveCount(1);
+  await expect(verse.getByText('G', { exact: true })).toHaveCount(1);
+
+  // Transposed, the Song Voicings fall away, and the numbers with them.
+  await page.evaluate((id) => localStorage.setItem(`bandmate.transpose.${id}`, '2'), song.id);
+  await page.reload();
+  await expect(chart(page).getByRole('img')).toHaveCount(2);
+  await expect(verse.getByText('F#m', { exact: true })).toHaveCount(3);
+  await expect(page.getByText(/[¹²]/)).toHaveCount(0);
+});

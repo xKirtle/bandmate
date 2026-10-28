@@ -213,3 +213,82 @@ test('the guitar and the piano play samples Bandmate serves itself; when they ca
   await hear.click();
   await expect(toast).toHaveCount(0);
 });
+
+/** Keeps what the page copies in the page, never on the system clipboard: each text copied, in order. */
+async function keepCopies(page: Page) {
+  await page.addInitScript(() => {
+    const copied: string[] = [];
+    Object.assign(window, { copied });
+    Object.defineProperty(navigator, 'clipboard', {
+      value: { writeText: async (text: string) => void copied.push(text) },
+    });
+  });
+  return () => page.evaluate(() => (window as unknown as { copied: string[] }).copied.at(-1));
+}
+
+test('a guitar Voicing copies as a Song Voicing that pastes into a Song as that Chord, and the piano offers no copy', async ({
+  page,
+  bandmate,
+}) => {
+  const lastCopied = await keepCopies(page);
+  await page.goto('/chords');
+  const copy = (where: Locator) => where.getByRole('button', { name: /^Copy .* as a Song Voicing$/ });
+
+  // Look up: each Voicing copies as its name and frets, parted by dashes, in their brackets.
+  const lookUp = page.getByRole('tabpanel', { name: 'Look up' });
+  await lookUp.getByRole('textbox', { name: 'Chord' }).fill('Em');
+  const second = lookUp.getByRole('list', { name: 'Voicings of Em, best first' }).getByRole('listitem').nth(1);
+  // Its diagram reads out its frets, e.g. "Em: x 7 9 9 8 7, from fret 7".
+  const drawn = (await second.getByRole('img').getAttribute('aria-label')) ?? '';
+  const frets = drawn.replace(/^Em: |, from fret \d+$/g, '');
+  await copy(second).click();
+  await expect(second.getByRole('status')).toHaveText('Copied');
+  const copied = await lastCopied();
+  expect(copied).toBe('[Em:' + frets.split(' ').join('-') + ']');
+
+  // Name it: the shape placed, by whichever name it's copied with.
+  await page.getByRole('tab', { name: 'Name it' }).click();
+  const nameIt = page.getByRole('tabpanel', { name: 'Name it' });
+  const board = nameIt.getByRole('group', { name: 'Fretboard' });
+  await board.getByRole('button', { name: '5th string: muted', exact: true }).click();
+  await board.getByRole('button', { name: '4th string, fret 2', exact: true }).click();
+  await board.getByRole('button', { name: '3rd string, fret 2', exact: true }).click();
+  await board.getByRole('button', { name: '2nd string, fret 1', exact: true }).click();
+  await board.getByRole('button', { name: '1st string: muted', exact: true }).click();
+  const readings = nameIt.getByRole('list', { name: 'Readings, best first' }).getByRole('listitem');
+  await expect(readings).toHaveText(['Am', 'C6/A']);
+  await copy(readings.nth(1)).click();
+  await expect(readings.nth(1).getByRole('status')).toHaveText('Copied');
+  expect(await lastCopied()).toBe('[C6/A:x-0-2-2-1-0]');
+
+  // Suggest: its Voicings copy too.
+  await page.getByRole('tab', { name: 'Suggest' }).click();
+  const suggest = page.getByRole('tabpanel', { name: 'Suggest' });
+  await expect(copy(suggest).first()).toHaveAccessibleName(/^Copy \[\S+:[x0-9]+(-[x0-9]+)+\] as a Song Voicing$/);
+
+  // On the piano, there's nothing to copy.
+  await pickInstrument(page, 'Piano');
+  for (const tab of ['Look up', 'Name it', 'Suggest']) {
+    await page.getByRole('tab', { name: tab }).click();
+    await expect(copy(page.getByRole('tabpanel', { name: tab }))).toHaveCount(0);
+  }
+  await pickInstrument(page, 'Guitar');
+
+  // Pasted into a Line in Write mode as copied, it reads back as Em with that Song Voicing.
+  const song = await bandmate.song({ title: 'Pasted' });
+  const sheet = await bandmate.addSection(song.id, 'Verse');
+  await bandmate.setLines(song.id, sheet.sections[0].alternates[0].id, 'la');
+  await page.goto(`/songs/${song.id}`);
+  const lines = page.getByRole('article', { name: 'Verse' }).getByRole('textbox', { name: 'Lines' });
+  await lines.click();
+  await lines.press('Home');
+  await page.keyboard.insertText(copied!);
+  await expect(lines).toHaveValue(`${copied}la`);
+  await page.getByRole('radio', { name: 'Read' }).check();
+  const verse = page.getByRole('region', { name: 'Lyric Sheet' }).getByRole('region', { name: 'Verse' });
+  await expect(verse.getByText('Em', { exact: true })).toBeVisible();
+  await expect(verse).not.toContainText(copied!);
+  await expect(page.getByRole('region', { name: 'Chord Chart' }).getByRole('img')).toHaveAccessibleName(
+    new RegExp(`^Em: ${frets}`),
+  );
+});

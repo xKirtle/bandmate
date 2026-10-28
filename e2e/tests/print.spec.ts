@@ -230,3 +230,33 @@ test('printing from Write mode shows the title, the Details line and the Lyric S
   expect(await style(chord, 'font-weight')).toBe('700');
   expect(await style(page.locator('body'), 'background-color')).toBe('rgb(255, 255, 255)');
 });
+
+test("a Chord's Song Voicing prints as typed from Write mode, and from Read mode only its name", async ({
+  page,
+  bandmate,
+}) => {
+  /** A Song with one Verse, its Chords written with Song Voicings: drafting, it opens in Write mode, and finished, in Read mode. */
+  async function openStrings(status: 'drafting' | 'finished') {
+    const song = await bandmate.song({ title: 'Open Strings', status });
+    const verse = (await bandmate.addSection(song.id, 'Verse')).sections.at(-1)!;
+    await bandmate.setLines(song.id, verse.alternates[0].id, '[Em:00002x]Hello [Em:x-0-9-9-x-x]old [Em]friend');
+    return song;
+  }
+
+  await printed(page, (await openStrings('drafting')).id, 'Write');
+  const written = sheet(page).getByRole('region', { name: 'Verse' });
+  for (const typed of ['Em:00002x', 'Em:x-0-9-9-x-x', 'Em'])
+    await expect(written.getByText(typed, { exact: true })).toBeVisible();
+  await expect(written.getByText('friend', { exact: true })).toBeVisible();
+
+  await page.emulateMedia({ media: 'screen' });
+  await printed(page, (await openStrings('finished')).id, 'Read');
+  const read = sheet(page).getByRole('region', { name: 'Verse' });
+  // Em is played three ways, so each is numbered, as on screen, the Chord Chart's diagrams too.
+  for (const numbered of ['Em\u202f¹', 'Em\u202f²', 'Em\u202f³']) {
+    await expect(read.getByText(numbered, { exact: true })).toBeVisible();
+    await expect(chart(page).getByText(numbered, { exact: true })).toBeVisible();
+  }
+  await expect(read).not.toContainText('00002x');
+  await expect(read).not.toContainText('x-0-9-9-x-x');
+});

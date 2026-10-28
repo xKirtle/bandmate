@@ -1,8 +1,10 @@
 package app_test
 
 import (
+	"fmt"
 	"net/http"
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -27,14 +29,14 @@ func TestChordsAreParsedOutOfTheLineText(t *testing.T) {
 		chords []chord
 	}{
 		"no chords":         {"City lights are calling", "City lights are calling", []chord{}},
-		"start of line":     {"[G]City lights", "City lights", []chord{{0, "G"}}},
-		"mid-word":          {"Hel[Am]lo", "Hello", []chord{{3, "Am"}}},
-		"end of line":       {"are calling [F]", "are calling ", []chord{{12, "F"}}},
-		"end right after":   {"calling[F]", "calling", []chord{{7, "F"}}},
-		"several":           {"[C]City [G]lights are [Am]call[F]ing", "City lights are calling", []chord{{0, "C"}, {5, "G"}, {16, "Am"}, {20, "F"}}},
-		"two at one place":  {"[Am][G]home", "home", []chord{{0, "Am"}, {0, "G"}}},
-		"offsets in chars":  {"Can[D]ção do [E]mar", "Canção do mar", []chord{{3, "D"}, {10, "E"}}},
-		"chord text kept":   {"  [Em]  wide  ", "    wide  ", []chord{{2, "Em"}}},
+		"start of line":     {"[G]City lights", "City lights", []chord{{Offset: 0, Name: "G"}}},
+		"mid-word":          {"Hel[Am]lo", "Hello", []chord{{Offset: 3, Name: "Am"}}},
+		"end of line":       {"are calling [F]", "are calling ", []chord{{Offset: 12, Name: "F"}}},
+		"end right after":   {"calling[F]", "calling", []chord{{Offset: 7, Name: "F"}}},
+		"several":           {"[C]City [G]lights are [Am]call[F]ing", "City lights are calling", []chord{{Offset: 0, Name: "C"}, {Offset: 5, Name: "G"}, {Offset: 16, Name: "Am"}, {Offset: 20, Name: "F"}}},
+		"two at one place":  {"[Am][G]home", "home", []chord{{Offset: 0, Name: "Am"}, {Offset: 0, Name: "G"}}},
+		"offsets in chars":  {"Can[D]ção do [E]mar", "Canção do mar", []chord{{Offset: 3, Name: "D"}, {Offset: 10, Name: "E"}}},
+		"chord text kept":   {"  [Em]  wide  ", "    wide  ", []chord{{Offset: 2, Name: "Em"}}},
 		"brackets in words": {"[Chorus] x2", "[Chorus] x2", []chord{}},
 	}
 	for name, c := range cases {
@@ -74,7 +76,7 @@ func TestChordNamesFollowTheChordGrammar(t *testing.T) {
 
 			got := ts.parsedLine("la [" + name + "]la")
 
-			if want := []chord{{3, name}}; !reflect.DeepEqual(got.Chords, want) || got.Lyrics != "la la" {
+			if want := []chord{{Offset: 3, Name: name}}; !reflect.DeepEqual(got.Chords, want) || got.Lyrics != "la la" {
 				t.Errorf("lyrics = %q, chords = %+v; want %q, %+v", got.Lyrics, got.Chords, "la la", want)
 			}
 		})
@@ -99,12 +101,86 @@ func TestBracketedTextThatIsNotAChordStaysInTheLyrics(t *testing.T) {
 	}
 }
 
+// frets is a Song Voicing as the API returns it, from each string's fret, muted for a muted one.
+func frets(of ...int) []*int {
+	voicing := make([]*int, len(of))
+	for i, f := range of {
+		if f != muted {
+			voicing[i] = &f
+		}
+	}
+	return voicing
+}
+
+// muted is a muted string, for frets.
+const muted = -1
+
+func TestAChordCanCarryASongVoicing(t *testing.T) {
+	cases := map[string]chord{
+		"Em:00002x":         {Offset: 3, Name: "Em", SongVoicing: frets(0, 0, 0, 0, 2, muted)},
+		"Em:0-0-0-0-2-x":    {Offset: 3, Name: "Em", SongVoicing: frets(0, 0, 0, 0, 2, muted)},
+		"A:x-12-14-14-13-x": {Offset: 3, Name: "A", SongVoicing: frets(muted, 12, 14, 14, 13, muted)},
+		"Em:x-0-9-9-x-x":    {Offset: 3, Name: "Em", SongVoicing: frets(muted, 0, 9, 9, muted, muted)},
+		"D/F#:2x0232":       {Offset: 3, Name: "D/F#", SongVoicing: frets(2, muted, 0, 2, 3, 2)},
+		// One character a fret, so four strings, not frets 10 and 12.
+		"Em:1012": {Offset: 3, Name: "Em", SongVoicing: frets(1, 0, 1, 2)},
+		"C:x3201": {Offset: 3, Name: "C", SongVoicing: frets(muted, 3, 2, 0, 1)},
+	}
+	for text, want := range cases {
+		t.Run(text, func(t *testing.T) {
+			ts := newTestServer(t)
+
+			got := ts.parsedLine("la [" + text + "]la")
+
+			if !reflect.DeepEqual(got.Chords, []chord{want}) || got.Lyrics != "la la" {
+				t.Errorf("lyrics = %q, chords = %s; want %q, %s", got.Lyrics, showChords(got.Chords), "la la", showChords([]chord{want}))
+			}
+		})
+	}
+}
+
+func TestBracketedTextWhoseNameOrFretsCantBeReadStaysInTheLyrics(t *testing.T) {
+	texts := []string{
+		"[Em:00z]", "[foo:000000]", "[Em:]", "[:000000]", "[Em:0-0-0-0-2-]", "[Em:-0-0]", "[Em:0--0]",
+		"[Em:00-002x]", "[Em:X00000]", "[Em: 000000]", "[Em:00 0000]", "[Em:000000:]", "[Em:x-012-0]",
+		"[Em:x-123-0]",
+	}
+	for _, text := range texts {
+		t.Run(text, func(t *testing.T) {
+			ts := newTestServer(t)
+
+			got := ts.parsedLine("la " + text + " la")
+
+			if want := "la " + text + " la"; got.Lyrics != want || len(got.Chords) != 0 {
+				t.Errorf("lyrics = %q, chords = %s; want %q and no chords", got.Lyrics, showChords(got.Chords), want)
+			}
+		})
+	}
+}
+
+// showChords writes Chords out with their Song Voicings' frets, not their pointers.
+func showChords(chords []chord) string {
+	var b strings.Builder
+	for _, c := range chords {
+		fmt.Fprintf(&b, "{%d %s", c.Offset, c.Name)
+		for _, f := range c.SongVoicing {
+			if f == nil {
+				b.WriteString(" x")
+			} else {
+				fmt.Fprintf(&b, " %d", *f)
+			}
+		}
+		b.WriteString("}")
+	}
+	return "[" + b.String() + "]"
+}
+
 func TestAChordNextToLiteralBracketsIsStillParsed(t *testing.T) {
 	ts := newTestServer(t)
 
 	got := ts.parsedLine("[[Am]la] [x2]")
 
-	if want := []chord{{1, "Am"}}; got.Lyrics != "[la] [x2]" || !reflect.DeepEqual(got.Chords, want) {
+	if want := []chord{{Offset: 1, Name: "Am"}}; got.Lyrics != "[la] [x2]" || !reflect.DeepEqual(got.Chords, want) {
 		t.Errorf("lyrics = %q, chords = %+v; want %q, %+v", got.Lyrics, got.Chords, "[la] [x2]", want)
 	}
 }

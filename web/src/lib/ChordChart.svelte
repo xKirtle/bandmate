@@ -3,12 +3,17 @@
   // Voicing for each Chord the Song shows, in one row that scrolls sideways,
   // on the device's Instrument, the one the Chord Finder plays. Each draws
   // the preferred Voicing for the Chord (on the guitar, in the Song's
-  // tuning), or the top-ranked one, as the Chord Finder would. On the piano,
-  // every card draws the same keys, the whole octaves just covering every
-  // key any of them presses, so they line up. A Chord that can't be read, or
-  // has no Voicing, keeps its place as its name over an empty frame; on the
+  // tuning), or the top-ranked one, as the Chord Finder would; on the guitar,
+  // untransposed, a Chord with a Song Voicing draws that instead, a card for
+  // each way a name is played, and none for one on more or fewer strings
+  // than the tuning. On the piano, every card draws the same keys, the whole
+  // octaves just covering every key any of them presses, so they line up. A
+  // Chord that can't be read, or has no Voicing, keeps its place as its name
+  // over an empty frame, as one whose Song Voicing doesn't fit does; on the
   // guitar, a tuning that can't be read gets no diagrams at all, rather than
   // a guess, while the piano has no tuning, so the Song's doesn't matter.
+  // While a name has more than one card, each is numbered after its name,
+  // in the order they first appear, as its Chords above the lyrics are.
   // Hidden, it isn't drawn at all; it's hidden, shown and pinned to the top
   // of the window from the Reading menu, for every Song on this device, and
   // sized there by the Chart Size, one size for both Instruments.
@@ -16,8 +21,16 @@
   import type { Song } from './api';
   import ChordDiagram from './ChordDiagram.svelte';
   import type { ChordOpener } from './ChordPopover.svelte';
-  import { chartChords, chartContext, chartKeyRange, chartVoicing } from './chordChart';
+  import {
+    chartChords,
+    chartContext,
+    chartKeyRange,
+    chartVoicing,
+    numberedName,
+    type ChartNumbers,
+  } from './chordChart';
   import { isPianoVoicing, whiteKeys } from './chordFinder';
+  import { chordKey } from './chords';
   import PianoDiagram from './PianoDiagram.svelte';
   import { chartSize } from './sharedChartSize.svelte';
   import { chordChartState } from './sharedChordChartState.svelte';
@@ -27,23 +40,35 @@
   let {
     song,
     transpose = 0,
+    numbers = () => null,
     opener,
   }: {
     song: Song;
     transpose?: number;
+    /** The number each card carries after its name, as its Chords above the lyrics do (from chartNumbers). */
+    numbers?: ChartNumbers;
     /** Given, clicking a diagram opens its Chord's popover. */
     opener?: ChordOpener;
   } = $props();
 
-  const names = $derived(chartChords(song, transpose));
+  const listed = $derived(chartChords(song, transpose, instrument.value));
   const context = $derived(chartContext(instrument.value, song.tuning));
   const piano = $derived(context?.instrument === 'piano');
   const chords = $derived.by(() => {
     if (!context) return [];
     const preferring = preferredVoicings.preferring(context);
-    return names.map((name) => {
-      const drawn = chartVoicing(name, preferring);
-      return { name, voicing: drawn.kind === 'voicing' ? drawn.voicing : null };
+    return listed.map((listedChord) => {
+      const drawn = chartVoicing(listedChord, preferring);
+      return {
+        shown: listedChord,
+        key: chordKey(listedChord),
+        name: numberedName(listedChord.name, numbers(listedChord)),
+        voicing: drawn.kind === 'voicing' ? drawn.voicing : null,
+        why:
+          drawn.kind === 'song-voicing-strings'
+            ? `No diagram: this Chord's Song Voicing has ${drawn.strings} strings, and the Song's tuning ${drawn.tuningStrings}`
+            : "No diagram: Bandmate can't read this Chord or find a Voicing for it",
+      };
     });
   });
   // The keys every piano card draws, worked out again as the Chords change.
@@ -75,7 +100,7 @@
   });
 </script>
 
-{#if names.length > 0 && shown}
+{#if listed.length > 0 && shown}
   <section class={['chart', { pinned }]} aria-label="Chord Chart" bind:this={chart} bind:clientHeight={height}>
     {#if !context}
       <p class="muted note">
@@ -86,14 +111,14 @@
         class={['row', { piano }]}
         style:--chart-white-keys={piano ? whiteKeys(range.lowest, range.highest) : undefined}
       >
-        {#each chords as chord (chord.name)}
+        {#each chords as chord (chord.key)}
           <li>
             <button
               type="button"
               class="chord"
               aria-haspopup="dialog"
               title="Open {chord.name}'s diagram"
-              onclick={(e) => opener?.press(chord.name, e.currentTarget)}
+              onclick={(e) => opener?.press(chord.shown, e.currentTarget)}
             >
               <span class="name" title={chord.name}>{chord.name}</span>
               {#if chord.voicing && isPianoVoicing(chord.voicing)}
@@ -107,12 +132,7 @@
               {:else if chord.voicing}
                 <ChordDiagram voicing={chord.voicing} name={chord.name} />
               {:else}
-                <span
-                  class="empty"
-                  role="img"
-                  aria-label="{chord.name}: no diagram"
-                  title="No diagram: Bandmate can't read this Chord or find a Voicing for it"
-                ></span>
+                <span class="empty" role="img" aria-label="{chord.name}: no diagram" title={chord.why}></span>
               {/if}
             </button>
           </li>

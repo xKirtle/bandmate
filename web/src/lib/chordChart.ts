@@ -3,7 +3,7 @@
 // the Chord Finder (ADR 0012), drawn as its diagrams are.
 
 import type { Song } from './api';
-import { hasChords } from './chords';
+import { chordKey, hasChords, shownChord, type ShownChord } from './chords';
 import {
   chordName,
   highestKey,
@@ -16,28 +16,77 @@ import {
   type PianoVoicing,
   type Voicing,
 } from './chordFinder';
+import { writtenVoicing } from './guitar';
 import { activeAlternate, sectionsInArrangement } from './sections';
-import { transposeChord } from './transpose';
 
 /**
  * The Chords the Chord Chart draws: those in the Arrangement's active
  * Alternates, Chord Lines included, as Read mode shows them (transposed by
- * semitones, spelled from the Song's key), each once, in the order they first
- * appear. Two names the Chord Finder tidies to the same Chord (CMaj7, Cmaj7)
- * are one, shown as it first appears. A name that can't be read keeps its
- * place, once, as shown.
+ * semitones, spelled from the Song's key), each way a name is played once, in
+ * the order they first appear. Two names the Chord Finder tidies to the same
+ * Chord (CMaj7, Cmaj7) are one, shown as it first appears. A name that can't
+ * be read keeps its place, once, as shown. On the guitar, untransposed, a
+ * Chord with a Song Voicing is played its own way, so it's listed apart from
+ * the same name without one or with another; transposed, or on the piano, a
+ * Song Voicing falls away, so the Chord is one with any other of its name.
  */
-export function chartChords(song: Song, transpose = 0): string[] {
+export function chartChords(song: Song, transpose = 0, instrument: InstrumentName = 'guitar'): ShownChord[] {
   const sections = new Map(song.sections.map((s) => [s.id, s]));
-  const listed = new Map<string, string>();
+  const listed = new Map<string, ShownChord>();
   for (const section of sectionsInArrangement(song, sections))
     for (const line of activeAlternate(section)?.lines ?? [])
       for (const chord of line.chords) {
-        const shown = transposeChord(chord.name, transpose, song.key);
-        const tidied = chordName(shown) ?? shown;
-        if (!listed.has(tidied)) listed.set(tidied, shown);
+        const shown = playedOn(shownChord(chord, transpose, song.key), instrument);
+        const way = wayPlayed(shown);
+        if (!listed.has(way)) listed.set(way, shown);
       }
   return [...listed.values()];
+}
+
+/** A Chord as shown, as it's played on an Instrument: on the piano, without its Song Voicing. */
+function playedOn(chord: ShownChord, instrument: InstrumentName): ShownChord {
+  return instrument === 'piano' && chord.songVoicing ? { ...chord, songVoicing: null } : chord;
+}
+
+/** The way a Chord as played is drawn in the Chord Chart, as a key: by its tidied name and its Song Voicing. */
+function wayPlayed(chord: ShownChord): string {
+  return chordKey({ ...chord, name: tidied(chord.name) });
+}
+
+/** A Chord's name as the Chord Finder tidies it, or as shown when it can't be read. */
+function tidied(name: string): string {
+  return chordName(name) ?? name;
+}
+
+/** The number a Chord as shown carries, from chartNumbers, or null for none. */
+export type ChartNumbers = (chord: ShownChord) => number | null;
+
+/**
+ * The numbers Read mode's Chords carry, above the lyrics and on their
+ * diagrams in the Chord Chart, on the device's Instrument: while a name has
+ * more than one diagram in the Chart (from chartChords), each way it's
+ * played is numbered from 1, in the order they first appear. A name with one
+ * diagram, a Chord not in the Chart, and every Chord on the guitar while the
+ * Song's tuning can't be read, so the Chart draws no diagrams, carry none.
+ */
+export function chartNumbers(song: Song, transpose = 0, instrument: InstrumentName = 'guitar'): ChartNumbers {
+  if (!chartContext(instrument, song.tuning)) return () => null;
+  const ofName = new Map<string, string[]>();
+  for (const chord of chartChords(song, transpose, instrument)) {
+    const name = tidied(chord.name);
+    ofName.set(name, [...(ofName.get(name) ?? []), wayPlayed(chord)]);
+  }
+  const ways = new Map<string, number>();
+  for (const played of ofName.values()) if (played.length > 1) played.forEach((way, i) => ways.set(way, i + 1));
+  return (chord) => ways.get(wayPlayed(playedOn(chord, instrument))) ?? null;
+}
+
+const superscripts = '⁰¹²³⁴⁵⁶⁷⁸⁹';
+
+/** A Chord's name with its number (from chartNumbers) raised after it, held to it by a narrow space ("Em ²"), or just its name, unnumbered. */
+export function numberedName(name: string, number: number | null): string {
+  if (number === null) return name;
+  return `${name}\u202f${[...String(number)].map((d) => superscripts[Number(d)]).join('')}`;
 }
 
 /**
@@ -96,20 +145,26 @@ export function chartKeyRange(voicings: readonly PianoVoicing[]): KeyRange {
 }
 
 /**
- * What the Chord Chart draws for a Chord as shown: the preferred Voicing of
- * it on the device's Instrument (on the guitar, in the tuning), else the
- * top-ranked one, as the Chord Finder would, and as a Chord's popover opens
- * on. Or why it draws none: the Chord can't be read, it has no Voicing, or
- * the guitar's tuning can't be read (a null context, from chartContext).
+ * What the Chord Chart draws for a Chord as shown: on the guitar, its Song
+ * Voicing, if it has one; else the preferred Voicing of it on the device's
+ * Instrument (on the guitar, in the tuning), else the top-ranked one, as the
+ * Chord Finder would, and as a Chord's popover opens on. Or why it draws
+ * none: the Chord can't be read, it has no Voicing, the guitar's tuning
+ * can't be read (a null context, from chartContext), or its Song Voicing is
+ * on more or fewer strings than the tuning.
  */
 export type ChartVoicing =
   | { kind: 'voicing'; voicing: Voicing }
   | { kind: 'unreadable-chord' }
   | { kind: 'no-voicing' }
-  | { kind: 'unreadable-tuning' };
+  | { kind: 'unreadable-tuning' }
+  | SongVoicingStrings;
 
-export function chartVoicing(name: string, context: FinderContext | null): ChartVoicing {
-  const found = chartVoicings(name, context);
+/** A Song Voicing on more or fewer strings than the Song's tuning, so it gets no diagram, rather than a guess. */
+export type SongVoicingStrings = { kind: 'song-voicing-strings'; strings: number; tuningStrings: number };
+
+export function chartVoicing(chord: ShownChord, context: FinderContext | null): ChartVoicing {
+  const found = chartVoicings(chord, context);
   if (found.kind !== 'voicings') return found;
   const voicing = found.voicings[0];
   return voicing ? { kind: 'voicing', voicing } : { kind: 'no-voicing' };
@@ -118,19 +173,45 @@ export function chartVoicing(name: string, context: FinderContext | null): Chart
 /**
  * What a Chord's popover steps through: every Voicing of the Chord as shown
  * on the device's Instrument, the preferred one first, else the top-ranked,
- * as the Chord Finder lists them. With the Chord's name as the Chord Finder
- * reads it, the name preferring one names it by, and whether the first is
- * preferred. Or why there are none to step through: the Chord or the
- * guitar's tuning can't be read.
+ * as the Chord Finder lists them; on the guitar, its Song Voicing before
+ * them, if it has one, and not again among them. With the Chord's name as
+ * the Chord Finder reads it, the name preferring one names it by, whether
+ * the first is the Song Voicing, and whether the first of the Chord's own,
+ * after any Song Voicing, is preferred. Or why there
+ * are none to step through: the Chord or the guitar's tuning can't be read,
+ * or the Song Voicing is on more or fewer strings than the tuning. A Chord
+ * the Chord Finder can't read still has its Song Voicing to show.
  */
 export type ChartVoicings =
-  | { kind: 'voicings'; chord: string; voicings: Voicing[]; preferred: boolean }
+  | { kind: 'voicings'; chord: string; voicings: Voicing[]; preferred: boolean; songVoicing: boolean }
   | { kind: 'unreadable-chord' }
-  | { kind: 'unreadable-tuning' };
+  | { kind: 'unreadable-tuning' }
+  | SongVoicingStrings;
 
-export function chartVoicings(name: string, context: FinderContext | null): ChartVoicings {
+export function chartVoicings(chord: ShownChord, context: FinderContext | null): ChartVoicings {
   if (!context) return { kind: 'unreadable-tuning' };
-  const found = lookUp(name, context);
-  if (found.kind !== 'chord') return { kind: 'unreadable-chord' };
-  return { kind: 'voicings', chord: found.name, voicings: found.voicings, preferred: found.preferred };
+  const found = lookUp(chord.name, context);
+  const frets = chord.songVoicing;
+  if (context.instrument === 'piano' || !frets) {
+    if (found.kind !== 'chord') return { kind: 'unreadable-chord' };
+    return {
+      kind: 'voicings',
+      chord: found.name,
+      voicings: found.voicings,
+      preferred: found.preferred,
+      songVoicing: false,
+    };
+  }
+  const strings = context.tuning.length;
+  if (frets.length !== strings) return { kind: 'song-voicing-strings', strings: frets.length, tuningStrings: strings };
+  const own = found.kind === 'chord' ? found.voicings : [];
+  const others = own.filter((v) => !('frets' in v && v.frets.every((f, i) => f === frets[i])));
+  return {
+    kind: 'voicings',
+    chord: found.kind === 'chord' ? found.name : chord.name,
+    voicings: [writtenVoicing(frets), ...others],
+    // The preferred one comes first among the Chord's own, unless it's the Song Voicing.
+    preferred: found.kind === 'chord' && found.preferred && others[0] === own[0],
+    songVoicing: true,
+  };
 }
