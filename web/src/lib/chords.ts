@@ -1,6 +1,7 @@
 import type { Chord, Line, Song } from './api';
 import type { Frets } from './guitar';
 import { transposeChord } from './transpose';
+import { writtenChords } from './writtenChord';
 
 /**
  * A Chord as Read mode shows it: its name, transposed, and the Song Voicing
@@ -27,6 +28,9 @@ export function chordKey({ name, songVoicing }: ShownChord): string {
   return `${name}:${songVoicing?.map((f) => f ?? 'x').join('-') ?? ''}`;
 }
 
+/** How a Line's Chords are named: as Read mode shows them, or as written, typed between their brackets. */
+export type ChordNames = 'as-shown' | 'as-written';
+
 /** A run of lyrics with the Chords (if any) that sit above its first character, in order. */
 export interface Piece {
   chords: ShownChord[];
@@ -46,14 +50,21 @@ export interface Piece {
  * space falls between words, so its Piece is all the whitespace it falls in,
  * from the word or Chord before it to the word or Chord after. The Chords show
  * transposed by semitones, as written by default, spelled from the Song's key.
+ * Shown as written, as Write mode prints them, each Chord is named as it's
+ * typed between its brackets, its Song Voicing's frets and all
+ * ("Em:00002x").
  */
-export function layoutLine(line: Line, transpose = 0, key = ''): Piece[][] {
+export function layoutLine(line: Line, transpose = 0, key = '', names: ChordNames = 'as-shown'): Piece[][] {
   // Offsets count code points, which Array.from splits on.
   const chars = Array.from(line.lyrics);
   const isSpace = (i: number) => i >= 0 && i < chars.length && /\s/.test(chars[i]);
   const chordsAt = new Map<number, ShownChord[]>();
-  for (const c of line.chords)
-    chordsAt.set(c.offset, [...(chordsAt.get(c.offset) ?? []), shownChord(c, transpose, key)]);
+  const typed = names === 'as-written' ? writtenChords(line.text) : [];
+  line.chords.forEach((c, i) => {
+    const shown = shownChord(c, transpose, key);
+    const named = typed[i] === undefined ? shown : { ...shown, name: typed[i] };
+    chordsAt.set(c.offset, [...(chordsAt.get(c.offset) ?? []), named]);
+  });
 
   // The Chords whose Piece starts at each character, and whether they fall
   // between words. A Chord Line's Chords sit on spaces too, but it has no

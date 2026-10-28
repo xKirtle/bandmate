@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { readWrittenChord } from './writtenChord';
+import { readWrittenChord, writtenChords } from './writtenChord';
 
 // The same cases as the server's, in internal/app/chords_test.go: the two must agree on what's a Chord.
 describe('readWrittenChord', () => {
@@ -24,5 +24,20 @@ describe('readWrittenChord', () => {
       'Em:X00000', 'Em: 000000', 'Em:00 0000', 'Em:000000:', 'Em:x-012-0', 'Em:x-123-0',
     ]; // prettier-ignore
     for (const text of unread) expect(readWrittenChord(text), text).toBeNull();
+  });
+
+  it('reads a four-string Song Voicing one character a fret, though it may look like frets of 10 and up', () => {
+    expect(readWrittenChord('Em:1012')).toEqual({ name: 'Em', songVoicing: [1, 0, 1, 2] });
+  });
+});
+
+describe('writtenChords', () => {
+  it("gives each Chord of a Line's text as typed between its brackets, in order, as the server finds them", () => {
+    expect(writtenChords('[G]Hel[Em:00002x]lo [Em:x-0-9-9-x-x]you')).toEqual(['G', 'Em:00002x', 'Em:x-0-9-9-x-x']);
+  });
+
+  it("skips brackets that aren't Chords, and finds one inside brackets around it", () => {
+    expect(writtenChords('[Chorus] [Em:00z] [[Am]la] [x2] [G')).toEqual(['Am']);
+    expect(writtenChords('no chords')).toEqual([]);
   });
 });

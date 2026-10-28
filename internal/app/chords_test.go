@@ -122,7 +122,9 @@ func TestAChordCanCarryASongVoicing(t *testing.T) {
 		"A:x-12-14-14-13-x": {Offset: 3, Name: "A", SongVoicing: frets(muted, 12, 14, 14, 13, muted)},
 		"Em:x-0-9-9-x-x":    {Offset: 3, Name: "Em", SongVoicing: frets(muted, 0, 9, 9, muted, muted)},
 		"D/F#:2x0232":       {Offset: 3, Name: "D/F#", SongVoicing: frets(2, muted, 0, 2, 3, 2)},
-		"C:x3201":           {Offset: 3, Name: "C", SongVoicing: frets(muted, 3, 2, 0, 1)},
+		// One character a fret, so four strings, not frets 10 and 12.
+		"Em:1012": {Offset: 3, Name: "Em", SongVoicing: frets(1, 0, 1, 2)},
+		"C:x3201": {Offset: 3, Name: "C", SongVoicing: frets(muted, 3, 2, 0, 1)},
 	}
 	for text, want := range cases {
 		t.Run(text, func(t *testing.T) {

@@ -25,6 +25,21 @@ describe('layoutLine', () => {
     ]);
   });
 
+  it('shows each Chord as typed between its brackets, as written, frets and all', () => {
+    const written = {
+      ...line('Hi you', [
+        { offset: 0, name: 'Em', songVoicing: [0, 0, 0, 0, 2, null] },
+        { offset: 3, name: 'G' },
+        { offset: 3, name: 'Em', songVoicing: [null, 0, 9, 9, null, null] },
+      ]),
+      text: '[Em:00002x]Hi [G][Em:x-0-9-9-x-x]you',
+    };
+    expect(layoutLine(written, 0, '', 'as-written')).toEqual([
+      [{ chords: [{ name: 'Em:00002x', songVoicing: [0, 0, 0, 0, 2, null] }], text: 'Hi ' }],
+      [{ chords: [named('G')[0], { name: 'Em:x-0-9-9-x-x', songVoicing: [null, 0, 9, 9, null, null] }], text: 'you' }],
+    ]);
+  });
+
   it('shows each Chord transposed by the amount, above its lyrics', () => {
     const shown = layoutLine(
       line('Hello you', [

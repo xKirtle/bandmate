@@ -20,6 +20,25 @@ export interface WrittenChord {
   songVoicing: Frets | null;
 }
 
+/**
+ * Each Chord in a Line's text as it's typed between its brackets
+ * ("Em:00002x"), in order, found as the server finds them: from each "[",
+ * up to the next "]", and when that isn't a Chord, on from the next
+ * character. So they're the Line's Chords, one for one.
+ */
+export function writtenChords(text: string): string[] {
+  const found: string[] = [];
+  for (let at = text.indexOf('['); at >= 0; at = text.indexOf('[', at + 1)) {
+    const end = text.indexOf(']', at + 1);
+    if (end < 0) break;
+    const written = text.slice(at + 1, end);
+    if (!readWrittenChord(written)) continue;
+    found.push(written);
+    at = end;
+  }
+  return found;
+}
+
 /** The Chord written between a pair of brackets, or null when its name or its frets can't be read, so it stays in the lyrics. */
 export function readWrittenChord(text: string): WrittenChord | null {
   const colon = text.indexOf(':');
