@@ -11,6 +11,8 @@ import { writtenChords } from './writtenChord';
 export interface ShownChord {
   name: string;
   songVoicing: Frets | null;
+  /** As written, the Chord as typed between its brackets ("Em:00002x"), shown in place of its name. */
+  written?: string;
 }
 
 /** A Chord as shown when transposed by semitones, spelled from the Song's key. */
@@ -50,9 +52,9 @@ export interface Piece {
  * space falls between words, so its Piece is all the whitespace it falls in,
  * from the word or Chord before it to the word or Chord after. The Chords show
  * transposed by semitones, as written by default, spelled from the Song's key.
- * Shown as written, as Write mode prints them, each Chord is named as it's
- * typed between its brackets, its Song Voicing's frets and all
- * ("Em:00002x").
+ * Shown as written, as Write mode prints them, each Chord also carries what
+ * was typed between its brackets, its Song Voicing's frets and all
+ * ("Em:00002x"), to show in place of its name.
  */
 export function layoutLine(line: Line, transpose = 0, key = '', names: ChordNames = 'as-shown'): Piece[][] {
   // Offsets count code points, which Array.from splits on.
@@ -62,8 +64,10 @@ export function layoutLine(line: Line, transpose = 0, key = '', names: ChordName
   const typed = names === 'as-written' ? writtenChords(line.text) : [];
   line.chords.forEach((c, i) => {
     const shown = shownChord(c, transpose, key);
-    const named = typed[i] === undefined ? shown : { ...shown, name: typed[i] };
-    chordsAt.set(c.offset, [...(chordsAt.get(c.offset) ?? []), named]);
+    // The server finds the same Chords in the text, one for one; as written,
+    // one it somehow didn't would show by its name rather than not at all.
+    const written = typed[i] === undefined ? shown : { ...shown, written: typed[i] };
+    chordsAt.set(c.offset, [...(chordsAt.get(c.offset) ?? []), written]);
   });
 
   // The Chords whose Piece starts at each character, and whether they fall

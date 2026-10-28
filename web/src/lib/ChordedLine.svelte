@@ -40,7 +40,7 @@
           <span class="piece" class:snug={piece.snug}>
             <span class="chord"
               >{#each piece.chords as shown, c (c)}{#if c > 0}{' '}{/if}<span {@attach chord ? chord(shown) : none}
-                  >{shown.name}</span
+                  >{shown.written ?? shown.name}</span
                 >{/each}</span
             >
             <span class="lyric">{piece.text || ' '}</span>

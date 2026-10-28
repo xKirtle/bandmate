@@ -35,8 +35,16 @@ describe('layoutLine', () => {
       text: '[Em:00002x]Hi [G][Em:x-0-9-9-x-x]you',
     };
     expect(layoutLine(written, 0, '', 'as-written')).toEqual([
-      [{ chords: [{ name: 'Em:00002x', songVoicing: [0, 0, 0, 0, 2, null] }], text: 'Hi ' }],
-      [{ chords: [named('G')[0], { name: 'Em:x-0-9-9-x-x', songVoicing: [null, 0, 9, 9, null, null] }], text: 'you' }],
+      [{ chords: [{ name: 'Em', songVoicing: [0, 0, 0, 0, 2, null], written: 'Em:00002x' }], text: 'Hi ' }],
+      [
+        {
+          chords: [
+            { ...named('G')[0], written: 'G' },
+            { name: 'Em', songVoicing: [null, 0, 9, 9, null, null], written: 'Em:x-0-9-9-x-x' },
+          ],
+          text: 'you',
+        },
+      ],
     ]);
   });
 
