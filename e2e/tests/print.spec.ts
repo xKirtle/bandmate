@@ -252,7 +252,11 @@ test("a Chord's Song Voicing prints as typed from Write mode, and from Read mode
   await page.emulateMedia({ media: 'screen' });
   await printed(page, (await openStrings('finished')).id, 'Read');
   const read = sheet(page).getByRole('region', { name: 'Verse' });
-  await expect(read.getByText('Em', { exact: true })).toHaveCount(3);
+  // Em is played three ways, so each is numbered, as on screen, the Chord Chart's diagrams too.
+  for (const numbered of ['Em\u202f¹', 'Em\u202f²', 'Em\u202f³']) {
+    await expect(read.getByText(numbered, { exact: true })).toBeVisible();
+    await expect(chart(page).getByText(numbered, { exact: true })).toBeVisible();
+  }
   await expect(read).not.toContainText('00002x');
   await expect(read).not.toContainText('x-0-9-9-x-x');
 });

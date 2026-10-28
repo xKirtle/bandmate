@@ -6,6 +6,8 @@ import {
   chartChords,
   chartContext,
   chartKeyRange,
+  chartNumbers,
+  numberedName,
   chartTuning,
   chartVoicing,
   chartVoicings,
@@ -111,6 +113,49 @@ describe('which Chords the Chord Chart lists', () => {
     const verse = section(alternate([line(['Em', 'Em:00002x', 'G:320003'])]));
     expect(chartChords(song([verse]), 2)).toEqual([named('F#m'), named('A')]);
     expect(chartChords(song([verse]), 0, 'piano')).toEqual([named('Em'), named('G')]);
+  });
+});
+
+describe('how the Chord Chart numbers a name played more than one way', () => {
+  /** The number each Chord of a Song's first Line carries, as Read mode shows it, or null for none. */
+  const numbersOf = (verse: Section, transpose = 0, instrument: 'guitar' | 'piano' = 'guitar') => {
+    const s = song([verse]);
+    const numbers = chartNumbers(s, transpose, instrument);
+    return verse.alternates[0].lines[0].chords.map((c) =>
+      numbers({ name: c.name, songVoicing: (transpose === 0 && c.songVoicing) || null }),
+    );
+  };
+
+  it('numbers each way a name is played in the order it first appears', () => {
+    const verse = section(alternate([line(['Em', 'Em:00002x', 'G', 'Em', 'Em:x-0-9-9-x-x', 'Em:0-0-0-0-2-x'])]));
+    expect(numbersOf(verse)).toEqual([1, 2, null, 1, 3, 2]);
+  });
+
+  it('leaves a name played one way unmarked, Song Voicing or not', () => {
+    const verse = section(alternate([line(['G', 'Em:00002x', 'G', 'Em:0-0-0-0-2-x'])]));
+    expect(numbersOf(verse)).toEqual([null, null, null, null]);
+  });
+
+  it('numbers two names the Chord Finder tidies to the same Chord as one', () => {
+    const verse = section(alternate([line(['CM7', 'Cmaj7:x32000'])]));
+    expect(numbersOf(verse)).toEqual([1, 2]);
+  });
+
+  it('numbers nothing transposed or on the piano, where the Song Voicings fall away', () => {
+    const verse = section(alternate([line(['Em', 'Em:00002x'])]));
+    expect(numbersOf(verse, 2)).toEqual([null, null]);
+    expect(numbersOf(verse, 0, 'piano')).toEqual([null, null]);
+  });
+
+  it('writes the number after the name, raised, held to it by a narrow space', () => {
+    expect(numberedName('Em', 2)).toBe('Em\u202f²');
+    expect(numberedName('Em', 10)).toBe('Em\u202f¹⁰');
+    expect(numberedName('Em', null)).toBe('Em');
+  });
+
+  it('counts only the active Alternates', () => {
+    const verse = section(alternate([line(['Em'])]), alternate([line(['Em:00002x'])], false));
+    expect(numbersOf(verse)).toEqual([null]);
   });
 });
 

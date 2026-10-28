@@ -37,7 +37,7 @@ export function chartChords(song: Song, transpose = 0, instrument: InstrumentNam
     for (const line of activeAlternate(section)?.lines ?? [])
       for (const chord of line.chords) {
         const shown = playedOn(shownChord(chord, transpose, song.key), instrument);
-        const way = chordKey({ ...shown, name: chordName(shown.name) ?? shown.name });
+        const way = wayPlayed(shown);
         if (!listed.has(way)) listed.set(way, shown);
       }
   return [...listed.values()];
@@ -46,6 +46,44 @@ export function chartChords(song: Song, transpose = 0, instrument: InstrumentNam
 /** A Chord as shown, as it's played on an Instrument: on the piano, without its Song Voicing. */
 function playedOn(chord: ShownChord, instrument: InstrumentName): ShownChord {
   return instrument === 'piano' && chord.songVoicing ? { ...chord, songVoicing: null } : chord;
+}
+
+/** The way a Chord as played is drawn in the Chord Chart, as a key: by its tidied name and its Song Voicing. */
+function wayPlayed(chord: ShownChord): string {
+  return chordKey({ ...chord, name: tidied(chord.name) });
+}
+
+/** A Chord's name as the Chord Finder tidies it, or as shown when it can't be read. */
+function tidied(name: string): string {
+  return chordName(name) ?? name;
+}
+
+/**
+ * The number a Chord as shown carries in Read mode, above the lyrics and on
+ * its diagram in the Chord Chart, on the device's Instrument: while its name
+ * has more than one diagram in the Chart (from chartChords), the place of
+ * the way it's played among them, from 1, in the order they first appear;
+ * null while its name has one, or it isn't in the Chart.
+ */
+export type ChartNumbers = (chord: ShownChord) => number | null;
+
+export function chartNumbers(song: Song, transpose = 0, instrument: InstrumentName = 'guitar'): ChartNumbers {
+  const listed = chartChords(song, transpose, instrument);
+  const ways = new Map<string, number>();
+  for (const chord of listed) {
+    const name = tidied(chord.name);
+    const ofName = listed.filter((c) => tidied(c.name) === name);
+    if (ofName.length > 1) ways.set(wayPlayed(chord), ofName.indexOf(chord) + 1);
+  }
+  return (chord) => ways.get(wayPlayed(playedOn(chord, instrument))) ?? null;
+}
+
+const superscripts = '⁰¹²³⁴⁵⁶⁷⁸⁹';
+
+/** A Chord's name with its number (from chartNumbers) raised after it, held to it by a narrow space ("Em ²"), or just its name, unnumbered. */
+export function numberedName(name: string, number: number | null): string {
+  if (number === null) return name;
+  return `${name}\u202f${[...String(number)].map((d) => superscripts[Number(d)]).join('')}`;
 }
 
 /**

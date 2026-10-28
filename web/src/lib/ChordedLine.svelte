@@ -2,9 +2,11 @@
   // A Line as Read mode draws it: its Chords above its words, which wrap as
   // wholes, each carrying its Chords; or its lyrics alone, while it has no
   // Chords or they're hidden. At Read mode's sizes, or at body text's in a
-  // tool, such as the Snapshots dialog.
+  // tool, such as the Snapshots dialog. Given the Chord Chart's numbers, a
+  // Chord whose name it draws more than one way carries its diagram's number.
   import type { Attachment } from 'svelte/attachments';
   import type { Line } from './api';
+  import { numberedName, type ChartNumbers } from './chordChart';
   import { layoutLine, type ChordNames, type ShownChord } from './chords';
 
   let {
@@ -13,6 +15,7 @@
     transpose = 0,
     songKey = '',
     chordNames = 'as-shown',
+    numbers,
     chord,
     sizes = 'read',
   }: {
@@ -23,6 +26,8 @@
     songKey?: string;
     /** How the Chords are named: as Read mode shows them, or as typed between their brackets. */
     chordNames?: ChordNames;
+    /** Given, the number each Chord carries, matching its diagram in the Chord Chart. */
+    numbers?: ChartNumbers;
     /** Given, attached to each Chord's name, e.g. to open its diagram. */
     chord?: (chord: ShownChord) => Attachment<HTMLElement>;
     /** Read mode's lyric sizes, or body text's. */
@@ -40,7 +45,7 @@
           <span class="piece" class:snug={piece.snug}>
             <span class="chord"
               >{#each piece.chords as shown, c (c)}{#if c > 0}{' '}{/if}<span {@attach chord ? chord(shown) : none}
-                  >{shown.written ?? shown.name}</span
+                  >{shown.written ?? numberedName(shown.name, numbers?.(shown) ?? null)}</span
                 >{/each}</span
             >
             <span class="lyric">{piece.text || ' '}</span>

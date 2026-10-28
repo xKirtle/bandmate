@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { Attachment } from 'svelte/attachments';
   import type { Section, Song } from './api';
+  import type { ChartNumbers } from './chordChart';
   import type { ChordOpener } from './ChordPopover.svelte';
   import ChordedLine from './ChordedLine.svelte';
   import type { ChordNames, ShownChord } from './chords';
@@ -14,6 +15,7 @@
     showChords,
     transpose = 0,
     chordNames = 'as-shown',
+    numbers,
     size = usualLyricSize,
     current = null,
     play,
@@ -25,6 +27,8 @@
     transpose?: number;
     /** How the Chords are named: as Read mode shows them, or, as Write mode prints them, as typed. */
     chordNames?: ChordNames;
+    /** Given, the number each Chord carries, matching its diagram in the Chord Chart. */
+    numbers?: ChartNumbers;
     /** The Lyric Size, in percent. */
     size?: number;
     /** Where playback is: highlighted and kept in view. */
@@ -160,7 +164,7 @@
               title={onClick ? 'Play from here' : undefined}
               onclick={onClick ? () => click(onClick) : undefined}
             >
-              <ChordedLine {line} {showChords} {transpose} {chordNames} songKey={song.key} chord={opens} />
+              <ChordedLine {line} {showChords} {transpose} {chordNames} {numbers} songKey={song.key} chord={opens} />
             </div>
           </div>
         {/each}
