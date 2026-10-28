@@ -220,11 +220,11 @@ test('a Chord written with a Song Voicing shows by its name, and the Chart and i
   await expect(sheet).not.toContainText('x-0-9-9-x-x');
   await expect(sheet).toContainText('[Em:00z]la');
 
-  // A diagram for each way Em is played, the Song Voicing as written, and none for one on five strings.
+  // A diagram for each way Em is played, numbered, the Song Voicing as written, and none for one on five strings.
   const diagrams = chart(page).getByRole('img');
   await expect(diagrams).toHaveCount(3);
-  await expect(diagrams.nth(0)).toHaveAccessibleName('Em: 0 2 2 0 0 0');
-  await expect(diagrams.nth(1)).toHaveAccessibleName('Em: x 0 9 9 x x, from fret 9');
+  await expect(diagrams.nth(0)).toHaveAccessibleName('Em\u202f¹: 0 2 2 0 0 0');
+  await expect(diagrams.nth(1)).toHaveAccessibleName('Em\u202f²: x 0 9 9 x x, from fret 9');
   await expect(diagrams.nth(2)).toHaveAccessibleName('C: no diagram');
 
   // Its popover opens on the Song's Voicing, then steps on to the Chord's own.
@@ -244,4 +244,29 @@ test('a Chord written with a Song Voicing shows by its name, and the Chart and i
   await pickInstrument(page, 'Piano');
   await page.goto(`/songs/${song.id}`);
   await expect(chart(page).getByRole('img')).toHaveCount(2);
+});
+
+test("a name played two ways numbers its diagrams and its Chords to match, until it's transposed", async ({
+  page,
+  bandmate,
+}) => {
+  const song = await songWith(bandmate, ['Em:x-0-9-9-x-x', 'G', 'Em', 'Em:x099xx']);
+  await page.goto(`/songs/${song.id}`);
+
+  // Em's two ways, in the order they first appear; G, played one way, is unmarked.
+  await expect(chart(page).getByRole('img')).toHaveCount(3);
+  await expect(chart(page).getByText('Em\u202f¹', { exact: true })).toBeVisible();
+  await expect(chart(page).getByText('G', { exact: true })).toBeVisible();
+  await expect(chart(page).getByText('Em\u202f²', { exact: true })).toBeVisible();
+  const verse = page.getByRole('region', { name: 'Lyric Sheet' }).getByRole('region', { name: 'Verse' });
+  await expect(verse.getByText('Em\u202f¹', { exact: true })).toHaveCount(2);
+  await expect(verse.getByText('Em\u202f²', { exact: true })).toHaveCount(1);
+  await expect(verse.getByText('G', { exact: true })).toHaveCount(1);
+
+  // Transposed, the Song Voicings fall away, and the numbers with them.
+  await page.evaluate((id) => localStorage.setItem(`bandmate.transpose.${id}`, '2'), song.id);
+  await page.reload();
+  await expect(chart(page).getByRole('img')).toHaveCount(2);
+  await expect(verse.getByText('F#m', { exact: true })).toHaveCount(3);
+  await expect(page.getByText(/[¹²]/)).toHaveCount(0);
 });
