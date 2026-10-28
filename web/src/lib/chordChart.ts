@@ -58,23 +58,26 @@ function tidied(name: string): string {
   return chordName(name) ?? name;
 }
 
-/**
- * The number a Chord as shown carries in Read mode, above the lyrics and on
- * its diagram in the Chord Chart, on the device's Instrument: while its name
- * has more than one diagram in the Chart (from chartChords), the place of
- * the way it's played among them, from 1, in the order they first appear;
- * null while its name has one, or it isn't in the Chart.
- */
+/** The number a Chord as shown carries, from chartNumbers, or null for none. */
 export type ChartNumbers = (chord: ShownChord) => number | null;
 
+/**
+ * The numbers Read mode's Chords carry, above the lyrics and on their
+ * diagrams in the Chord Chart, on the device's Instrument: while a name has
+ * more than one diagram in the Chart (from chartChords), each way it's
+ * played is numbered from 1, in the order they first appear. A name with one
+ * diagram, a Chord not in the Chart, and every Chord on the guitar while the
+ * Song's tuning can't be read, so the Chart draws no diagrams, carry none.
+ */
 export function chartNumbers(song: Song, transpose = 0, instrument: InstrumentName = 'guitar'): ChartNumbers {
-  const listed = chartChords(song, transpose, instrument);
-  const ways = new Map<string, number>();
-  for (const chord of listed) {
+  if (!chartContext(instrument, song.tuning)) return () => null;
+  const ofName = new Map<string, string[]>();
+  for (const chord of chartChords(song, transpose, instrument)) {
     const name = tidied(chord.name);
-    const ofName = listed.filter((c) => tidied(c.name) === name);
-    if (ofName.length > 1) ways.set(wayPlayed(chord), ofName.indexOf(chord) + 1);
+    ofName.set(name, [...(ofName.get(name) ?? []), wayPlayed(chord)]);
   }
+  const ways = new Map<string, number>();
+  for (const played of ofName.values()) if (played.length > 1) played.forEach((way, i) => ways.set(way, i + 1));
   return (chord) => ways.get(wayPlayed(playedOn(chord, instrument))) ?? null;
 }
 

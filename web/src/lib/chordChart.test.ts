@@ -7,11 +7,11 @@ import {
   chartContext,
   chartKeyRange,
   chartNumbers,
-  numberedName,
   chartTuning,
   chartVoicing,
   chartVoicings,
   chordsInRead,
+  numberedName,
   type ChartVoicing,
 } from './chordChart';
 
@@ -118,8 +118,8 @@ describe('which Chords the Chord Chart lists', () => {
 
 describe('how the Chord Chart numbers a name played more than one way', () => {
   /** The number each Chord of a Song's first Line carries, as Read mode shows it, or null for none. */
-  const numbersOf = (verse: Section, transpose = 0, instrument: 'guitar' | 'piano' = 'guitar') => {
-    const s = song([verse]);
+  const numbersOf = (verse: Section, transpose = 0, instrument: 'guitar' | 'piano' = 'guitar', tuning = '') => {
+    const s = { ...song([verse]), tuning };
     const numbers = chartNumbers(s, transpose, instrument);
     return verse.alternates[0].lines[0].chords.map((c) =>
       numbers({ name: c.name, songVoicing: (transpose === 0 && c.songVoicing) || null }),
@@ -151,6 +151,11 @@ describe('how the Chord Chart numbers a name played more than one way', () => {
     expect(numberedName('Em', 2)).toBe('Em\u202f²');
     expect(numberedName('Em', 10)).toBe('Em\u202f¹⁰');
     expect(numberedName('Em', null)).toBe('Em');
+  });
+
+  it("numbers nothing on the guitar when the Song's tuning can't be read, as the Chart draws no diagrams", () => {
+    const verse = section(alternate([line(['Em', 'Em:00002x'])]));
+    expect(numbersOf(verse, 0, 'guitar', 'my weird tuning')).toEqual([null, null]);
   });
 
   it('counts only the active Alternates', () => {

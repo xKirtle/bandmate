@@ -21,7 +21,14 @@
   import type { Song } from './api';
   import ChordDiagram from './ChordDiagram.svelte';
   import type { ChordOpener } from './ChordPopover.svelte';
-  import { chartChords, chartContext, chartKeyRange, chartNumbers, chartVoicing, numberedName } from './chordChart';
+  import {
+    chartChords,
+    chartContext,
+    chartKeyRange,
+    chartVoicing,
+    numberedName,
+    type ChartNumbers,
+  } from './chordChart';
   import { isPianoVoicing, whiteKeys } from './chordFinder';
   import { chordKey } from './chords';
   import PianoDiagram from './PianoDiagram.svelte';
@@ -33,16 +40,18 @@
   let {
     song,
     transpose = 0,
+    numbers = () => null,
     opener,
   }: {
     song: Song;
     transpose?: number;
+    /** The number each card carries after its name, as its Chords above the lyrics do (from chartNumbers). */
+    numbers?: ChartNumbers;
     /** Given, clicking a diagram opens its Chord's popover. */
     opener?: ChordOpener;
   } = $props();
 
   const listed = $derived(chartChords(song, transpose, instrument.value));
-  const numbers = $derived(chartNumbers(song, transpose, instrument.value));
   const context = $derived(chartContext(instrument.value, song.tuning));
   const piano = $derived(context?.instrument === 'piano');
   const chords = $derived.by(() => {
