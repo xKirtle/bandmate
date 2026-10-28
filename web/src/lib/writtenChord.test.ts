@@ -44,15 +44,16 @@ describe('writtenChords', () => {
 });
 
 describe('chordWithSongVoicing', () => {
-  it('writes a Chord with its Song Voicing, its frets parted by dashes, x for a muted string', () => {
-    expect(chordWithSongVoicing('Em', [null, 0, 9, 9, null, null])).toBe('Em:x-0-9-9-x-x');
-    expect(chordWithSongVoicing('A', [null, 12, 14, 14, 13, null])).toBe('A:x-12-14-14-13-x');
-    expect(chordWithSongVoicing('D/F#', [2, null, 0, 2, 3, 2])).toBe('D/F#:2-x-0-2-3-2');
+  it('writes a Chord with its Song Voicing in its brackets, its frets parted by dashes, x for a muted string', () => {
+    expect(chordWithSongVoicing('Em', [null, 0, 9, 9, null, null])).toBe('[Em:x-0-9-9-x-x]');
+    expect(chordWithSongVoicing('A', [null, 12, 14, 14, 13, null])).toBe('[A:x-12-14-14-13-x]');
+    expect(chordWithSongVoicing('D/F#', [2, null, 0, 2, 3, 2])).toBe('[D/F#:2-x-0-2-3-2]');
   });
 
-  it('reads back as the same Chord with the same Song Voicing', () => {
+  it('reads back, pasted into a Line, as the same Chord with the same Song Voicing', () => {
     const frets = [null, 12, 14, 14, 13, null];
-    expect(readWrittenChord(chordWithSongVoicing('A', frets))).toEqual({ name: 'A', songVoicing: frets });
+    expect(readBack(chordWithSongVoicing('A', frets))).toEqual([{ name: 'A', songVoicing: frets }]);
+    expect(readBack(`Hel${chordWithSongVoicing('A', frets)}lo`)).toEqual([{ name: 'A', songVoicing: frets }]);
   });
 
   it('reads back for every Chord name the Chord Finder gives', () => {
@@ -63,11 +64,16 @@ describe('chordWithSongVoicing', () => {
       for (const { suffix } of qualities.filter((q) => q.suffix !== 'mMaj7'))
         for (const bass of ['', '/' + root]) {
           const name = chordName(root + suffix + bass)!;
-          expect(readWrittenChord(chordWithSongVoicing(name, frets)), name).toEqual({ name, songVoicing: frets });
+          expect(readBack(chordWithSongVoicing(name, frets)), name).toEqual([{ name, songVoicing: frets }]);
         }
     const named = nameIt([3, 2, 0, 0, 3, 3], { tuning: standard, instrument: 'guitar' });
     expect(named.kind === 'chord' && named.readings.length).toBeTruthy();
     for (const name of named.kind === 'chord' ? named.readings : [])
-      expect(readWrittenChord(chordWithSongVoicing(name, frets)), name).toEqual({ name, songVoicing: frets });
+      expect(readBack(chordWithSongVoicing(name, frets)), name).toEqual([{ name, songVoicing: frets }]);
   });
 });
+
+/** Each Chord in a Line of this text, as read. */
+function readBack(text: string) {
+  return writtenChords(text).map(readWrittenChord);
+}

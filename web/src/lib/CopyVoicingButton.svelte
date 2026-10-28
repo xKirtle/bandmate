@@ -1,7 +1,7 @@
 <script lang="ts">
   // Copies a guitar Voicing as a Song Voicing: an icon button that puts the
-  // Chord's name and the Voicing's frets on the clipboard, written as they go
-  // between a Chord's brackets in Write mode ("Em:x-0-9-9-x-x"). Beside it,
+  // Chord's name and the Voicing's frets on the clipboard in their brackets,
+  // ready to paste into a Line in Write mode ("[Em:x-0-9-9-x-x]"). Beside it,
   // a word says it was copied, or that the browser didn't allow it. The
   // Chord Finder puts it beside Hear and Arpeggiate, on the guitar only.
   import Copy from '@lucide/svelte/icons/copy';
@@ -38,7 +38,7 @@
     type="button"
     class="icon"
     aria-label="Copy {text} as a Song Voicing"
-    title="Copy {text}, to paste between a Chord's brackets in a Song"
+    title="Copy {text}, to paste into a Line in Write mode"
     onclick={copy}><Copy /></button
   >
   <span class="status" class:muted={status === 'copied'} class:error={status === 'failed'} role="status">
