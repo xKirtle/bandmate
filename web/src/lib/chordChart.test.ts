@@ -19,7 +19,7 @@ let nextId = 1;
 function written(text: string): Chord {
   const chord = readWrittenChord(text);
   if (!chord) throw new Error(`${text} isn't a Chord`);
-  return { offset: 0, name: chord.name, ...(chord.voicing && { voicing: [...chord.voicing] }) };
+  return { offset: 0, name: chord.name, ...(chord.songVoicing && { songVoicing: chord.songVoicing }) };
 }
 
 /** A Chord as shown, by its name alone. */
@@ -185,7 +185,6 @@ describe('the Voicing the Chord Chart draws for a Chord', () => {
     expect(chartVoicing(em, { ...guitar, preferred: { Em: [0, 2, 2, 0, 0, 0] } })).toEqual({
       kind: 'voicing',
       voicing: { frets: [null, 0, 9, 9, null, null] },
-      songVoicing: true,
     });
   });
 
@@ -276,14 +275,22 @@ describe("the Voicings a Chord's popover steps through", () => {
     expect(chartVoicings(named('C'), null)).toEqual({ kind: 'unreadable-tuning' });
   });
 
-  it('puts a Song Voicing first, then the Voicings the Chord Finder lists, without it again', () => {
+  it('puts a Song Voicing first, then the Voicings the Chord Finder lists, the preferred one second', () => {
     const c = { name: 'C', songVoicing: [null, 3, 2, 0, 1, 0] };
     const found = chartVoicings(c, { ...guitar, preferred: { C: [null, 3, 5, 5, 5, 3] } });
-    expect(found).toMatchObject({ kind: 'voicings', chord: 'C', songVoicing: true, preferred: false });
+    expect(found).toMatchObject({ kind: 'voicings', chord: 'C', songVoicing: true, preferred: true });
     if (found.kind !== 'voicings') return;
     expect(found.voicings[0]).toEqual({ frets: [null, 3, 2, 0, 1, 0] });
     expect(found.voicings[1]).toMatchObject({ frets: [null, 3, 5, 5, 5, 3] });
     expect(found.voicings.filter((v) => 'frets' in v && v.frets.join() === ',3,2,0,1,0')).toHaveLength(1);
+  });
+
+  it('has no preferred Voicing second when the preferred one is the Song Voicing, or there is none', () => {
+    const c = { name: 'C', songVoicing: [null, 3, 5, 5, 5, 3] };
+    expect(chartVoicings(c, { ...guitar, preferred: { C: [null, 3, 5, 5, 5, 3] } })).toMatchObject({
+      preferred: false,
+    });
+    expect(chartVoicings(c, guitar)).toMatchObject({ preferred: false });
   });
 
   it("has only the Song Voicing to show of a Chord the Chord Finder can't read", () => {

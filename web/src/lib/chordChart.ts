@@ -3,7 +3,7 @@
 // the Chord Finder (ADR 0012), drawn as its diagrams are.
 
 import type { Song } from './api';
-import { hasChords, shownChord, songVoicingText, type ShownChord } from './chords';
+import { chordKey, hasChords, shownChord, type ShownChord } from './chords';
 import {
   chordName,
   highestKey,
@@ -37,7 +37,7 @@ export function chartChords(song: Song, transpose = 0, instrument: InstrumentNam
     for (const line of activeAlternate(section)?.lines ?? [])
       for (const chord of line.chords) {
         const shown = playedOn(shownChord(chord, transpose, song.key), instrument);
-        const way = `${chordName(shown.name) ?? shown.name}:${songVoicingText(shown.songVoicing)}`;
+        const way = chordKey({ ...shown, name: chordName(shown.name) ?? shown.name });
         if (!listed.has(way)) listed.set(way, shown);
       }
   return [...listed.values()];
@@ -113,7 +113,7 @@ export function chartKeyRange(voicings: readonly PianoVoicing[]): KeyRange {
  * on more or fewer strings than the tuning.
  */
 export type ChartVoicing =
-  | { kind: 'voicing'; voicing: Voicing; songVoicing: boolean }
+  | { kind: 'voicing'; voicing: Voicing }
   | { kind: 'unreadable-chord' }
   | { kind: 'no-voicing' }
   | { kind: 'unreadable-tuning' }
@@ -126,7 +126,7 @@ export function chartVoicing(chord: ShownChord, context: FinderContext | null): 
   const found = chartVoicings(chord, context);
   if (found.kind !== 'voicings') return found;
   const voicing = found.voicings[0];
-  return voicing ? { kind: 'voicing', voicing, songVoicing: found.songVoicing } : { kind: 'no-voicing' };
+  return voicing ? { kind: 'voicing', voicing } : { kind: 'no-voicing' };
 }
 
 /**
@@ -135,7 +135,8 @@ export function chartVoicing(chord: ShownChord, context: FinderContext | null): 
  * as the Chord Finder lists them; on the guitar, its Song Voicing before
  * them, if it has one, and not again among them. With the Chord's name as
  * the Chord Finder reads it, the name preferring one names it by, whether
- * the first is the Song Voicing, and whether it's preferred. Or why there
+ * the first is the Song Voicing, and whether the first of the Chord's own,
+ * after any Song Voicing, is preferred. Or why there
  * are none to step through: the Chord or the guitar's tuning can't be read,
  * or the Song Voicing is on more or fewer strings than the tuning. A Chord
  * the Chord Finder can't read still has its Song Voicing to show.
@@ -168,7 +169,8 @@ export function chartVoicings(chord: ShownChord, context: FinderContext | null):
     kind: 'voicings',
     chord: found.kind === 'chord' ? found.name : chord.name,
     voicings: [writtenVoicing(frets), ...others],
-    preferred: false,
+    // The preferred one comes first among the Chord's own, unless it's the Song Voicing.
+    preferred: found.kind === 'chord' && found.preferred && others[0] === own[0],
     songVoicing: true,
   };
 }

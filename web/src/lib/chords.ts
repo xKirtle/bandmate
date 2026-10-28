@@ -14,18 +14,17 @@ export interface ShownChord {
 
 /** A Chord as shown when transposed by semitones, spelled from the Song's key. */
 export function shownChord(chord: Chord, transpose = 0, key = ''): ShownChord {
-  const songVoicing = transpose === 0 && chord.voicing ? chord.voicing : null;
+  const songVoicing = transpose === 0 && chord.songVoicing ? chord.songVoicing : null;
   return { name: transposeChord(chord.name, transpose, key), songVoicing };
 }
 
-/** Whether two Chords as shown are the same, by name and Song Voicing, as one popover shows them. */
-export function sameChord(a: ShownChord, b: ShownChord): boolean {
-  return a.name === b.name && songVoicingText(a.songVoicing) === songVoicingText(b.songVoicing);
-}
-
-/** A Song Voicing written with dashes, as it can always be written ("x-0-9-9-x-x"), or empty for none. */
-export function songVoicingText(frets: Frets | null): string {
-  return frets?.map((f) => f ?? 'x').join('-') ?? '';
+/**
+ * A Chord as shown, as a key: the same for two Chords of the same name played
+ * the same way, its Song Voicing written with dashes, as it always can be
+ * ("Em:x-0-9-9-x-x"), or none ("Em:").
+ */
+export function chordKey({ name, songVoicing }: ShownChord): string {
+  return `${name}:${songVoicing?.map((f) => f ?? 'x').join('-') ?? ''}`;
 }
 
 /** A run of lyrics with the Chords (if any) that sit above its first character, in order. */

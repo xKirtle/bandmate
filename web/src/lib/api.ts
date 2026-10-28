@@ -1,6 +1,7 @@
 // The SPA's only way to talk to the server. It renders what the API returns
 // and sends user intents back; domain rules live on the server.
 import { sendWithProgress, type UploadOptions } from './progressUpload';
+import type { Frets } from './guitar';
 
 export type Status = 'idea' | 'drafting' | 'finished' | 'shelved';
 
@@ -124,7 +125,7 @@ export interface Chord {
   offset: number;
   name: string;
   /** Its Song Voicing, if it's written with one: each string's fret, low string to high, counted from the capo, null for muted. */
-  voicing?: (number | null)[];
+  songVoicing?: Frets;
 }
 
 /** One Cue's value: a Line's; null for none. */

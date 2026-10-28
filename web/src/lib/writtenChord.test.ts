@@ -5,16 +5,16 @@ import { readWrittenChord } from './writtenChord';
 describe('readWrittenChord', () => {
   it('reads a Chord name', () => {
     for (const name of ['A', 'C#', 'Bb', 'F♯', 'Am', 'Cmaj7', 'Bm7b5', 'Fm(maj7)', 'E7(#9)', 'C6/9', 'A6/9/E', 'D/F#'])
-      expect(readWrittenChord(name)).toEqual({ name, voicing: null });
+      expect(readWrittenChord(name)).toEqual({ name, songVoicing: null });
   });
 
   it('reads a Chord with its Song Voicing, written one character a fret or parted by dashes', () => {
-    expect(readWrittenChord('Em:00002x')).toEqual({ name: 'Em', voicing: [0, 0, 0, 0, 2, null] });
-    expect(readWrittenChord('Em:0-0-0-0-2-x')).toEqual({ name: 'Em', voicing: [0, 0, 0, 0, 2, null] });
-    expect(readWrittenChord('A:x-12-14-14-13-x')).toEqual({ name: 'A', voicing: [null, 12, 14, 14, 13, null] });
-    expect(readWrittenChord('Em:x-0-9-9-x-x')).toEqual({ name: 'Em', voicing: [null, 0, 9, 9, null, null] });
-    expect(readWrittenChord('D/F#:2x0232')).toEqual({ name: 'D/F#', voicing: [2, null, 0, 2, 3, 2] });
-    expect(readWrittenChord('C:x3201')).toEqual({ name: 'C', voicing: [null, 3, 2, 0, 1] });
+    expect(readWrittenChord('Em:00002x')).toEqual({ name: 'Em', songVoicing: [0, 0, 0, 0, 2, null] });
+    expect(readWrittenChord('Em:0-0-0-0-2-x')).toEqual({ name: 'Em', songVoicing: [0, 0, 0, 0, 2, null] });
+    expect(readWrittenChord('A:x-12-14-14-13-x')).toEqual({ name: 'A', songVoicing: [null, 12, 14, 14, 13, null] });
+    expect(readWrittenChord('Em:x-0-9-9-x-x')).toEqual({ name: 'Em', songVoicing: [null, 0, 9, 9, null, null] });
+    expect(readWrittenChord('D/F#:2x0232')).toEqual({ name: 'D/F#', songVoicing: [2, null, 0, 2, 3, 2] });
+    expect(readWrittenChord('C:x3201')).toEqual({ name: 'C', songVoicing: [null, 3, 2, 0, 1] });
   });
 
   it("reads nothing whose name or frets can't be read", () => {

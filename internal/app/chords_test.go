@@ -101,28 +101,28 @@ func TestBracketedTextThatIsNotAChordStaysInTheLyrics(t *testing.T) {
 	}
 }
 
-// frets is a Song Voicing as the API returns it, from each string's fret, x for a muted one.
+// frets is a Song Voicing as the API returns it, from each string's fret, muted for a muted one.
 func frets(of ...int) []*int {
 	voicing := make([]*int, len(of))
 	for i, f := range of {
-		if f != x {
+		if f != muted {
 			voicing[i] = &f
 		}
 	}
 	return voicing
 }
 
-// x is a muted string, for frets.
-const x = -1
+// muted is a muted string, for frets.
+const muted = -1
 
 func TestAChordCanCarryASongVoicing(t *testing.T) {
 	cases := map[string]chord{
-		"Em:00002x":         {Offset: 3, Name: "Em", Voicing: frets(0, 0, 0, 0, 2, x)},
-		"Em:0-0-0-0-2-x":    {Offset: 3, Name: "Em", Voicing: frets(0, 0, 0, 0, 2, x)},
-		"A:x-12-14-14-13-x": {Offset: 3, Name: "A", Voicing: frets(x, 12, 14, 14, 13, x)},
-		"Em:x-0-9-9-x-x":    {Offset: 3, Name: "Em", Voicing: frets(x, 0, 9, 9, x, x)},
-		"D/F#:2x0232":       {Offset: 3, Name: "D/F#", Voicing: frets(2, x, 0, 2, 3, 2)},
-		"C:x3201":           {Offset: 3, Name: "C", Voicing: frets(x, 3, 2, 0, 1)},
+		"Em:00002x":         {Offset: 3, Name: "Em", SongVoicing: frets(0, 0, 0, 0, 2, muted)},
+		"Em:0-0-0-0-2-x":    {Offset: 3, Name: "Em", SongVoicing: frets(0, 0, 0, 0, 2, muted)},
+		"A:x-12-14-14-13-x": {Offset: 3, Name: "A", SongVoicing: frets(muted, 12, 14, 14, 13, muted)},
+		"Em:x-0-9-9-x-x":    {Offset: 3, Name: "Em", SongVoicing: frets(muted, 0, 9, 9, muted, muted)},
+		"D/F#:2x0232":       {Offset: 3, Name: "D/F#", SongVoicing: frets(2, muted, 0, 2, 3, 2)},
+		"C:x3201":           {Offset: 3, Name: "C", SongVoicing: frets(muted, 3, 2, 0, 1)},
 	}
 	for text, want := range cases {
 		t.Run(text, func(t *testing.T) {
@@ -161,7 +161,7 @@ func showChords(chords []chord) string {
 	var b strings.Builder
 	for _, c := range chords {
 		fmt.Fprintf(&b, "{%d %s", c.Offset, c.Name)
-		for _, f := range c.Voicing {
+		for _, f := range c.SongVoicing {
 			if f == nil {
 				b.WriteString(" x")
 			} else {

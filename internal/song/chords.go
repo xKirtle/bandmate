@@ -14,10 +14,10 @@ type Chord struct {
 	// equal the lyrics' length, for a Chord at the end of the Line.
 	Offset int    `json:"offset"`
 	Name   string `json:"name"`
-	// Voicing is the Chord's Song Voicing, if it's written with one: each
+	// SongVoicing is the Chord's Song Voicing, if it's written with one: each
 	// string's fret, low string to high, counted from the capo, nil for a
 	// muted string.
-	Voicing []*int `json:"voicing,omitempty"`
+	SongVoicing []*int `json:"songVoicing,omitempty"`
 }
 
 // chordName is the chord grammar: a root A–G, an optional sharp or flat, an
@@ -78,7 +78,7 @@ func cutChord(text string) (chord Chord, rest string, ok bool) {
 	}
 	chord = Chord{Name: name}
 	if hasFrets {
-		if chord.Voicing, ok = readSongVoicing(frets); !ok {
+		if chord.SongVoicing, ok = readSongVoicing(frets); !ok {
 			return Chord{}, "", false
 		}
 	}
@@ -99,10 +99,8 @@ func readSongVoicing(text string) ([]*int, bool) {
 		if w == "x" {
 			continue
 		}
-		fret, err := strconv.Atoi(w)
-		if err != nil {
-			return nil, false
-		}
+		// songVoicing only lets through frets of one or two digits.
+		fret, _ := strconv.Atoi(w)
 		frets[i] = &fret
 	}
 	return frets, true

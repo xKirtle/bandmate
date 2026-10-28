@@ -17,7 +17,7 @@ const songVoicing = new RegExp(`^(?:[0-9x]+|${fret}(?:-${fret})+)$`);
 /** A Chord as written: its name, and its Song Voicing's frets, or null when it's written without one. */
 export interface WrittenChord {
   name: string;
-  voicing: Frets | null;
+  songVoicing: Frets | null;
 }
 
 /** The Chord written between a pair of brackets, or null when its name or its frets can't be read, so it stays in the lyrics. */
@@ -25,9 +25,9 @@ export function readWrittenChord(text: string): WrittenChord | null {
   const colon = text.indexOf(':');
   const name = colon < 0 ? text : text.slice(0, colon);
   if (!chordName.test(name)) return null;
-  if (colon < 0) return { name, voicing: null };
+  if (colon < 0) return { name, songVoicing: null };
   const frets = text.slice(colon + 1);
   if (!songVoicing.test(frets)) return null;
   const written = frets.includes('-') ? frets.split('-') : Array.from(frets);
-  return { name, voicing: written.map((f) => (f === 'x' ? null : Number(f))) };
+  return { name, songVoicing: written.map((f) => (f === 'x' ? null : Number(f))) };
 }

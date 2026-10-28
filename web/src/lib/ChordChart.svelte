@@ -6,10 +6,10 @@
   // tuning), or the top-ranked one, as the Chord Finder would; on the guitar,
   // untransposed, a Chord with a Song Voicing draws that instead, a card for
   // each way a name is played, and none for one on more or fewer strings
-  // than the tuning. On the piano,
-  // every card draws the same keys, the whole octaves just covering every
-  // key any of them presses, so they line up. A Chord that can't be read, or
-  // has no Voicing, keeps its place as its name over an empty frame; on the
+  // than the tuning. On the piano, every card draws the same keys, the whole
+  // octaves just covering every key any of them presses, so they line up. A
+  // Chord that can't be read, or has no Voicing, keeps its place as its name
+  // over an empty frame, as one whose Song Voicing doesn't fit does; on the
   // guitar, a tuning that can't be read gets no diagrams at all, rather than
   // a guess, while the piano has no tuning, so the Song's doesn't matter.
   // Hidden, it isn't drawn at all; it's hidden, shown and pinned to the top
@@ -21,7 +21,7 @@
   import type { ChordOpener } from './ChordPopover.svelte';
   import { chartChords, chartContext, chartKeyRange, chartVoicing } from './chordChart';
   import { isPianoVoicing, whiteKeys } from './chordFinder';
-  import { songVoicingText } from './chords';
+  import { chordKey } from './chords';
   import PianoDiagram from './PianoDiagram.svelte';
   import { chartSize } from './sharedChartSize.svelte';
   import { chordChartState } from './sharedChordChartState.svelte';
@@ -49,8 +49,7 @@
       const drawn = chartVoicing(listedChord, preferring);
       return {
         shown: listedChord,
-        name: listedChord.name,
-        key: `${listedChord.name}:${songVoicingText(listedChord.songVoicing)}`,
+        key: chordKey(listedChord),
         voicing: drawn.kind === 'voicing' ? drawn.voicing : null,
         why:
           drawn.kind === 'song-voicing-strings'
@@ -105,22 +104,22 @@
               type="button"
               class="chord"
               aria-haspopup="dialog"
-              title="Open {chord.name}'s diagram"
+              title="Open {chord.shown.name}'s diagram"
               onclick={(e) => opener?.press(chord.shown, e.currentTarget)}
             >
-              <span class="name" title={chord.name}>{chord.name}</span>
+              <span class="name" title={chord.shown.name}>{chord.shown.name}</span>
               {#if chord.voicing && isPianoVoicing(chord.voicing)}
                 <!-- Read out low to high, e.g. "B7 on the piano: B3 D#4 F#4 A4". -->
                 <PianoDiagram
                   pressed={chord.voicing.keys}
                   lowest={range.lowest}
                   highest={range.highest}
-                  label="{chord.name} on the piano: {chord.voicing.notes.join(' ')}"
+                  label="{chord.shown.name} on the piano: {chord.voicing.notes.join(' ')}"
                 />
               {:else if chord.voicing}
-                <ChordDiagram voicing={chord.voicing} name={chord.name} />
+                <ChordDiagram voicing={chord.voicing} name={chord.shown.name} />
               {:else}
-                <span class="empty" role="img" aria-label="{chord.name}: no diagram" title={chord.why}></span>
+                <span class="empty" role="img" aria-label="{chord.shown.name}: no diagram" title={chord.why}></span>
               {/if}
             </button>
           </li>

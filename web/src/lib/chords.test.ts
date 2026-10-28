@@ -12,7 +12,7 @@ const named = (...names: string[]) => names.map((name) => ({ name, songVoicing: 
 describe('layoutLine', () => {
   it('shows a Chord by its name alone, carrying its Song Voicing as written, but none once transposed', () => {
     const written = line('Hi you', [
-      { offset: 0, name: 'Em', voicing: [0, 0, 0, 0, 2, null] },
+      { offset: 0, name: 'Em', songVoicing: [0, 0, 0, 0, 2, null] },
       { offset: 3, name: 'Em' },
     ]);
     expect(layoutLine(written)).toEqual([

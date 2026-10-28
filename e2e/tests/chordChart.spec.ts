@@ -235,7 +235,10 @@ test('a Chord written with a Song Voicing shows by its name, and the Chart and i
   await expect(popover.getByRole('button', { name: 'Prefer' })).toHaveCount(0);
   await popover.getByRole('button', { name: 'Next Voicing' }).click();
   await expect(popover.getByRole('img', { name: 'Em: 0 2 2 0 0 0' })).toBeVisible();
-  await expect(popover.getByRole('button', { name: 'Prefer' })).toBeVisible();
+  await popover.getByRole('button', { name: 'Prefer' }).click();
+  await expect(popover.getByRole('img', { name: 'Em: 0 2 2 0 0 0' })).toBeVisible();
+  await expect(popover).toContainText('Preferred');
+  await expect(popover.getByRole('button', { name: 'Clear' })).toBeVisible();
 
   // On the piano, Em is played one way.
   await pickInstrument(page, 'Piano');

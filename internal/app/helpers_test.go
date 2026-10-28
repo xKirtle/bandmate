@@ -278,9 +278,9 @@ type line struct {
 type chord struct {
 	Offset int    `json:"offset"`
 	Name   string `json:"name"`
-	// Voicing is the Chord's Song Voicing: each string's fret, low string to
+	// SongVoicing is the Chord's Song Voicing: each string's fret, low string to
 	// high, nil for a muted one. Nil for a Chord written without one.
-	Voicing []*int `json:"voicing,omitempty"`
+	SongVoicing []*int `json:"songVoicing,omitempty"`
 }
 
 // sectionsByID indexes a Song's Sections by id.

@@ -1,5 +1,5 @@
 <script lang="ts" module>
-  import { sameChord, type ShownChord } from './chords';
+  import { chordKey, type ShownChord } from './chords';
 
   /** Opens a Chord's popover, from a Chord in a Line or a diagram in the Chord Chart. */
   export interface ChordOpener {
@@ -77,7 +77,9 @@
   const showing = $derived(Math.min(at, voicings.length - 1));
   const voicing = $derived(voicings[showing]);
   const isSongVoicing = $derived(found?.kind === 'voicings' && found.songVoicing && showing === 0);
-  const isPreferred = $derived(found?.kind === 'voicings' && found.preferred && showing === 0);
+  // Where the Chord's own Voicings start: after the Song Voicing, if it has one.
+  const ownFrom = $derived(found?.kind === 'voicings' && found.songVoicing ? 1 : 0);
+  const isPreferred = $derived(found?.kind === 'voicings' && found.preferred && showing === ownFrom);
   // The Instrument's samples load as the popover first opens, and as another
   // is picked while it's open, so a Hear plays at once.
   $effect(() => {
@@ -90,13 +92,13 @@
     at = (showing + by + voicings.length) % voicings.length;
   }
 
-  // Preferring the Voicing showing moves it first, so it stays showing;
-  // clearing the preference shows the top-ranked one.
+  // Preferring the Voicing showing moves it first among the Chord's own, so
+  // it stays showing; clearing the preference shows the top-ranked one.
   function prefer() {
     if (found?.kind !== 'voicings' || !context || !voicing) return;
     const on = finderInstrument(context);
     preferredVoicings.set(on, found.chord, isPreferred ? null : on.preference(voicing));
-    at = 0;
+    at = ownFrom;
   }
 
   // Arrow keys step through the Voicings too, as the buttons do.
@@ -109,7 +111,7 @@
 
   async function open(chord: ShownChord, anchor: HTMLElement, line: HTMLElement | null, by: Opened['by']) {
     clearTimeout(leaveTimer);
-    if (!opened || !sameChord(opened.chord, chord)) at = 0;
+    if (!opened || chordKey(opened.chord) !== chordKey(chord)) at = 0;
     opened = { chord, anchor, line, by };
     await tick();
     if (box && !box.matches(':popover-open')) box.showPopover();
