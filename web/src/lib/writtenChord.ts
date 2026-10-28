@@ -57,6 +57,6 @@ export function readWrittenChord(text: string): WrittenChord | null {
  * dashes, x for a muted string ("[Em:x-0-9-9-x-x]"). Dashes read whatever
  * the frets are.
  */
-export function chordWithSongVoicing(name: string, frets: Frets): string {
+export function bracketedChordWithSongVoicing(name: string, frets: Frets): string {
   return `[${name}:${frets.map((f) => f ?? 'x').join('-')}]`;
 }

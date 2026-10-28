@@ -7,7 +7,7 @@
   import Copy from '@lucide/svelte/icons/copy';
   import { copyText } from './copyText';
   import type { Frets } from './guitar';
-  import { chordWithSongVoicing } from './writtenChord';
+  import { bracketedChordWithSongVoicing } from './writtenChord';
 
   let {
     chord,
@@ -19,7 +19,7 @@
     frets: Frets;
   } = $props();
 
-  const text = $derived(chordWithSongVoicing(chord, frets));
+  const text = $derived(bracketedChordWithSongVoicing(chord, frets));
 
   let status = $state<'copied' | 'failed' | null>(null);
   let statusTimer: ReturnType<typeof setTimeout> | undefined;
