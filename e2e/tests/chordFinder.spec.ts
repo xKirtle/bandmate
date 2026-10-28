@@ -234,7 +234,7 @@ test('a guitar Voicing copies as a Song Voicing that pastes into a Song as that 
   await page.goto('/chords');
   const copy = (where: Locator) => where.getByRole('button', { name: /^Copy .* as a Song Voicing$/ });
 
-  // Look up: each Voicing copies as its name and frets, parted by dashes.
+  // Look up: each Voicing copies as its name and frets, parted by dashes, in their brackets.
   const lookUp = page.getByRole('tabpanel', { name: 'Look up' });
   await lookUp.getByRole('textbox', { name: 'Chord' }).fill('Em');
   const second = lookUp.getByRole('list', { name: 'Voicings of Em, best first' }).getByRole('listitem').nth(1);
@@ -244,7 +244,7 @@ test('a guitar Voicing copies as a Song Voicing that pastes into a Song as that 
   await copy(second).click();
   await expect(second.getByRole('status')).toHaveText('Copied');
   const copied = await lastCopied();
-  expect(copied).toBe('Em:' + frets.split(' ').join('-'));
+  expect(copied).toBe('[Em:' + frets.split(' ').join('-') + ']');
 
   // Name it: the shape placed, by whichever name it's copied with.
   await page.getByRole('tab', { name: 'Name it' }).click();
@@ -259,12 +259,12 @@ test('a guitar Voicing copies as a Song Voicing that pastes into a Song as that 
   await expect(readings).toHaveText(['Am', 'C6/A']);
   await copy(readings.nth(1)).click();
   await expect(readings.nth(1).getByRole('status')).toHaveText('Copied');
-  expect(await lastCopied()).toBe('C6/A:x-0-2-2-1-0');
+  expect(await lastCopied()).toBe('[C6/A:x-0-2-2-1-0]');
 
   // Suggest: its Voicings copy too.
   await page.getByRole('tab', { name: 'Suggest' }).click();
   const suggest = page.getByRole('tabpanel', { name: 'Suggest' });
-  await expect(copy(suggest).first()).toHaveAccessibleName(/^Copy \S+:[x0-9]+(-[x0-9]+)+ as a Song Voicing$/);
+  await expect(copy(suggest).first()).toHaveAccessibleName(/^Copy \[\S+:[x0-9]+(-[x0-9]+)+\] as a Song Voicing$/);
 
   // On the piano, there's nothing to copy.
   await pickInstrument(page, 'Piano');
@@ -274,7 +274,7 @@ test('a guitar Voicing copies as a Song Voicing that pastes into a Song as that 
   }
   await pickInstrument(page, 'Guitar');
 
-  // Pasted into a bracket in Write mode, it reads back as Em with that Song Voicing.
+  // Pasted into a Line in Write mode as copied, it reads back as Em with that Song Voicing.
   const song = await bandmate.song({ title: 'Pasted' });
   const sheet = await bandmate.addSection(song.id, 'Verse');
   await bandmate.setLines(song.id, sheet.sections[0].alternates[0].id, 'la');
@@ -282,10 +282,8 @@ test('a guitar Voicing copies as a Song Voicing that pastes into a Song as that 
   const lines = page.getByRole('article', { name: 'Verse' }).getByRole('textbox', { name: 'Lines' });
   await lines.click();
   await lines.press('Home');
-  await page.keyboard.type('[');
   await page.keyboard.insertText(copied!);
-  await page.keyboard.type(']');
-  await expect(lines).toHaveValue(`[${copied}]la`);
+  await expect(lines).toHaveValue(`${copied}la`);
   await page.getByRole('radio', { name: 'Read' }).check();
   const verse = page.getByRole('region', { name: 'Lyric Sheet' }).getByRole('region', { name: 'Verse' });
   await expect(verse.getByText('Em', { exact: true })).toBeVisible();

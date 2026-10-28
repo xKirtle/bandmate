@@ -246,6 +246,29 @@ test('a Chord written with a Song Voicing shows by its name, and the Chart and i
   await expect(chart(page).getByRole('img')).toHaveCount(2);
 });
 
+test("Write mode's hint shows a Chord written plain and with a Song Voicing, and the second reads back as one", async ({
+  page,
+  bandmate,
+}) => {
+  const song = await bandmate.song({ title: 'Hinted' });
+  const sheet = await bandmate.addSection(song.id, 'Verse');
+  await page.goto(`/songs/${song.id}`);
+  const examples = page.getByText(/^Put Chords in brackets/).locator('code');
+  await expect(examples).toHaveText(['Hel[Am]lo', 'Hel[Am:x02210]lo']);
+
+  // Written as the hint shows, it reads as Am, and the Chart draws the Song's Voicing.
+  await bandmate.setLines(song.id, sheet.sections[0].alternates[0].id, (await examples.nth(1).textContent())!);
+  await page.reload();
+  await page.getByRole('radio', { name: 'Read' }).check();
+  const verse = page.getByRole('region', { name: 'Lyric Sheet' }).getByRole('region', { name: 'Verse' });
+  await expect(verse.getByText('Am', { exact: true })).toBeVisible();
+  await expect(verse).not.toContainText('[');
+  await expect(verse).not.toContainText('x02210');
+  await expect(chart(page).getByRole('img')).toHaveAccessibleName('Am: x 0 2 2 1 0');
+  await chart(page).getByRole('button').click();
+  await expect(page.getByRole('dialog', { name: 'Am diagram' })).toContainText('This Song’s');
+});
+
 test("a name played two ways numbers its diagrams and its Chords to match, until it's transposed", async ({
   page,
   bandmate,

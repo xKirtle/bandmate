@@ -52,10 +52,11 @@ export function readWrittenChord(text: string): WrittenChord | null {
 }
 
 /**
- * A Chord written with a Song Voicing, as it goes between brackets: its
- * name, a colon and its frets low string to high, parted by dashes, x for a
- * muted string ("Em:x-0-9-9-x-x"). Dashes read whatever the frets are.
+ * A Chord written with a Song Voicing, brackets and all, ready to paste into
+ * a Line: its name, a colon and its frets low string to high, parted by
+ * dashes, x for a muted string ("[Em:x-0-9-9-x-x]"). Dashes read whatever
+ * the frets are.
  */
-export function chordWithSongVoicing(name: string, frets: Frets): string {
-  return `${name}:${frets.map((f) => f ?? 'x').join('-')}`;
+export function bracketedChordWithSongVoicing(name: string, frets: Frets): string {
+  return `[${name}:${frets.map((f) => f ?? 'x').join('-')}]`;
 }
