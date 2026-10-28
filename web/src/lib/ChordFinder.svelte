@@ -3,7 +3,9 @@
   // page shows them, on the Instrument picked there: a Voicing is drawn as a
   // Chord diagram on the guitar and a keyboard on the piano. Switching
   // Instruments keeps the Chord looked up and the Key suggested from. It
-  // lays itself out by its own width, not the window's.
+  // lays itself out by its own width, not the window's. On the guitar, each
+  // Voicing shown can be copied as a Song Voicing, and the shape placed in
+  // Name it by any of its readings.
   import { tick } from 'svelte';
   import ChordDiagram from './ChordDiagram.svelte';
   import {
@@ -34,6 +36,7 @@
   import Fretboard from './Fretboard.svelte';
   import HearButton from './HearButton.svelte';
   import ArpeggiateButton from './ArpeggiateButton.svelte';
+  import CopyVoicingButton from './CopyVoicingButton.svelte';
   import { prepareToHear } from './hear';
   import { preferredVoicings } from './sharedPreferredVoicings.svelte';
   import PianoDiagram from './PianoDiagram.svelte';
@@ -274,6 +277,9 @@
           <div class="voicing-actions">
             <HearButton chord={s.chord} notes={heard} {sound} />
             <ArpeggiateButton chord={s.chord} notes={heard} {sound} />
+            {#if !isPianoVoicing(voicing)}
+              <CopyVoicingButton chord={s.chord} frets={voicing.frets} />
+            {/if}
             <button
               type="button"
               class="button quiet more"
@@ -422,6 +428,7 @@
                     <div class="voicing-actions">
                       <HearButton chord={found.name} notes={heard} {sound} />
                       <ArpeggiateButton chord={found.name} notes={heard} {sound} />
+                      <CopyVoicingButton chord={found.name} frets={voicing.frets} />
                       {@render preferButton(
                         voicing,
                         preferred,
@@ -458,6 +465,9 @@
                       title="Look up how to play {reading}"
                       onclick={() => openInLookUp(reading)}>{reading}</button
                     >
+                    {#if !piano}
+                      <CopyVoicingButton chord={reading} frets={placed} />
+                    {/if}
                   </li>
                 {/each}
               </ol>
@@ -734,6 +744,11 @@
     margin: 0;
     padding: 0;
     list-style: none;
+  }
+  /* A reading, and on the guitar its Copy beside it, to copy the shape placed by that name. */
+  .readings li {
+    display: flex;
+    align-items: center;
   }
   .reading {
     min-height: 2rem;

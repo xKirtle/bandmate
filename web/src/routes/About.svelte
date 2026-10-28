@@ -14,6 +14,7 @@
   } from '../lib/api';
   import { bugReportDetails, updateStatus, uptime, ytDlpOffer, ytDlpUpdated } from '../lib/about';
   import BrandMark from '../lib/BrandMark.svelte';
+  import { copyText } from '../lib/copyText';
   import FoldChevron from '../lib/FoldChevron.svelte';
   import SettingsPage from '../lib/SettingsPage.svelte';
   import { formatDay } from '../lib/time';
@@ -132,32 +133,8 @@
   async function copyDetails(details: string) {
     const text = bugReportDetails(details, navigator.userAgent, ytDlp?.version);
     clearTimeout(copyStatusTimer);
-    copyStatus = (await copy(text)) ? 'copied' : 'failed';
+    copyStatus = (await copyText(text)) ? 'copied' : 'failed';
     if (copyStatus === 'copied') copyStatusTimer = setTimeout(() => (copyStatus = null), 2000);
-  }
-
-  /** Puts text on the clipboard, falling back to the old way where the
-      Clipboard API isn't offered, e.g. over plain HTTP on a local network. */
-  async function copy(text: string): Promise<boolean> {
-    try {
-      await navigator.clipboard.writeText(text);
-      return true;
-    } catch {
-      const area = document.createElement('textarea');
-      area.value = text;
-      area.setAttribute('readonly', '');
-      area.style.position = 'fixed';
-      area.style.opacity = '0';
-      document.body.append(area);
-      area.select();
-      try {
-        return document.execCommand('copy');
-      } catch {
-        return false;
-      } finally {
-        area.remove();
-      }
-    }
   }
 
   const tabs = [
