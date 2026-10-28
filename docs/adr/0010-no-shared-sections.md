@@ -9,3 +9,5 @@ Without sharing, a Line is sung at one time, so a Cue lives on the Line itself. 
 Considered and rejected: keeping sharing and storing Cues as offsets from the start of their Section plus a start time per Occurrence. It would let Cues travel with Lines while keeping sharing, but assumes a shared Section is sung at the same pace every time and would have reversed ADR 0009 and reworked Sync mode.
 
 Existing shared Sections are split by keeping each one's first appearance and deleting the others, as the app was still in development and its data disposable. Paste-import no longer shares either: a repeated labelled Section becomes its own Section, and a heading on its own becomes a Duplicate of the most recent Section with that Label.
+
+_(Paste Import was removed in #658: nobody used it. Songs are made with New Song, or brought back from a Backup.)_

@@ -5,3 +5,5 @@ Supersedes the Occurrence-level Cue of ADR 0005. An Occurrence used to have a Cu
 Existing Occurrence Cues move to their first Line when it has none; those of Occurrences with no Lines are dropped. Import still reads a timestamp on a heading (`[00:30.0][Chorus]`, #139) and gives it to the Section's first Line. A heading timestamp with no Line under it, or one that differs from the first Line's, rejects the paste (ADR 0008).
 
 _(Since ADR 0010 there are no Occurrences: a Section starts where its first Line is cued.)_
+
+_(Paste Import was removed in #658: nobody used it. Songs are made with New Song, or brought back from a Backup.)_
