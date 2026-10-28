@@ -469,7 +469,7 @@
       {/if}
     </div>
     <p class="hint muted">
-      Put Chords in brackets where they fall: <code>Hel[Am]lo</code>, or with their frets:
+      Put Chords in brackets where they fall: <code>Hel[Am]lo</code>, or for guitar, with its frets:
       <code>Hel[Am:x02210]lo</code>.
     </p>
     <!-- What a Print shows in place of the editors: the Lyric Sheet as
