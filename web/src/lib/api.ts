@@ -123,6 +123,8 @@ export interface Chord {
   /** Characters (Unicode code points, not UTF-16 units) into the lyrics; may equal their length. */
   offset: number;
   name: string;
+  /** Its Song Voicing, if it's written with one: each string's fret, low string to high, counted from the capo, null for muted. */
+  voicing?: (number | null)[];
 }
 
 /** One Cue's value: a Line's; null for none. */

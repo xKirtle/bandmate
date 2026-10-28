@@ -1,9 +1,36 @@
-import type { Line, Song } from './api';
+import type { Chord, Line, Song } from './api';
+import type { Frets } from './guitar';
 import { transposeChord } from './transpose';
+
+/**
+ * A Chord as Read mode shows it: its name, transposed, and the Song Voicing
+ * it's played with, if it's written with one and isn't transposed. Moved to
+ * another key, a Song Voicing falls away.
+ */
+export interface ShownChord {
+  name: string;
+  songVoicing: Frets | null;
+}
+
+/** A Chord as shown when transposed by semitones, spelled from the Song's key. */
+export function shownChord(chord: Chord, transpose = 0, key = ''): ShownChord {
+  const songVoicing = transpose === 0 && chord.voicing ? chord.voicing : null;
+  return { name: transposeChord(chord.name, transpose, key), songVoicing };
+}
+
+/** Whether two Chords as shown are the same, by name and Song Voicing, as one popover shows them. */
+export function sameChord(a: ShownChord, b: ShownChord): boolean {
+  return a.name === b.name && songVoicingText(a.songVoicing) === songVoicingText(b.songVoicing);
+}
+
+/** A Song Voicing written with dashes, as it can always be written ("x-0-9-9-x-x"), or empty for none. */
+export function songVoicingText(frets: Frets | null): string {
+  return frets?.map((f) => f ?? 'x').join('-') ?? '';
+}
 
 /** A run of lyrics with the Chords (if any) that sit above its first character, in order. */
 export interface Piece {
-  chords: string[];
+  chords: ShownChord[];
   text: string;
   /**
    * The Chords fall between words, and what comes straight after isn't a
@@ -25,14 +52,14 @@ export function layoutLine(line: Line, transpose = 0, key = ''): Piece[][] {
   // Offsets count code points, which Array.from splits on.
   const chars = Array.from(line.lyrics);
   const isSpace = (i: number) => i >= 0 && i < chars.length && /\s/.test(chars[i]);
-  const chordsAt = new Map<number, string[]>();
+  const chordsAt = new Map<number, ShownChord[]>();
   for (const c of line.chords)
-    chordsAt.set(c.offset, [...(chordsAt.get(c.offset) ?? []), transposeChord(c.name, transpose, key)]);
+    chordsAt.set(c.offset, [...(chordsAt.get(c.offset) ?? []), shownChord(c, transpose, key)]);
 
   // The Chords whose Piece starts at each character, and whether they fall
   // between words. A Chord Line's Chords sit on spaces too, but it has no
   // words to fall between, so its Chords stay as they are.
-  const chordPieceAt = new Map<number, { chords: string[]; isBetween: boolean }>();
+  const chordPieceAt = new Map<number, { chords: ShownChord[]; isBetween: boolean }>();
   for (const [offset, chords] of chordsAt) {
     const isBetween = !line.chordLine && isSpace(offset);
     let start = offset;

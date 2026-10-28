@@ -143,6 +143,15 @@ function guitarVoicings(chord: Chord, tuning: readonly number[]): GuitarVoicing[
 }
 
 /**
+ * A Song Voicing as a Voicing to draw: its frets as written, on the barre
+ * it needs if it can't be played with four fingers otherwise. One that can't
+ * be played either way is still drawn as written, with no barre.
+ */
+export function writtenVoicing(frets: Frets): GuitarVoicing {
+  return { frets: [...frets], ...barreFor([...frets]) };
+}
+
+/**
  * The fret a chord diagram of a Voicing starts at, its first of `rows` rows:
  * a barre's fret, so the barre lies on the first row; else 1, under the nut,
  * for a Voicing that fits there; else the lowest fret the Voicing presses.

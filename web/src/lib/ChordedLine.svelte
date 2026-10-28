@@ -5,7 +5,7 @@
   // tool, such as the Snapshots dialog.
   import type { Attachment } from 'svelte/attachments';
   import type { Line } from './api';
-  import { layoutLine } from './chords';
+  import { layoutLine, type ShownChord } from './chords';
 
   let {
     line,
@@ -21,7 +21,7 @@
     transpose?: number;
     songKey?: string;
     /** Given, attached to each Chord's name, e.g. to open its diagram. */
-    chord?: (name: string) => Attachment<HTMLElement>;
+    chord?: (chord: ShownChord) => Attachment<HTMLElement>;
     /** Read mode's lyric sizes, or body text's. */
     sizes?: 'read' | 'body';
   } = $props();
@@ -36,8 +36,8 @@
         {#each word as piece, p (p)}
           <span class="piece" class:snug={piece.snug}>
             <span class="chord"
-              >{#each piece.chords as name, c (c)}{#if c > 0}{' '}{/if}<span {@attach chord ? chord(name) : none}
-                  >{name}</span
+              >{#each piece.chords as shown, c (c)}{#if c > 0}{' '}{/if}<span {@attach chord ? chord(shown) : none}
+                  >{shown.name}</span
                 >{/each}</span
             >
             <span class="lyric">{piece.text || ' '}</span>
