@@ -22,12 +22,14 @@ describe('transposeChord', () => {
     expect(transposeChord('Dsus4', -2)).toBe('Csus4');
     expect(transposeChord('Cadd9(#11)', 5)).toBe('Fadd9(#11)');
     expect(transposeChord('C6/9', 2)).toBe('D6/9');
+    expect(transposeChord('CmMaj7', 2)).toBe('DmMaj7');
   });
 
   it("moves a slash chord's bass note too", () => {
     expect(transposeChord('F#m7/C#', 2)).toBe('Abm7/Eb');
     expect(transposeChord('C/E', -1)).toBe('B/Eb');
     expect(transposeChord('G/B♭', 2)).toBe('A/C');
+    expect(transposeChord('CmMaj7/G', 2)).toBe('DmMaj7/A');
   });
 
   it("leaves a name that doesn't start with a readable note as written", () => {

@@ -6,7 +6,7 @@
 import type { Frets } from './guitar';
 
 const note = '[A-G][#b♯♭]?';
-const token = '(?:maj|min|ma|mi|dim|aug|sus|add|alt|m|M|\\+|-|°|ø|Δ|6/9|[#b♯♭]?[0-9]+)';
+const token = '(?:maj|Maj|min|ma|mi|dim|aug|sus|add|alt|m|M|\\+|-|°|ø|Δ|6/9|[#b♯♭]?[0-9]+)';
 const chordName = new RegExp(`^${note}(?:${token}|\\((?:${token}|,)+\\))*(?:/${note})?$`, 'u');
 
 // Each string's fret, low string to high, x for a muted one: one character a

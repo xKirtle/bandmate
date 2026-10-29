@@ -67,8 +67,8 @@ func TestChordNamesFollowTheChordGrammar(t *testing.T) {
 		"C#", "Bb", "F♯", "E♭",
 		"Am", "Cmaj7", "Dm7", "G7", "Esus4", "Asus2", "Cadd9", "Bdim", "Caug", "C+",
 		"Bm7b5", "G13", "C6", "Dmin", "Fm(maj7)", "E7(#9)", "C7alt", "A5", "Bø", "C°7",
-		"C6/9", "Cmi7", "Cma7", "A6/9/E",
-		"D/F#", "G/B", "Am7/G", "C#m/G#", "Bb/Ab",
+		"C6/9", "Cmi7", "Cma7", "A6/9/E", "CmMaj7", "CMaj7",
+		"D/F#", "G/B", "Am7/G", "C#m/G#", "Bb/Ab", "CmMaj7/G",
 	}
 	for _, name := range chords {
 		t.Run(name, func(t *testing.T) {
@@ -117,11 +117,12 @@ const muted = -1
 
 func TestAChordCanCarryASongVoicing(t *testing.T) {
 	cases := map[string]chord{
-		"Em:00002x":         {Offset: 3, Name: "Em", SongVoicing: frets(0, 0, 0, 0, 2, muted)},
-		"Em:0-0-0-0-2-x":    {Offset: 3, Name: "Em", SongVoicing: frets(0, 0, 0, 0, 2, muted)},
-		"A:x-12-14-14-13-x": {Offset: 3, Name: "A", SongVoicing: frets(muted, 12, 14, 14, 13, muted)},
-		"Em:x-0-9-9-x-x":    {Offset: 3, Name: "Em", SongVoicing: frets(muted, 0, 9, 9, muted, muted)},
-		"D/F#:2x0232":       {Offset: 3, Name: "D/F#", SongVoicing: frets(2, muted, 0, 2, 3, 2)},
+		"Em:00002x":          {Offset: 3, Name: "Em", SongVoicing: frets(0, 0, 0, 0, 2, muted)},
+		"Em:0-0-0-0-2-x":     {Offset: 3, Name: "Em", SongVoicing: frets(0, 0, 0, 0, 2, muted)},
+		"A:x-12-14-14-13-x":  {Offset: 3, Name: "A", SongVoicing: frets(muted, 12, 14, 14, 13, muted)},
+		"Em:x-0-9-9-x-x":     {Offset: 3, Name: "Em", SongVoicing: frets(muted, 0, 9, 9, muted, muted)},
+		"D/F#:2x0232":        {Offset: 3, Name: "D/F#", SongVoicing: frets(2, muted, 0, 2, 3, 2)},
+		"CmMaj7:x-3-5-4-4-3": {Offset: 3, Name: "CmMaj7", SongVoicing: frets(muted, 3, 5, 4, 4, 3)},
 		// One character a fret, so four strings, not frets 10 and 12.
 		"Em:1012": {Offset: 3, Name: "Em", SongVoicing: frets(1, 0, 1, 2)},
 		"C:x3201": {Offset: 3, Name: "C", SongVoicing: frets(muted, 3, 2, 0, 1)},
