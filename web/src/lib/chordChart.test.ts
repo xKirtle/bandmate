@@ -223,14 +223,8 @@ describe('the Voicing the Chord Chart draws for a Chord', () => {
     expect(chartVoicing(named('CmMaj7'), guitar)).toMatchObject({ kind: 'voicing' });
     expect(chartVoicing(named('CmMaj7'), guitar)).toEqual(chartVoicing(named('CmM7'), guitar));
     expect(keysOf(chartVoicing(named('CmMaj7'), piano))).toEqual([60, 63, 67, 71]);
-    expect(fretsOf(chartVoicing({ name: 'CmMaj7', songVoicing: [null, 3, 5, 4, 4, 3] }, guitar))).toEqual([
-      null,
-      3,
-      5,
-      4,
-      4,
-      3,
-    ]);
+    const frets = [null, 3, 5, 4, 4, 3];
+    expect(fretsOf(chartVoicing({ name: 'CmMaj7', songVoicing: frets }, guitar))).toEqual(frets);
   });
 
   it('draws root position on the piano, round middle C', () => {
