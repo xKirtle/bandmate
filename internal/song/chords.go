@@ -21,12 +21,12 @@ type Chord struct {
 }
 
 // chordName is the chord grammar: a root A–G, an optional sharp or flat, an
-// optional quality or extension (e.g. m, maj7, sus4, add9, m7b5, 6/9, 7(#9)), and
-// an optional slash bass note.
+// optional quality or extension (e.g. m, maj7, Maj7, sus4, add9, m7b5, 6/9,
+// 7(#9)), and an optional slash bass note.
 var chordName = func() *regexp.Regexp {
 	const (
 		note  = `[A-G][#b♯♭]?`
-		token = `(?:maj|min|ma|mi|dim|aug|sus|add|alt|m|M|\+|-|°|ø|Δ|6/9|[#b♯♭]?\d+)`
+		token = `(?:maj|Maj|min|ma|mi|dim|aug|sus|add|alt|m|M|\+|-|°|ø|Δ|6/9|[#b♯♭]?\d+)`
 	)
 	return regexp.MustCompile(`^` + note + `(?:` + token + `|\((?:` + token + `|,)+\))*(?:/` + note + `)?$`)
 }()

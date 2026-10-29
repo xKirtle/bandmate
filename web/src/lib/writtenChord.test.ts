@@ -5,8 +5,15 @@ import { bracketedChordWithSongVoicing, readWrittenChord, writtenChords } from '
 // The same cases as the server's, in internal/app/chords_test.go: the two must agree on what's a Chord.
 describe('readWrittenChord', () => {
   it('reads a Chord name', () => {
-    for (const name of ['A', 'C#', 'Bb', 'F♯', 'Am', 'Cmaj7', 'Bm7b5', 'Fm(maj7)', 'E7(#9)', 'C6/9', 'A6/9/E', 'D/F#'])
-      expect(readWrittenChord(name)).toEqual({ name, songVoicing: null });
+    const names = [
+      'A', 'B', 'C', 'D', 'E', 'F', 'G',
+      'C#', 'Bb', 'F♯', 'E♭',
+      'Am', 'Cmaj7', 'Dm7', 'G7', 'Esus4', 'Asus2', 'Cadd9', 'Bdim', 'Caug', 'C+',
+      'Bm7b5', 'G13', 'C6', 'Dmin', 'Fm(maj7)', 'E7(#9)', 'C7alt', 'A5', 'Bø', 'C°7',
+      'C6/9', 'Cmi7', 'Cma7', 'A6/9/E', 'CmMaj7', 'CMaj7',
+      'D/F#', 'G/B', 'Am7/G', 'C#m/G#', 'Bb/Ab', 'CmMaj7/G',
+    ]; // prettier-ignore
+    for (const name of names) expect(readWrittenChord(name), name).toEqual({ name, songVoicing: null });
   });
 
   it('reads a Chord with its Song Voicing, written one character a fret or parted by dashes', () => {
@@ -15,7 +22,17 @@ describe('readWrittenChord', () => {
     expect(readWrittenChord('A:x-12-14-14-13-x')).toEqual({ name: 'A', songVoicing: [null, 12, 14, 14, 13, null] });
     expect(readWrittenChord('Em:x-0-9-9-x-x')).toEqual({ name: 'Em', songVoicing: [null, 0, 9, 9, null, null] });
     expect(readWrittenChord('D/F#:2x0232')).toEqual({ name: 'D/F#', songVoicing: [2, null, 0, 2, 3, 2] });
+    expect(readWrittenChord('CmMaj7:x-3-5-4-4-3')).toEqual({ name: 'CmMaj7', songVoicing: [null, 3, 5, 4, 4, 3] });
     expect(readWrittenChord('C:x3201')).toEqual({ name: 'C', songVoicing: [null, 3, 2, 0, 1] });
+  });
+
+  it('reads every Chord name the Chord Finder gives, written in a Line', () => {
+    for (const root of roots)
+      for (const { suffix } of qualities)
+        for (const bass of ['', '/' + root]) {
+          const name = chordName(root + suffix + bass)!;
+          expect(readBack(`la [${name}]la`), name).toEqual([{ name, songVoicing: null }]);
+        }
   });
 
   it("reads nothing whose name or frets can't be read", () => {
@@ -58,10 +75,8 @@ describe('bracketedChordWithSongVoicing', () => {
 
   it('reads back for every Chord name the Chord Finder gives', () => {
     const frets = [0, 2, 2, 1, 0, 0];
-    // Not yet the minor-major seventh: the Chord Finder names it CmMaj7, which
-    // a Song doesn't read as a Chord (its reader takes maj or M, not Maj).
     for (const root of roots)
-      for (const { suffix } of qualities.filter((q) => q.suffix !== 'mMaj7'))
+      for (const { suffix } of qualities)
         for (const bass of ['', '/' + root]) {
           const name = chordName(root + suffix + bass)!;
           expect(readBack(bracketedChordWithSongVoicing(name, frets)), name).toEqual([{ name, songVoicing: frets }]);

@@ -79,6 +79,12 @@ describe('which Chords the Chord Chart lists', () => {
     expect(names(chartChords(song([verse], [leftover])))).toEqual(['G']);
   });
 
+  it('lists a Chord written with Maj like any other, transposed or not', () => {
+    const verse = section(alternate([line(['CmMaj7', 'CmM7', 'CmMaj7/G', 'CMaj7'])]));
+    expect(names(chartChords(song([verse])))).toEqual(['CmMaj7', 'CmMaj7/G', 'CMaj7']);
+    expect(names(chartChords(song([verse]), 2))).toEqual(['DmMaj7', 'DmMaj7/A', 'DMaj7']);
+  });
+
   it("lists Chord Lines' Chords", () => {
     const intro = section(alternate([line(['A', 'E'], true), line(['D'])]));
     expect(names(chartChords(song([intro])))).toEqual(['A', 'E', 'D']);
@@ -211,6 +217,14 @@ describe('the Voicing the Chord Chart draws for a Chord', () => {
   it('draws the preferred Voicing, read by its tidied name', () => {
     const drawn = chartVoicing(named('CMaj7'), { ...guitar, preferred: { Cmaj7: [null, 3, 5, 4, 5, 3] } });
     expect(fretsOf(drawn)).toEqual([null, 3, 5, 4, 5, 3]);
+  });
+
+  it('draws a Chord written with Maj, and its Song Voicing, like any other', () => {
+    expect(chartVoicing(named('CmMaj7'), guitar)).toMatchObject({ kind: 'voicing' });
+    expect(chartVoicing(named('CmMaj7'), guitar)).toEqual(chartVoicing(named('CmM7'), guitar));
+    expect(keysOf(chartVoicing(named('CmMaj7'), piano))).toEqual([60, 63, 67, 71]);
+    const frets = [null, 3, 5, 4, 4, 3];
+    expect(fretsOf(chartVoicing({ name: 'CmMaj7', songVoicing: frets }, guitar))).toEqual(frets);
   });
 
   it('draws root position on the piano, round middle C', () => {
