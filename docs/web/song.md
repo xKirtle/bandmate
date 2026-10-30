@@ -22,7 +22,7 @@ Write lyrics the way you would in a notebook, with the chords right where you pl
 
 To say how you play a chord in this song, write its frets after its name in the brackets, from the lowest string to the highest, with `x` for a string you don't play: `[Em:x-0-9-9-x-x]`, or without the dashes, `[Em:x099xx]`, while no fret is past 9.
 
-- **In print**: Read mode, and a print from it, shows only the name. A print from Write mode shows it as you typed it.
+- **What you see**: Write mode shows the frets as you typed them, and Read mode shows only the chord's name, like any other. Printing from either mode does the same.
 - **On guitar**: the shape drawn for it at the top is those frets, counted from the capo.
 - **One chord at a time**: it's that one chord's, so another `[Em]` in the song is drawn its own way. While a chord is played more than one way, its shapes at the top are numbered in the order they first come, Em ¹, Em ², and each Em over the words carries its shape's number.
 - **Transposed, or on piano**: it's drawn like any other Em, and the numbers go.
