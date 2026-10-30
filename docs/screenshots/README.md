@@ -5,9 +5,10 @@ The screenshots in the README and on the docs site, `docs/web/`, taken in the da
 | File                    | Shows                                                          |
 | ----------------------- | -------------------------------------------------------------- |
 | `write-mode.png`        | The hero Song in Write mode on desktop, with the Timeline open |
-| `write-mode-labelled.png` | The hero Song in Write mode with the Chorus's Alternates open, numbered for the key on Writing and recording: Status, Details, Write and Read, a Section's Label, Chords, a Chord Line, an Alternate, a Cue, the Scrapbook and Rhymes |
+| `write-mode-labelled.png` | The hero Song in Write mode with the Chorus's Alternates open, numbered for the key on Inside a song: Status, Details, Write and Read, a Section's Label, Chords, an Alternate, a Cue, the Scrapbook and Rhymes |
 | `timeline-labelled.png` | The hero Song's Timeline with a Loop from 0:20 to 0:40 on, the playhead in it and the Take's Clip selected, numbered: Play, Loop, the Loop's stretch, Record, Import audio, Mix down, the mic button, Add a Track, the Chosen Track, the Beat's Clip and the Take's Clip |
 | `take-menu-labelled.png` | The Take's Clip menu, numbered: Retake, Takes and Nudge |
+| `clip-menu.png` | The Beat's Clip menu, opened by right-clicking it |
 | `input-picker-labelled.png` | The mic button's popover, the default input picked and hearing Chromium's fake microphone, numbered 4 and 5: Input and Level |
 | `beat-library-labelled.png` | The Beat Library, numbered: Add from link, the search, the Beat's title, its producer, the Song using it and Edit |
 | `backups-labelled.png` | Settings' Backups holding the demo Backup, numbered: Scheduled Backups, Upload, New Backup, the Backup and Restore |
@@ -19,7 +20,9 @@ The screenshots in the README and on the docs site, `docs/web/`, taken in the da
 | `phone-lyric-sheet.png` | The hero Song in Read mode on a phone                          |
 | `chord-chart-guitar.png` | The hero Song's Chord Chart in Read mode, on the guitar |
 | `chord-chart-piano.png` | The hero Song's Chord Chart in Read mode, on the piano |
-| `read-mode.png`         | The hero Song in Read mode, with the Line playing highlighted  |
+| `read-mode-desktop.png` | The hero Song in Read mode on desktop, at rest, down to the end of Verse 1 |
+| `reading-options.png` | The reading options in Read mode, open, on their own |
+| `read-mode.webp`        | The hero Song in Read mode following the Line playing through Verse 1, animated |
 | `sync-mode.webp`        | Sync mode cueing the Bridge's Lines, animated                  |
 | `snapshots.png` | The hero Song's Snapshots, grouped into the last 24 hours, daily and weekly, the oldest Kept and open beside Now, with Verse 1's third Line rewritten since. The capture takes them just before, so it shows them as taken over weeks |
 | `rhymes.png` | The hero Song in Rhyme mode with the Chorus's second Alternate chosen, suggesting rhymes for error, its last word, with the caret after it. The capture chooses that Alternate after the Snapshots, so Verse 1 shows their rewrite, and downloads the English rhyming dictionary to that shot's browser alone |

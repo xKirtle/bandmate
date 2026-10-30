@@ -132,10 +132,10 @@ function animate(shot, name, { start, end, fps = 30, width = 1400 }) {
   await page.context().close();
 }
 
-// The numbered shots, for the wiki's Using Bandmate pages (docs/web/features.md
-// and settings.md): each number is placed beside what it names as the page is
-// captured, so it follows the UI as it changes. The key under each shot says
-// what the numbers are.
+// The numbered shots, for the wiki's Using Bandmate pages (docs/web/features.md,
+// song.md and settings.md): each number is placed beside what it names as the
+// page is captured, so it follows the UI as it changes. The key under each shot
+// says what the numbers are.
 
 /** Where an element's text ends, on its last line: the place for a number. */
 async function textEnd(locator) {
@@ -262,7 +262,6 @@ async function number(page, places, { first = 1, into } = {}) {
     ...desktop,
     viewport: { width: 1440, height: 2000 },
   });
-  const intro = page.getByRole("article", { name: "Intro" });
   const verse = page.getByRole("article", { name: "Verse 1" });
   const chorus = page.getByRole("article", { name: "Chorus" });
   const scrapbook = page.getByRole("tab", { name: "Scrapbook" });
@@ -276,7 +275,6 @@ async function number(page, places, { first = 1, into } = {}) {
     ),
     await textEnd(verse.getByRole("combobox")),
     await textEnd(verse.locator("textarea")),
-    await textEnd(intro.locator("textarea")),
     await textEnd(chorus.getByPlaceholder("Softer")),
     await rightOf(
       page.getByRole("button", { name: /^Cue for Line 1 of Verse 1/ }),
@@ -425,6 +423,28 @@ async function number(page, places, { first = 1, into } = {}) {
       y: top,
       width: list.width + 32,
       height: clip.y + clip.height + 16 - top,
+    },
+  });
+  await page.context().close();
+}
+
+// A Beat's menu on the Timeline, opened by right-clicking its Clip.
+{
+  const page = await open(heroURL);
+  const timeline = page.getByRole("region", { name: "Timeline" });
+  const beat = timeline.getByRole("group", { name: /^Lorem Click/ });
+  await beat.click({ button: "right", position: { x: 200, y: 40 } });
+  const menu = page.getByRole("menu");
+  await menu.waitFor();
+  // Measured once it has finished opening, as it grows into place.
+  await page.waitForTimeout(500);
+  const list = await menu.boundingBox();
+  await save(page, "clip-menu", {
+    clip: {
+      x: list.x - 16,
+      y: list.y - 16,
+      width: list.width + 32,
+      height: list.height + 32,
     },
   });
   await page.context().close();
@@ -653,15 +673,63 @@ for (const instrument of ["guitar", "piano"]) {
   await context.close();
 }
 
-// Read mode, with the Line playing highlighted.
+// Read mode, at rest, down to the end of Verse 1.
+{
+  // Tall enough that the Timeline sits below the shot.
+  const page = await open(heroURL, {
+    ...desktop,
+    viewport: { width: 1440, height: 2000 },
+  });
+  await readMode(page);
+  // Off the Chord Chart, which the click into Read mode leaves it over.
+  await page.mouse.move(0, 0);
+  const chorus = await page
+    .getByText("Chorus", { exact: true })
+    .first()
+    .boundingBox();
+  await save(page, "read-mode-desktop", {
+    clip: { x: 0, y: 0, width: 1440, height: chorus.y - 8 },
+  });
+  await page.context().close();
+}
+
+// Read mode's reading options, open.
 {
   const page = await open(heroURL);
   await readMode(page);
-  await play(page);
-  // Into Verse 1's second Line, cued at 0:10.
-  await page.waitForTimeout(11_500);
-  await save(page, "read-mode");
+  await page.getByRole("button", { name: "Reading", exact: true }).click();
+  const options = page.getByRole("dialog", { name: "Reading options" });
+  await options.waitFor();
+  // Off the first button, which opening it focuses.
+  await page.evaluate(() => document.activeElement.blur());
+  const box = await options.boundingBox();
+  await save(page, "reading-options", {
+    clip: { x: box.x, y: box.y, width: box.width, height: box.height },
+  });
   await page.context().close();
+}
+
+// Read mode following the Line playing through Verse 1, as an animated WebP.
+{
+  // As narrow as Sync mode's, so the two read as a pair.
+  const page = await open(heroURL, {
+    ...desktop,
+    viewport: { width: 1100, height: 880 },
+  });
+  await readMode(page);
+  await play(page);
+  const playing = Date.now();
+  // From just before Verse 1's first Line, cued at 0:05, past its third, at
+  // 0:15, so the highlight moves down twice.
+  const start = playing + 4_000;
+  const end = playing + 16_500;
+
+  await page.waitForTimeout(start - 500 - Date.now());
+  const stop = await screencast(page, "read-mode");
+  await page.waitForTimeout(end - Date.now());
+  const shot = await stop();
+  await page.context().close();
+  animate(shot, "read-mode", { start, end });
 }
 
 // Sync mode cueing the Bridge's Lines, as an animated WebP.
