@@ -134,7 +134,11 @@ Every song has a timeline: its beat, your takes and any other audio, laid out on
 
 Undo takes back everything you typed in a section's lines, its label or an alternate's name since you clicked in, in one go. While you're still in the box, Ctrl+Z undoes your typing a bit at a time, as in any text box.
 
-A clip's **⋯** menu sets its **tempo** and **pitch**, each on its own or both together: slow a beat down to write over it, or move it a couple of semitones to suit your voice. Select several clips to change them all at once. The file itself is never changed, so you can always set them again, or reset them.
+Right-click a clip, or press its **⋯**, for its menu:
+
+<img class="phone" src="@screenshots/clip-menu.png" alt="A beat's menu on the Timeline, with Rename, Gain, Tempo, Pitch, Nudge, Copy, Cut, Duplicate, Split at playhead and Delete Clip">
+
+Select several clips to change their **Tempo** and **Pitch** all at once. The file itself is never changed, so you can always reset them.
 
 Zoom in with Ctrl and the scroll wheel, or by pinching.
 

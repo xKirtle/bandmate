@@ -428,6 +428,28 @@ async function number(page, places, { first = 1, into } = {}) {
   await page.context().close();
 }
 
+// A Beat's menu on the Timeline, opened by right-clicking its Clip.
+{
+  const page = await open(heroURL);
+  const timeline = page.getByRole("region", { name: "Timeline" });
+  const beat = timeline.getByRole("group", { name: /^Lorem Click/ });
+  await beat.click({ button: "right", position: { x: 200, y: 40 } });
+  const menu = page.getByRole("menu");
+  await menu.waitFor();
+  // Measured once it has finished opening, as it grows into place.
+  await page.waitForTimeout(500);
+  const list = await menu.boundingBox();
+  await save(page, "clip-menu", {
+    clip: {
+      x: list.x - 16,
+      y: list.y - 16,
+      width: list.width + 32,
+      height: list.height + 32,
+    },
+  });
+  await page.context().close();
+}
+
 // The mic button's popover: the Inputs to record from, the one recorded
 // from metering Chromium's fake microphone.
 {
