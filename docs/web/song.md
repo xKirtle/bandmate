@@ -48,7 +48,9 @@ In Write mode, the clock button beside Write and Read opens them. Pick one to se
 
 <img src="@screenshots/snapshots.png" alt="The Snapshots, grouped by age, with a kept one open beside Now and a changed line highlighted on both sides">
 
-Snapshots thin out as they age: every one from the last day stays, then one a day for a month, then one a week. To keep one for good, such as the version you played at an open mic, press its lock to **Keep** it, and it's never thinned. Press the lock again to let it thin out.
+Snapshots thin out as they age, so the older they are, the further apart they sit: every one from the last day stays, then the newest of each day for a month, then the newest of each week. Each Snapshot is a whole copy of the song's lyrics and Scrapbook, so the ones left are as complete as ever. You can still go back to how the song stood that day or week, just not to every step in between.
+
+To hold on to a step that would otherwise go, such as the version you played at an open mic, press its lock to **Keep** it, and it's never thinned. Press the lock again to let it thin out.
 
 **Restore this Snapshot** makes your lyrics and Scrapbook the Snapshot's. What you have now is kept as a Snapshot first, marked "Before restoring", and Undo takes the restore back too. Lines still there keep their timings, and lines it brings back get the timings they had.
 
