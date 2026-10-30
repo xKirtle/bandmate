@@ -709,15 +709,27 @@ for (const instrument of ["guitar", "piano"]) {
   await page.context().close();
 }
 
-// Read mode, with the Line playing highlighted.
+// Read mode following the Line playing through Verse 1, as an animated WebP.
 {
-  const page = await open(heroURL);
+  // As narrow as Sync mode's, so the two read as a pair.
+  const page = await open(heroURL, {
+    ...desktop,
+    viewport: { width: 1100, height: 880 },
+  });
   await readMode(page);
   await play(page);
-  // Into Verse 1's second Line, cued at 0:10.
-  await page.waitForTimeout(11_500);
-  await save(page, "read-mode");
+  const playing = Date.now();
+  // From just before Verse 1's first Line, cued at 0:05, past its third, at
+  // 0:15, so the highlight moves down twice.
+  const start = playing + 4_000;
+  const end = playing + 16_500;
+
+  await page.waitForTimeout(start - 500 - Date.now());
+  const stop = await screencast(page, "read-mode");
+  await page.waitForTimeout(end - Date.now());
+  const shot = await stop();
   await page.context().close();
+  animate(shot, "read-mode", { start, end });
 }
 
 // Sync mode cueing the Bridge's Lines, as an animated WebP.

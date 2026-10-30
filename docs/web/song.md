@@ -151,9 +151,13 @@ Line your lyrics up with the music, so you always know where you are.
 - In Read mode, tap a line to play the song from there.
 - Moved the beat? Shift every timing at once, from **Cues** above the lyrics, where you can also clear them all.
 
+In Write mode, marking each line as the song plays:
+
 <img src="@screenshots/sync-mode.webp" alt="Sync mode cueing a Section's Lines as the Timeline plays">
 
-<img src="@screenshots/read-mode.png" alt="A Song in Read mode, with the Line playing highlighted">
+In Read mode, following along once they're marked:
+
+<img src="@screenshots/read-mode.webp" alt="A Song in Read mode as the Timeline plays, the highlight moving from Line to Line and the lyrics scrolling with it">
 
 ## Record
 
