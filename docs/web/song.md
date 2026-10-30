@@ -130,8 +130,6 @@ Every song has a timeline: its beat, your takes and any other audio, laid out on
 10. **A beat**: drag it to move it, or its ends to trim it. The file itself is never changed.
 11. **A take**, selected. Its **⋯** menu records it again or picks another take, see [Record](#record).
 
-In a narrower window, Import audio, Mix down and then the input fold into a **⋯** at the end of the row, which lists just the ones that don't fit; the input is **Record from…** there. On a phone held upright, the timeline only plays, and offers just Mix down.
-
 **Undo** and **Redo** are at the top of the song's page, beside Write and Read. Undo takes back your changes to the song's sections, alternates, Scrapbook, timeline and line timings, one at a time, until you leave the song, in Read mode and on a phone too. They're off while you record a take or a merge is being made. Undoing a change to the lyrics stops syncing.
 
 Undo takes back everything you typed in a section's lines, its label or an alternate's name since you clicked in, in one go. While you're still in the box, Ctrl+Z undoes your typing a bit at a time, as in any text box.
@@ -170,7 +168,7 @@ Sing over your beat, right in the browser, in full quality.
 4. **Input**: every input connected to this device, each channel of an audio interface on its own, its channel first. Pick the one you record from. Each device remembers its own.
 5. **Level**: of the input you picked. Sing your loudest, and keep the meter out of the red. Here it's in the red, from a test tone.
 
-The take menu is the **⋯** on a take. The inputs to record from are behind the timeline's mic button, at the end of its row, or **Record from…** in the timeline's **⋯** when the window's too narrow for it.
+The take menu is the **⋯** on a take. The inputs to record from are behind the timeline's mic button, at the end of its row.
 
 ::: info
 Recording only works when you open Bandmate on `localhost` or over HTTPS: browsers don't allow the microphone anywhere else. See [Security](/self-hosting#security) for putting Bandmate behind HTTPS.
