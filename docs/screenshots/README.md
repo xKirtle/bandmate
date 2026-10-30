@@ -20,6 +20,7 @@ The screenshots in the README and on the docs site, `docs/web/`, taken in the da
 | `chord-chart-guitar.png` | The hero Song's Chord Chart in Read mode, on the guitar |
 | `chord-chart-piano.png` | The hero Song's Chord Chart in Read mode, on the piano |
 | `read-mode-desktop.png` | The hero Song in Read mode on desktop, at rest, down to the end of Verse 1 |
+| `reading-options.png` | The reading options in Read mode, open, on their own |
 | `read-mode.png`         | The hero Song in Read mode, with the Line playing highlighted  |
 | `sync-mode.webp`        | Sync mode cueing the Bridge's Lines, animated                  |
 | `snapshots.png` | The hero Song's Snapshots, grouped into the last 24 hours, daily and weekly, the oldest Kept and open beside Now, with Verse 1's third Line rewritten since. The capture takes them just before, so it shows them as taken over weeks |

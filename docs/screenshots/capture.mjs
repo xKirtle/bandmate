@@ -671,6 +671,22 @@ for (const instrument of ["guitar", "piano"]) {
   await page.context().close();
 }
 
+// Read mode's reading options, open.
+{
+  const page = await open(heroURL);
+  await readMode(page);
+  await page.getByRole("button", { name: "Reading", exact: true }).click();
+  const options = page.getByRole("dialog", { name: "Reading options" });
+  await options.waitFor();
+  // Off the first button, which opening it focuses.
+  await page.evaluate(() => document.activeElement.blur());
+  const box = await options.boundingBox();
+  await save(page, "reading-options", {
+    clip: { x: box.x, y: box.y, width: box.width, height: box.height },
+  });
+  await page.context().close();
+}
+
 // Read mode, with the Line playing highlighted.
 {
   const page = await open(heroURL);

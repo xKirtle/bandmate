@@ -68,14 +68,19 @@ And on a phone:
 
 ### Reading options
 
-The button at the top right sets:
+The **Reading** button at the top right opens them:
 
-- **Text size**.
-- **Chords**: transpose or hide them.
-- **Chord shapes**: show, pin or resize them, larger to read them from a music stand further off, smaller to fit more on a phone.
+<img class="phone" src="@screenshots/reading-options.png" alt="The reading options: Lyric Size, Transpose, Chords, Chord Chart, Chart Size, Instrument and Auto-scroll speed">
+
+- **Lyric Size**: how large the lyrics show.
+- **Transpose**: move the chords up or down, a semitone at a time.
+- **Chords**: show or hide them.
+- **Chord Chart**: show the chord shapes at the top, or pin them there.
+- **Chart Size**: how large the chord shapes show, larger to read them from a music stand further off, smaller to fit more on a phone.
 - **Instrument**: guitar or piano, for the chord shapes here and on the [Chords](/features#chords) page.
+- **Auto-scroll speed**: see [Auto-scroll](#auto-scroll).
 
-The chord shapes' size is separate from the text size, and both hold for every song on that device.
+Lyric Size and Chart Size are separate, and both hold for every song on that device.
 
 ### Chord shapes
 
