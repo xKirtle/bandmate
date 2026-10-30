@@ -58,7 +58,11 @@ A [Backup](/settings#backups) of a song holds its Snapshots, so restoring the Ba
 
 ## Read
 
-Read mode shows the song large and uncluttered, to play from: the chords over the words, and how to play each one at the top. Here it is on a phone.
+Read mode shows the song large and uncluttered, to play from: the chords over the words, and how to play each one at the top.
+
+<img src="@screenshots/read-mode-desktop.png" alt="A song in Read mode on a desktop: the chord shapes at the top, then the chords over the words">
+
+And on a phone:
 
 <img class="phone" src="@screenshots/phone-lyric-sheet.png" alt="A song in Read mode on a phone, with the chord shapes at the top">
 

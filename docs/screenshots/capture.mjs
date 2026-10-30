@@ -651,6 +651,26 @@ for (const instrument of ["guitar", "piano"]) {
   await context.close();
 }
 
+// Read mode, at rest, down to the end of Verse 1.
+{
+  // Tall enough that the Timeline sits below the shot.
+  const page = await open(heroURL, {
+    ...desktop,
+    viewport: { width: 1440, height: 2000 },
+  });
+  await readMode(page);
+  // Off the Chord Chart, which the click into Read mode leaves it over.
+  await page.mouse.move(0, 0);
+  const chorus = await page
+    .getByText("Chorus", { exact: true })
+    .first()
+    .boundingBox();
+  await save(page, "read-mode-desktop", {
+    clip: { x: 0, y: 0, width: 1440, height: chorus.y - 8 },
+  });
+  await page.context().close();
+}
+
 // Read mode, with the Line playing highlighted.
 {
   const page = await open(heroURL);
