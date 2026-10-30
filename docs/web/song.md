@@ -146,7 +146,7 @@ Hold ← or → on the ruler to scan the song, faster with Shift.
 
 Line your lyrics up with the music, so you always know where you are.
 
-- Tap along as the song plays to mark when each line starts, or type the times in.
+- Turn on **Sync lyrics** and play the song, then press **Enter**, or **Now**, as each line starts to mark it. You can also type the times in.
 - As it plays, the current line lights up and the lyrics scroll along with it.
 - In Read mode, tap a line to play the song from there.
 - Moved the beat? Shift every timing at once, from **Cues** above the lyrics, where you can also clear them all.
