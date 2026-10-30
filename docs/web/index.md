@@ -22,16 +22,16 @@ hero:
 features:
   - title: Write
     details: Write lyrics with the chords right where you play them. Try a few versions of a verse, and keep the lines that didn't make it.
-    link: /features#write
+    link: /song#write
   - title: Listen
     details: Lay out your beats on a multi-track timeline. Upload a beat, or download one from YouTube, SoundCloud or Bandcamp.
     link: /features#beats
   - title: Sync
     details: Tap along to mark when each line starts, and the lyrics light up and scroll as the song plays.
-    link: /features#sync
+    link: /song#sync
   - title: Record
     details: Sing over your beat in the browser, in full quality, and keep every take until you pick one.
-    link: /features#record
+    link: /song#record
 ---
 
 <img class="landing-shot" src="@screenshots/write-mode.png" alt="A Song in Write mode: its Details, the Lyric Sheet with Chords and Cues, the Scrapbook, and the Timeline with a Beat and a Take">

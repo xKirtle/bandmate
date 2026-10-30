@@ -5,7 +5,7 @@ The screenshots in the README and on the docs site, `docs/web/`, taken in the da
 | File                    | Shows                                                          |
 | ----------------------- | -------------------------------------------------------------- |
 | `write-mode.png`        | The hero Song in Write mode on desktop, with the Timeline open |
-| `write-mode-labelled.png` | The hero Song in Write mode with the Chorus's Alternates open, numbered for the key on Writing and recording: Status, Details, Write and Read, a Section's Label, Chords, an Alternate, a Cue, the Scrapbook and Rhymes |
+| `write-mode-labelled.png` | The hero Song in Write mode with the Chorus's Alternates open, numbered for the key on Inside a song: Status, Details, Write and Read, a Section's Label, Chords, an Alternate, a Cue, the Scrapbook and Rhymes |
 | `timeline-labelled.png` | The hero Song's Timeline with a Loop from 0:20 to 0:40 on, the playhead in it and the Take's Clip selected, numbered: Play, Loop, the Loop's stretch, Record, Import audio, Mix down, the mic button, Add a Track, the Chosen Track, the Beat's Clip and the Take's Clip |
 | `take-menu-labelled.png` | The Take's Clip menu, numbered: Retake, Takes and Nudge |
 | `input-picker-labelled.png` | The mic button's popover, the default input picked and hearing Chromium's fake microphone, numbered 4 and 5: Input and Level |

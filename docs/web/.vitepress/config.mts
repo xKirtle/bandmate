@@ -3,10 +3,11 @@ import { defineConfig } from 'vitepress';
 
 const repo = 'https://github.com/xKirtle/bandmate';
 
-// Writing and recording keeps the old Features page's address, which the
+// Songs, Chords and Beats keeps the old Features page's address, which the
 // app's Tour links to.
 const usingBandmate = [
-  { text: 'Writing and recording', link: '/features' },
+  { text: 'Songs, Chords and Beats', link: '/features' },
+  { text: 'Inside a song', link: '/song' },
   { text: 'Settings and Backups', link: '/settings' },
 ];
 
@@ -25,7 +26,7 @@ export default defineConfig({
     nav: [
       {
         text: 'Using Bandmate',
-        activeMatch: '^/(features|settings)',
+        activeMatch: '^/(features|song|settings)',
         items: usingBandmate,
       },
       { text: 'Self-hosting', link: '/self-hosting' },

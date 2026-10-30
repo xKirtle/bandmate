@@ -132,10 +132,10 @@ function animate(shot, name, { start, end, fps = 30, width = 1400 }) {
   await page.context().close();
 }
 
-// The numbered shots, for the wiki's Using Bandmate pages (docs/web/features.md
-// and settings.md): each number is placed beside what it names as the page is
-// captured, so it follows the UI as it changes. The key under each shot says
-// what the numbers are.
+// The numbered shots, for the wiki's Using Bandmate pages (docs/web/features.md,
+// song.md and settings.md): each number is placed beside what it names as the
+// page is captured, so it follows the UI as it changes. The key under each shot
+// says what the numbers are.
 
 /** Where an element's text ends, on its last line: the place for a number. */
 async function textEnd(locator) {

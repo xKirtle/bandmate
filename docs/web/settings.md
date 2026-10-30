@@ -1,6 +1,6 @@
 # Settings and Backups
 
-A reference for setting Bandmate up the way you like, keeping copies of your work, and moving it between installs: look up the part you need. Writing a song and recording it are on [Writing and recording](/features).
+A reference for setting Bandmate up the way you like, keeping copies of your work, and moving it between installs: look up the part you need. Writing a song and recording it are on [Inside a song](/song).
 
 ## Settings
 
@@ -8,8 +8,8 @@ A reference for setting Bandmate up the way you like, keeping copies of your wor
 
 - **This device**: what each device keeps for itself.
   - **Appearance**: three colour palettes, Terracotta (the default), Ink and Olive, each in light and dark. Follow your system's light or dark, or pick one.
-  - **Recording**: every input on this device, each channel of an audio interface on its own, with its latency. Pick the one you record from, and check its level with **Test input**. Open one to [calibrate](/features#calibrate) it, or type its latency. Inputs that aren't plugged in keep their latency, under **Not connected**, where you can forget them.
-  - **Rhyming dictionaries**: download one for each language you write in, so [Rhymes](/features#rhymes) can suggest words in it, or remove one you no longer need.
+  - **Recording**: every input on this device, each channel of an audio interface on its own, with its latency. Pick the one you record from, and check its level with **Test input**. Open one to [calibrate](/song#calibrate) it, or type its latency. Inputs that aren't plugged in keep their latency, under **Not connected**, where you can forget them.
+  - **Rhyming dictionaries**: download one for each language you write in, so [Rhymes](/song#rhymes) can suggest words in it, or remove one you no longer need.
   - **Chords**: play chords on guitar or piano, on the [Chords](/features#chords) page and in Read mode alike, and flip the guitar's diagrams for left-handed playing.
 - **Shortcuts**: every [keyboard shortcut](#keyboard-shortcuts), with its keys. Open one to see what it does and where it works, and to [change its keys](#change-a-shortcut-s-keys), or search them as in the shortcuts list. Shown only on a bigger screen.
 - **Backups**: see [Backups](#backups).
