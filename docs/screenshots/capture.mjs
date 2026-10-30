@@ -262,7 +262,6 @@ async function number(page, places, { first = 1, into } = {}) {
     ...desktop,
     viewport: { width: 1440, height: 2000 },
   });
-  const intro = page.getByRole("article", { name: "Intro" });
   const verse = page.getByRole("article", { name: "Verse 1" });
   const chorus = page.getByRole("article", { name: "Chorus" });
   const scrapbook = page.getByRole("tab", { name: "Scrapbook" });
@@ -276,7 +275,6 @@ async function number(page, places, { first = 1, into } = {}) {
     ),
     await textEnd(verse.getByRole("combobox")),
     await textEnd(verse.locator("textarea")),
-    await textEnd(intro.locator("textarea")),
     await textEnd(chorus.getByPlaceholder("Softer")),
     await rightOf(
       page.getByRole("button", { name: /^Cue for Line 1 of Verse 1/ }),

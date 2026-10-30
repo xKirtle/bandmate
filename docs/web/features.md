@@ -15,18 +15,17 @@ Every song is in one list. Search it by title, filter it by status, tag or wheth
 
 Write lyrics the way you would in a notebook, with the chords right where you play them.
 
-<img src="@screenshots/write-mode-labelled.png" alt="A song in Write mode, numbered 1 to 10 to match the list below it">
+<img src="@screenshots/write-mode-labelled.png" alt="A song in Write mode, numbered 1 to 9 to match the list below it">
 
 1. **Status**: where the song is at: an idea, a draft, or finished.
 2. **Song details**: its key, tempo, capo and tuning, the languages it's sung in, and notes of your own. Languages offers only those Bandmate suggests [rhymes](#rhymes) in, so others aren't on the list yet.
 3. **Write and Read**: Read mode shows the song large and uncluttered, to play from. Finished songs open in it.
 4. **A section**: one part of the song, named however you like: a verse, a chorus, a hook. Move sections around, or repeat one wherever it comes back.
 5. **Chords**: typed in brackets right before the syllable they land on, even mid-word. Read mode shows them above the words.
-6. **A line of chords alone**: for intros, solos and other parts without words.
-7. **Alternates**: other versions of a section. Write a few, and pick the one the song uses. The others wait here until you change your mind.
-8. **Line timings**: when each line starts in the song, set as you [sync](#sync). They appear once the [timeline](#timeline) has some audio on it: a beat, a take or another sound.
-9. **Scrapbook**: sections that aren't in the song: leftovers and ideas to come back to.
-10. **Rhymes**: suggestions for the word you're writing. See [Rhymes](#rhymes).
+6. **Alternates**: other versions of a section. Write a few, and pick the one the song uses. The others wait here until you change your mind.
+7. **Line timings**: when each line starts in the song, set as you [sync](#sync). They appear once the [timeline](#timeline) has any audio on it.
+8. **Scrapbook**: sections that aren't in the song: leftovers and ideas to come back to.
+9. **Rhymes**: suggestions for the word you're writing. See [Rhymes](#rhymes).
 
 And this is Read mode, here on a phone: the chords over the words, and how to play each one at the top. The button at the top right sets the text size, transposes or hides the chords, and shows, pins or resizes the chord shapes: larger to read them from a music stand further off, smaller to fit more on a phone. The chord shapes' size is separate from the text size, and both hold for every song on that device. The same button switches the chord shapes between guitar and piano, for the [Chords](#chords) page too.
 
