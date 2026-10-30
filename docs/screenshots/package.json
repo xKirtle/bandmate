@@ -3,8 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "capture": "node capture.mjs",
-    "walkthrough": "node walkthrough.mjs"
+    "capture": "node capture.mjs"
   },
   "devDependencies": {
     "playwright-core": "1.63.0"

@@ -67,18 +67,6 @@ When the UI changes and the screenshots go stale, restore the demo into a fresh 
 
 Capturing leaves the Bridge cued, and Verse 1 rewritten with Snapshots taken, so restore again from step 1 before capturing again.
 
-## The walkthrough
-
-`walkthrough.mp4` is a silent video of a song being written, synced, recorded and read in one sitting, about 40 seconds at 1920 by 1200. `walkthrough.mjs` records it from an empty Bandmate: it restores the demo itself, gives it believable words, and refuses to run on a Bandmate with Songs in it, as it changes them. So start one on a new data directory, as in step 1 above, then:
-
-```sh
-cd docs/screenshots
-npm ci
-npm run walkthrough
-```
-
-It takes `CHROMIUM` and `BANDMATE_URL` like the capture, also needs ffmpeg with libx264, and takes about a minute. Leave the machine idle while it runs, as it's recorded in real time.
-
 ## Changing the demo
 
 Restore the demo into a fresh Bandmate as above, change it in the app, then make a New Backup of every Song and the Beat Library, download it and replace `demo.bandmate` with it. A Backup from an older Bandmate restores into every newer one, so the file only needs replacing when the demo itself changes.
