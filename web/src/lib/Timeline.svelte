@@ -3016,7 +3016,7 @@
   }
   .clip-more:hover,
   :global(:root:not([data-pointer-focus]) :focus-visible) > .clip-more {
-    color: var(--accent);
+    color: var(--clip-colour);
   }
   .trim {
     position: absolute;
@@ -3032,7 +3032,7 @@
     right: 0;
   }
   .trim:hover {
-    background: var(--accent);
+    background: var(--clip-colour);
     opacity: 0.4;
   }
   .wave {
@@ -3083,7 +3083,7 @@
   .clip.gaining .gain-line::before {
     height: 2px;
     margin-top: -0.5px;
-    background: var(--accent);
+    background: var(--clip-colour);
     opacity: 1;
   }
   /* A Clip's Fades, drawn as straight slopes over its waveform, whatever their curve. */

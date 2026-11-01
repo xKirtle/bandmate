@@ -31,6 +31,9 @@ const borderOf = (c: Locator) => c.evaluate((el) => getComputedStyle(el).borderT
 /** The colour a Clip's gain line or fade dot is drawn in. */
 const markOf = (c: Locator) => c.evaluate((el) => getComputedStyle(el, '::before').backgroundColor);
 
+/** How thick a Clip's gain line is drawn. */
+const weightOf = (c: Locator) => c.evaluate((el) => getComputedStyle(el, '::before').height);
+
 const backgroundOf = (c: Locator) => c.evaluate((el) => getComputedStyle(el).backgroundColor);
 
 /** Every colour something is drawn in, as the browser reports them. */
@@ -232,7 +235,7 @@ test("a Clip's unchanged Gain line stays muted", async ({ page, bandmate }) => {
   expect(await markOf(gainLine(clip(page, 'Take 2')))).toBe(await drawnColour(page, '--text-muted'));
 });
 
-test("a Clip's Gain line is in the accent while it's hovered or dragged, and back in its Track's colour after", async ({
+test("a Clip's Gain line stays in its Track's colour, and thickens while it's hovered or dragged", async ({
   page,
   bandmate,
 }) => {
@@ -243,22 +246,27 @@ test("a Clip's Gain line is in the accent while it's hovered or dragged, and bac
   const take = clip(page, 'Take 2');
   const line = gainLine(take);
   await expect(line).toBeVisible();
-  const accent = await drawnColour(page, '--accent');
+  const colour = await drawnColour(page, '--track-colour-2');
+  expect(await markOf(line)).toBe(colour);
+  expect(await weightOf(line)).toBe('1px');
 
   await line.hover();
-  await expect.poll(() => markOf(line)).toBe(accent);
+  await expect.poll(() => weightOf(line)).toBe('2px');
+  expect(await markOf(line)).toBe(colour);
 
-  // Dragged, it stays in the accent with the pointer off it and off the Clip.
+  // Dragged, it stays thick with the pointer off it and off the Clip.
   const from = await middleOf(line);
   const { height } = (await take.boundingBox())!;
   await page.mouse.down();
   await page.mouse.move(from.x, from.y - height / 8, { steps: 4 });
   await page.mouse.move(from.x, from.y - height * 2, { steps: 4 });
-  expect(await markOf(line)).toBe(accent);
+  expect(await weightOf(line)).toBe('2px');
+  expect(await markOf(line)).toBe(colour);
   await page.mouse.up();
 
   await page.mouse.move(0, 0);
-  await expect.poll(() => markOf(line)).toBe(await drawnColour(page, '--track-colour-2'));
+  await expect.poll(() => weightOf(line)).toBe('1px');
+  expect(await markOf(line)).toBe(colour);
 });
 
 test("a Clip's fade dots are in its Track's colour", async ({ page, bandmate }) => {
