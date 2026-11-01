@@ -73,8 +73,8 @@ services:
       - "${BANDMATE_PORT:-8080}:8080"
     environment:
       BANDMATE_MAX_UPLOAD_MB: ${BANDMATE_MAX_UPLOAD_MB:-500}
-      BANDMATE_UPDATE_CHECK: ${BANDMATE_UPDATE_CHECK:-on}
-      BANDMATE_ADD_FROM_LINK: ${BANDMATE_ADD_FROM_LINK:-on}
+      BANDMATE_UPDATE_CHECK: ${BANDMATE_UPDATE_CHECK:-true}
+      BANDMATE_ADD_FROM_LINK: ${BANDMATE_ADD_FROM_LINK:-true}
     volumes:
       - ./data:/data
     healthcheck:
