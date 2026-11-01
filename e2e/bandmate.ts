@@ -194,6 +194,18 @@ export class Bandmate {
     return json<Timeline>(this.api.put(`/api/songs/${songId}/timeline/clips/${clipId}/nudge`, { data: { nudge } }));
   }
 
+  /** Sets a Clip's Gain, in dB, as its gain line does. */
+  setClipGain(songId: number, clipId: number, gain: number): Promise<Timeline> {
+    return json<Timeline>(this.api.put(`/api/songs/${songId}/timeline/clips/${clipId}/gain`, { data: { gain } }));
+  }
+
+  /** Sets a Clip's Fades, in seconds, as its fade dots do. */
+  setClipFades(songId: number, clipId: number, fadeIn: number, fadeOut: number): Promise<Timeline> {
+    return json<Timeline>(
+      this.api.put(`/api/songs/${songId}/timeline/clips/${clipId}/fades`, { data: { fadeIn, fadeOut } }),
+    );
+  }
+
   /** A Song's Timeline, as it is now. */
   timeline(songId: number): Promise<Timeline> {
     return json<Timeline>(this.api.get(`/api/songs/${songId}/timeline`));

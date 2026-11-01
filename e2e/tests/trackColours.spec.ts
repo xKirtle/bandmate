@@ -1,15 +1,59 @@
 import type { Locator, Page } from '@playwright/test';
 import { expect, test } from '../fixtures';
-import { clip, drawnColour, dragTo, heroSong, timeline, trackHead } from '../songPage';
+import {
+  clip,
+  drawnColour,
+  dragTo,
+  fadeDot,
+  gainLine,
+  heroSong,
+  middleOf,
+  serverClips,
+  timeline,
+  trackHead,
+  trimEdge,
+} from '../songPage';
 
 // A Clip's border in its Track's Track Colour, on the demo Backup's hero
 // Song: the Beat's Clip on the Beat Track, its first, and Take 2 on the Lead
 // vox Track, its second. A shade is compared with the token as the page holds
 // it, as the shades change with the Palette and the theme. A waveform is
 // hidden from a screen reader, so palettes.test.ts checks it takes the same
-// colour.
+// colour. So are a Clip's Fade slopes, which are found as the only lines
+// drawn on it.
 
 const borderOf = (c: Locator) => c.evaluate((el) => getComputedStyle(el).borderTopColor);
+
+/** The colour a Clip's gain line or fade dot is drawn in. */
+const markOf = (c: Locator) => c.evaluate((el) => getComputedStyle(el, '::before').backgroundColor);
+
+/** The colours of what's drawn in lines inside a Clip: its Fade slopes, while nothing else shows one. */
+const strokesOn = (c: Locator) =>
+  c.evaluate((el) =>
+    [...el.querySelectorAll('*')]
+      .filter((inside) => inside.checkVisibility())
+      .map((inside) => getComputedStyle(inside).stroke)
+      .filter((stroke) => stroke !== 'none'),
+  );
+
+/** Every colour that shows on something and inside it, drawn by an element or its ::before. What's see-through or hidden doesn't count. */
+const coloursOn = (c: Locator) =>
+  c.evaluate((el) => {
+    const shown = [el, ...el.querySelectorAll('*')].filter((inside) =>
+      inside.checkVisibility({ opacityProperty: true, visibilityProperty: true }),
+    );
+    return shown.flatMap((inside) =>
+      [getComputedStyle(inside), getComputedStyle(inside, '::before')].flatMap((style) => [
+        style.color,
+        style.backgroundColor,
+        style.borderTopColor,
+        style.outlineColor,
+        style.fill,
+        style.stroke,
+        style.boxShadow,
+      ]),
+    );
+  });
 
 /** Expects a Clip's border to be in a token's colour. */
 async function expectBorderIn(page: Page, c: Locator, token: string) {
@@ -97,4 +141,82 @@ test("a Track's header shows no colour, and the Chosen Track's is marked in the 
 
   expect(painted).toContain(await drawnColour(page, '--accent'));
   for (const shade of shades) expect(painted).not.toContain(shade);
+});
+
+test("a Clip's Fade slopes and changed Gain line are in its Track's colour, and nothing on it at rest is in the accent", async ({
+  page,
+  bandmate,
+}) => {
+  const hero = await heroSong(bandmate);
+  const [placed] = await serverClips(bandmate, hero.id, 'Lead vox');
+  await bandmate.setClipGain(hero.id, placed.id, -6);
+  await bandmate.setClipFades(hero.id, placed.id, 3, 3);
+  await page.goto(`/songs/${hero.id}`);
+  const take = clip(page, 'Take 2');
+  await expect(take).toHaveAccessibleName('Take 2, 0:04 to 0:25, −6 dB, fade in 3 s, fade out 3 s');
+  const shade = await drawnColour(page, '--track-colour-2');
+
+  expect(await strokesOn(take)).toEqual([shade, shade]);
+  expect(await markOf(gainLine(take))).toBe(shade);
+  expect(await coloursOn(take)).not.toContain(await drawnColour(page, '--accent'));
+});
+
+test("a Clip's unchanged Gain line stays muted", async ({ page, bandmate }) => {
+  const hero = await heroSong(bandmate);
+  await page.goto(`/songs/${hero.id}`);
+
+  expect(await markOf(gainLine(clip(page, 'Take 2')))).toBe(await drawnColour(page, '--text-muted'));
+});
+
+test("a Clip's Gain line is in the accent while it's hovered or dragged, and back in its Track's colour after", async ({
+  page,
+  bandmate,
+}) => {
+  const hero = await heroSong(bandmate);
+  const [placed] = await serverClips(bandmate, hero.id, 'Lead vox');
+  await bandmate.setClipGain(hero.id, placed.id, -6);
+  await page.goto(`/songs/${hero.id}`);
+  const take = clip(page, 'Take 2');
+  const line = gainLine(take);
+  await expect(line).toBeVisible();
+  const accent = await drawnColour(page, '--accent');
+
+  await line.hover();
+  await expect.poll(() => markOf(line)).toBe(accent);
+
+  // Dragged, it stays in the accent with the pointer off it and off the Clip.
+  const from = await middleOf(line);
+  const { height } = (await take.boundingBox())!;
+  await page.mouse.down();
+  await page.mouse.move(from.x, from.y - height / 8, { steps: 4 });
+  await page.mouse.move(from.x, from.y - height * 2, { steps: 4 });
+  expect(await markOf(line)).toBe(accent);
+  await page.mouse.up();
+
+  await page.mouse.move(0, 0);
+  await expect.poll(() => markOf(line)).toBe(await drawnColour(page, '--track-colour-2'));
+});
+
+test("a Clip's fade dots, a hovered trim edge and a hovered menu button are in the accent", async ({
+  page,
+  bandmate,
+}) => {
+  const hero = await heroSong(bandmate);
+  await page.goto(`/songs/${hero.id}`);
+  const take = clip(page, 'Take 2');
+  await expect(take).toBeVisible();
+  const accent = await drawnColour(page, '--accent');
+
+  await take.hover();
+  await expect(fadeDot(take, 'Fade in')).toHaveCSS('opacity', '1');
+  expect(await markOf(fadeDot(take, 'Fade in'))).toBe(accent);
+  expect(await markOf(fadeDot(take, 'Fade out'))).toBe(accent);
+
+  const end = trimEdge(take, 'end');
+  await end.hover();
+  await expect(end).toHaveCSS('background-color', accent);
+
+  const menu = take.getByRole('button', { name: 'More actions for Take 2' });
+  await menu.hover();
+  await expect.poll(() => coloursOn(menu)).toContain(accent);
 });

@@ -174,6 +174,23 @@ function waveformStrength(): number {
   return fromTimeline(/\n {2}rect \{[^}]*opacity: ([\d.]+);/, 'a waveform is drawn at an opacity') * 100;
 }
 
+/** How strongly a Clip's Fade slopes are drawn over its waveform, as a percentage. */
+function fadeSlopeStrength(): number {
+  return (
+    fromTimeline(/\n {2}\.fade-slopes line \{[^}]*opacity: ([\d.]+);/, 'a Fade slope is drawn at an opacity') * 100
+  );
+}
+
+/** How strongly a Clip's changed Gain line is drawn over its waveform, as a percentage. */
+function changedGainLineStrength(): number {
+  return (
+    fromTimeline(
+      /\n {2}\.gain-line\.changed::before \{[^}]*opacity: ([\d.]+);/,
+      'a changed Gain line is drawn at an opacity',
+    ) * 100
+  );
+}
+
 describe("a Clip's Track Colour", () => {
   const timeline = readFileSync(new URL('./lib/Timeline.svelte', import.meta.url), 'utf8');
 
@@ -184,6 +201,13 @@ describe("a Clip's Track Colour", () => {
   it('draws its border and waveform', () => {
     expect(timeline).toMatch(/\n {2}\.clip \{[^}]*border: 1px solid var\(--clip-colour\);/);
     expect(timeline).toMatch(/\n {2}rect \{[^}]*fill: var\(--clip-colour\);/);
+  });
+
+  it('draws its Fade slopes and changed Gain line, at the strength they stand out from its waveform by', () => {
+    expect(timeline).toMatch(/\n {2}\.fade-slopes line \{[^}]*stroke: var\(--clip-colour\);[^}]*opacity: 0\.8;/);
+    expect(timeline).toMatch(
+      /\n {2}\.gain-line\.changed::before \{[^}]*background: var\(--clip-colour\);[^}]*opacity: 0\.8;/,
+    );
   });
 });
 
@@ -275,6 +299,20 @@ describe('Palettes', () => {
             expect(contrast(drawn, background), `${shade} on ${background}`).toBeGreaterThanOrEqual(
               MIN_TRACK_COLOUR_CONTRAST,
             );
+          }
+        }
+      });
+
+      it(`${name} ${theme}: a Fade slope or changed Gain line in any Track Colour is at least 3:1 on a Clip, selected or not`, () => {
+        const selected = mix(colours['--accent'], selectedClipTint(), colours['--surface-1']);
+        for (const background of [colours['--surface-1'], selected]) {
+          for (const shade of shades) {
+            for (const strength of [fadeSlopeStrength(), changedGainLineStrength()]) {
+              const drawn = mix(shade, strength, background);
+              expect(contrast(drawn, background), `${shade} on ${background}`).toBeGreaterThanOrEqual(
+                MIN_TRACK_COLOUR_CONTRAST,
+              );
+            }
           }
         }
       });
