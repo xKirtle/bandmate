@@ -223,3 +223,15 @@
   --track-colour-5: #f9add0;
   --track-colour-6: #b6cbf6;
 }
+
+/* Track Colours turned off in Settings: the Palette's accent in their place.
+   Set on the body, so it beats the Palette's own on the root in every Palette
+   and theme, and takes the accent shown there. */
+[data-track-colours='off'] body {
+  --track-colour-1: var(--accent);
+  --track-colour-2: var(--accent);
+  --track-colour-3: var(--accent);
+  --track-colour-4: var(--accent);
+  --track-colour-5: var(--accent);
+  --track-colour-6: var(--accent);
+}

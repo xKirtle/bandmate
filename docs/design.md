@@ -43,7 +43,7 @@ The user picks a Palette, and System, Light or Dark, in Settings, kept per devic
 | `--drafting-*`, `--finished-*` | The drafting and finished Status badges (`-bg` and `-fg`)               |
 | `--shelved-*`                  | The shelved Status badge (`-bg` and `-fg`)                              |
 | `--piano-white`, `--piano-black` | A piano's white and black keys in a keyboard drawing, the black also edging every key                           |
-| `--track-colour-1` to `--track-colour-6` | The six Track Colours: what tells one Track from another, on its Clips and its header, numbered rather than named by hue, as each Palette has its own shades |
+| `--track-colour-1` to `--track-colour-6` | The six Track Colours: what tells one Track from another, on its Clips and its header, numbered rather than named by hue, as each Palette has its own shades; all the accent while they're turned off |
 
 Shared by every Palette, the scrim and the only shadows there are:
 
@@ -59,6 +59,8 @@ Shared by every Palette, the scrim and the only shadows there are:
 | `--invalid-outline`  | Rings a field holding an invalid value, inside its danger border           |
 
 **Track Colours** are muted, and never near the accent, which is left to what's active. Each shade is held to 3:1 against a Clip's background, selected or not, even at the opacity a waveform is drawn at, and against its Track's header, tinted or not, for its volume slider and the Chosen Track's edge; its OKLCH chroma stays at 0.1 or under, so it's low in saturation and not in contrast; and it sits at least 50° of OKLCH hue and 0.1 of OKLab difference from its Palette's accent, so no Clip looks like the one being recorded. The set is in the order Tracks take it, and most Songs only ever show the first two, so in each Palette and theme those are its most distinct pair. `palettes.test.ts` checks all of this.
+
+The user can turn Track Colours off in Settings, kept per device (`appearance.ts`). `data-track-colours="off"` on the root element, set before the first paint like the Palette, puts `--accent` in all six tokens, so everything that shows a Track Colour shows the accent, and each Track keeps its colour for when they're on again. It's the one case where the accent isn't left to what's active. Mute, Solo and the Clip being recorded look the same either way, though with everything else in the accent they stand out less. Not every accent reaches 3:1 at a waveform's 0.7 opacity, so with Track Colours off the waveform, Fade slopes and a changed Gain line are drawn at 0.85; `palettes.test.ts` holds the accent to the same floors as a Track Colour.
 
 A literal colour is written only in `palettes.css`, and a `box-shadow` is always one of these tokens: Stylelint fails anything else. A tint of a token, such as `color-mix(in srgb, var(--accent) 12%, transparent)`, is allowed.
 

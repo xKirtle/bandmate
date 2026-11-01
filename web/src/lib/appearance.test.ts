@@ -9,7 +9,9 @@ import {
   shownTheme,
   storePalette,
   storeThemeChoice,
+  storeTrackColours,
   themeKey,
+  trackColoursKey,
 } from './appearance';
 import { storage } from './storageFake';
 
@@ -109,13 +111,21 @@ const root = (dataset: Record<string, string> = {}) => ({ dataset }) as HTMLElem
 describe('applyAppearance', () => {
   it('marks the root with the Palette and light or dark', () => {
     const el = root();
-    applyAppearance(el, 'ink', 'dark');
+    applyAppearance(el, 'ink', 'dark', true);
     expect(el.dataset).toEqual({ palette: 'ink', theme: 'dark' });
+  });
+
+  it('marks the root only while Track Colours are off', () => {
+    const el = root();
+    applyAppearance(el, 'terracotta', 'light', false);
+    expect(el.dataset).toEqual({ theme: 'light', trackColours: 'off' });
+    applyAppearance(el, 'terracotta', 'light', true);
+    expect(el.dataset).toEqual({ theme: 'light' });
   });
 
   it('leaves Terracotta unmarked, as the default', () => {
     const el = root({ palette: 'olive', theme: 'dark' });
-    applyAppearance(el, 'terracotta', 'light');
+    applyAppearance(el, 'terracotta', 'light', true);
     expect(el.dataset).toEqual({ theme: 'light' });
   });
 });
@@ -158,7 +168,7 @@ describe("index.html's first paint", () => {
     for (const { id: palette } of palettes) {
       for (const theme of ['light', 'dark'] as const) {
         const el = root();
-        applyAppearance(el, palette, theme);
+        applyAppearance(el, palette, theme, true);
         const kept = storage();
         storePalette(kept, palette);
         storeThemeChoice(kept, theme);
@@ -167,8 +177,24 @@ describe("index.html's first paint", () => {
     }
   });
 
+  it('shows Track Colours turned off on this device, as the app does', () => {
+    for (const trackColours of [true, false]) {
+      const el = root();
+      applyAppearance(el, 'terracotta', 'light', trackColours);
+      const kept = storage({ [themeKey]: 'light' });
+      storeTrackColours(kept, trackColours);
+      expect(firstPaint(kept, false), `Track Colours ${trackColours}`).toEqual(el.dataset);
+    }
+    expect(firstPaint(storage({ [trackColoursKey]: 'off', [themeKey]: 'light' }), false)).toEqual({
+      theme: 'light',
+      trackColours: 'off',
+    });
+  });
+
   it('falls back like the app when what is kept is no choice, or storage is blocked', () => {
-    expect(firstPaint(storage({ [paletteKey]: 'neon', [themeKey]: 'sepia' }), true)).toEqual({ theme: 'dark' });
+    expect(
+      firstPaint(storage({ [paletteKey]: 'neon', [themeKey]: 'sepia', [trackColoursKey]: 'sepia' }), true),
+    ).toEqual({ theme: 'dark' });
     expect(firstPaint(storage({}, true), false)).toEqual({ theme: 'light' });
   });
 });
