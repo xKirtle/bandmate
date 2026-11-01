@@ -22,12 +22,26 @@ import {
 // it, as the shades change with the Palette and the theme. A waveform is
 // hidden from a screen reader, so palettes.test.ts checks it takes the same
 // colour, and so too for its Fade slopes, a trim edge and its ⋯, and that
-// nothing else on a Clip is in the accent.
+// nothing else on a Clip is in the accent. A Track's volume slider is drawn by
+// the browser, so its check is the colour the page gives the browser to draw it
+// in, and palettes.test.ts holds that colour to the contrast floor.
 
 const borderOf = (c: Locator) => c.evaluate((el) => getComputedStyle(el).borderTopColor);
 
 /** The colour a Clip's gain line or fade dot is drawn in. */
 const markOf = (c: Locator) => c.evaluate((el) => getComputedStyle(el, '::before').backgroundColor);
+
+const backgroundOf = (c: Locator) => c.evaluate((el) => getComputedStyle(el).backgroundColor);
+
+/** Every colour something is drawn in, as the browser reports them. */
+const paintOf = (c: Locator) =>
+  c.evaluate((el) => {
+    const { backgroundColor, borderLeftColor, boxShadow, color } = getComputedStyle(el);
+    return [backgroundColor, borderLeftColor, boxShadow, color].join(' ');
+  });
+
+/** A Track's volume slider. */
+const volumeOf = (page: Page, track: string) => timeline(page).getByRole('slider', { name: `Volume of ${track}` });
 
 /** Expects a Clip's border to be in a token's colour. */
 async function expectBorderIn(page: Page, c: Locator, token: string) {
@@ -62,6 +76,7 @@ for (const [palette, theme] of [
     await expect(page.locator('html')).toHaveAttribute('data-palette', palette);
     await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
     await expectBorderIn(page, clip(page, 'Take 2'), '--track-colour-2');
+    await expect(volumeOf(page, 'Lead vox')).toHaveCSS('accent-color', await drawnColour(page, '--track-colour-2'));
   });
 }
 
@@ -152,20 +167,47 @@ test("undoing a Track's deletion brings its colour back", async ({ page, bandmat
   expect(tracks.map((t) => t.colour)).toEqual([1, 2, 3, 4]);
 });
 
-test("a Track's header shows no colour, and the Chosen Track's is marked in the accent", async ({ page, bandmate }) => {
+test("a Track's volume slider is in its colour, on an empty Track too", async ({ page, bandmate }) => {
+  const hero = await heroSong(bandmate);
+  await page.goto(`/songs/${hero.id}`);
+  await expect(volumeOf(page, 'Beat')).toHaveCSS('accent-color', await drawnColour(page, '--track-colour-1'));
+  await expect(volumeOf(page, 'Lead vox')).toHaveCSS('accent-color', await drawnColour(page, '--track-colour-2'));
+
+  await timeline(page).getByRole('button', { name: 'Add a Track' }).click();
+
+  await expect(volumeOf(page, 'Track 3')).toHaveCSS('accent-color', await drawnColour(page, '--track-colour-3'));
+});
+
+test("a Track's header shows its colour only on its volume slider, and the Chosen Track's is marked in the accent", async ({
+  page,
+  bandmate,
+}) => {
   const hero = await heroSong(bandmate);
   await page.goto(`/songs/${hero.id}`);
 
   const chosen = trackHead(page, 'Lead vox');
   await expect(chosen).toHaveAttribute('aria-current', 'true');
   const shades = await Promise.all([1, 2, 3, 4, 5, 6].map((n) => drawnColour(page, `--track-colour-${n}`)));
-  const painted = await chosen.evaluate((el) => {
-    const { backgroundColor, borderLeftColor, boxShadow, color } = getComputedStyle(el);
-    return [backgroundColor, borderLeftColor, boxShadow, color].join(' ');
-  });
 
-  expect(painted).toContain(await drawnColour(page, '--accent'));
-  for (const shade of shades) expect(painted).not.toContain(shade);
+  expect(await paintOf(chosen)).toContain(await drawnColour(page, '--accent'));
+  expect(await backgroundOf(chosen)).not.toBe(await backgroundOf(trackHead(page, 'Beat')));
+  for (const part of [chosen, ...(await chosen.getByRole('button').all())]) {
+    const paint = await paintOf(part);
+    for (const shade of shades) expect(paint).not.toContain(shade);
+  }
+});
+
+test('Mute and Solo are in the accent while on, not the Track Colour', async ({ page, bandmate }) => {
+  const hero = await heroSong(bandmate);
+  await page.goto(`/songs/${hero.id}`);
+  const accent = await drawnColour(page, '--accent');
+
+  for (const name of ['Mute Lead vox', 'Solo Lead vox']) {
+    const toggle = timeline(page).getByRole('button', { name });
+    await toggle.click();
+    await expect(toggle).toHaveAttribute('aria-pressed', 'true');
+    await expect(toggle).toHaveCSS('background-color', accent);
+  }
 });
 
 test("a Clip's changed Gain line is in its Track's colour", async ({ page, bandmate }) => {

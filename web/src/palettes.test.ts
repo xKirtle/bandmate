@@ -181,6 +181,16 @@ function clipLineStrengths(): number[] {
   );
 }
 
+/** How much of the accent tints a Track's header while it's Chosen, or a file is dragged over it, as percentages. */
+function trackHeaderTints(): number[] {
+  return ['\\.head\\.chosen', '\\.head\\.file-target'].map((rule) =>
+    fromTimeline(
+      new RegExp(`\\n {2}${rule}[^{]*\\{[^}]*color-mix\\(in srgb, var\\(--accent\\) (\\d+)%, transparent\\)`),
+      `${rule} is a tint of the accent`,
+    ),
+  );
+}
+
 describe("a Clip's Track Colour", () => {
   const timeline = readFileSync(new URL('./lib/Timeline.svelte', import.meta.url), 'utf8');
 
@@ -321,6 +331,17 @@ describe('Palettes', () => {
                 MIN_TRACK_COLOUR_CONTRAST,
               );
             }
+          }
+        }
+      });
+
+      it(`${name} ${theme}: a volume slider in any Track Colour is at least 3:1 on a Track's header, tinted or not`, () => {
+        const tints = trackHeaderTints().map((tint) => mix(colours['--accent'], tint, colours['--bg']));
+        for (const background of [colours['--bg'], ...tints]) {
+          for (const shade of shades) {
+            expect(contrast(shade, background), `${shade} on ${background}`).toBeGreaterThanOrEqual(
+              MIN_TRACK_COLOUR_CONTRAST,
+            );
           }
         }
       });
