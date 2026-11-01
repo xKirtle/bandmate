@@ -729,6 +729,236 @@
     }
   },
   {
+    "name": "bring a Track back as it was, where it was",
+    "of": "timeline",
+    "change": {
+      "kind": "addTrack",
+      "track": {
+        "clips": [
+          {
+            "beatId": 1,
+            "length": 4,
+            "offset": 1,
+            "start": 2
+          }
+        ],
+        "colour": 5,
+        "muted": true,
+        "name": "Beat",
+        "position": 1,
+        "soloed": false,
+        "volume": -3
+      }
+    },
+    "request": {
+      "method": "POST",
+      "path": "/songs/1/timeline/tracks",
+      "body": {
+        "clips": [
+          {
+            "beatId": 1,
+            "length": 4,
+            "offset": 1,
+            "start": 2
+          }
+        ],
+        "colour": 5,
+        "muted": true,
+        "name": "Beat",
+        "position": 1,
+        "soloed": false,
+        "volume": -3
+      }
+    },
+    "before": {
+      "beats": [
+        {
+          "bpm": null,
+          "duration": 10,
+          "fileName": "Short.mp3",
+          "id": 1,
+          "size": 65,
+          "title": "Short"
+        },
+        {
+          "bpm": null,
+          "duration": 20,
+          "fileName": "Long.mp3",
+          "id": 2,
+          "size": 64,
+          "title": "Long"
+        }
+      ],
+      "loop": null,
+      "songId": 1,
+      "sounds": [],
+      "tracks": [
+        {
+          "clips": [
+            {
+              "activeTakeId": null,
+              "beatId": 1,
+              "fadeIn": 0,
+              "fadeOut": 0,
+              "gain": 0,
+              "id": 1,
+              "length": 10,
+              "name": null,
+              "nudge": 0,
+              "offset": 0,
+              "pitch": 0,
+              "soundId": null,
+              "start": 0,
+              "takes": [],
+              "tempo": 1
+            },
+            {
+              "activeTakeId": null,
+              "beatId": 2,
+              "fadeIn": 0,
+              "fadeOut": 0,
+              "gain": 0,
+              "id": 2,
+              "length": 20,
+              "name": null,
+              "nudge": 0,
+              "offset": 0,
+              "pitch": 0,
+              "soundId": null,
+              "start": 30,
+              "takes": [],
+              "tempo": 1
+            }
+          ],
+          "colour": 1,
+          "id": 1,
+          "muted": false,
+          "name": "Track 1",
+          "soloed": false,
+          "volume": 0
+        },
+        {
+          "clips": [],
+          "colour": 2,
+          "id": 2,
+          "muted": false,
+          "name": "Adlibs",
+          "soloed": false,
+          "volume": 0
+        }
+      ],
+      "updatedAt": "2026-01-01T00:00:00Z",
+      "version": 5
+    },
+    "after": {
+      "beats": [
+        {
+          "bpm": null,
+          "duration": 10,
+          "fileName": "Short.mp3",
+          "id": 1,
+          "size": 65,
+          "title": "Short"
+        },
+        {
+          "bpm": null,
+          "duration": 20,
+          "fileName": "Long.mp3",
+          "id": 2,
+          "size": 64,
+          "title": "Long"
+        }
+      ],
+      "loop": null,
+      "songId": 1,
+      "sounds": [],
+      "tracks": [
+        {
+          "clips": [
+            {
+              "activeTakeId": null,
+              "beatId": 1,
+              "fadeIn": 0,
+              "fadeOut": 0,
+              "gain": 0,
+              "id": 1,
+              "length": 10,
+              "name": null,
+              "nudge": 0,
+              "offset": 0,
+              "pitch": 0,
+              "soundId": null,
+              "start": 0,
+              "takes": [],
+              "tempo": 1
+            },
+            {
+              "activeTakeId": null,
+              "beatId": 2,
+              "fadeIn": 0,
+              "fadeOut": 0,
+              "gain": 0,
+              "id": 2,
+              "length": 20,
+              "name": null,
+              "nudge": 0,
+              "offset": 0,
+              "pitch": 0,
+              "soundId": null,
+              "start": 30,
+              "takes": [],
+              "tempo": 1
+            }
+          ],
+          "colour": 1,
+          "id": 1,
+          "muted": false,
+          "name": "Track 1",
+          "soloed": false,
+          "volume": 0
+        },
+        {
+          "clips": [
+            {
+              "activeTakeId": null,
+              "beatId": 1,
+              "fadeIn": 0,
+              "fadeOut": 0,
+              "gain": 0,
+              "id": 3,
+              "length": 4,
+              "name": null,
+              "nudge": 0,
+              "offset": 1,
+              "pitch": 0,
+              "soundId": null,
+              "start": 2,
+              "takes": [],
+              "tempo": 1
+            }
+          ],
+          "colour": 5,
+          "id": 3,
+          "muted": true,
+          "name": "Beat",
+          "soloed": false,
+          "volume": -3
+        },
+        {
+          "clips": [],
+          "colour": 2,
+          "id": 2,
+          "muted": false,
+          "name": "Adlibs",
+          "soloed": false,
+          "volume": 0
+        }
+      ],
+      "updatedAt": "2026-01-01T00:00:00Z",
+      "version": 6
+    }
+  },
+  {
     "name": "rename a Track and set its levels",
     "of": "timeline",
     "change": {
@@ -1484,6 +1714,272 @@
     }
   },
   {
+    "name": "place Clips onto Tracks added at the bottom, in their colours",
+    "of": "timeline",
+    "change": {
+      "clips": [
+        {
+          "clip": {
+            "beatId": 1,
+            "length": 10,
+            "offset": 0,
+            "start": 0
+          },
+          "newTrack": 0
+        },
+        {
+          "clip": {
+            "beatId": 2,
+            "length": 6,
+            "offset": 4,
+            "start": 3
+          },
+          "trackId": 2
+        }
+      ],
+      "kind": "placeClips",
+      "newTracks": [
+        {
+          "colour": 4,
+          "name": "Adlibs 2"
+        }
+      ]
+    },
+    "request": {
+      "method": "POST",
+      "path": "/songs/1/timeline/clips/place",
+      "body": {
+        "clips": [
+          {
+            "beatId": 1,
+            "length": 10,
+            "newTrack": 0,
+            "offset": 0,
+            "start": 0
+          },
+          {
+            "beatId": 2,
+            "length": 6,
+            "offset": 4,
+            "start": 3,
+            "trackId": 2
+          }
+        ],
+        "newTracks": [
+          {
+            "colour": 4,
+            "name": "Adlibs 2"
+          }
+        ]
+      }
+    },
+    "before": {
+      "beats": [
+        {
+          "bpm": null,
+          "duration": 10,
+          "fileName": "Short.mp3",
+          "id": 1,
+          "size": 65,
+          "title": "Short"
+        },
+        {
+          "bpm": null,
+          "duration": 20,
+          "fileName": "Long.mp3",
+          "id": 2,
+          "size": 64,
+          "title": "Long"
+        }
+      ],
+      "loop": null,
+      "songId": 1,
+      "sounds": [],
+      "tracks": [
+        {
+          "clips": [
+            {
+              "activeTakeId": null,
+              "beatId": 1,
+              "fadeIn": 0,
+              "fadeOut": 0,
+              "gain": 0,
+              "id": 1,
+              "length": 10,
+              "name": null,
+              "nudge": 0,
+              "offset": 0,
+              "pitch": 0,
+              "soundId": null,
+              "start": 0,
+              "takes": [],
+              "tempo": 1
+            },
+            {
+              "activeTakeId": null,
+              "beatId": 2,
+              "fadeIn": 0,
+              "fadeOut": 0,
+              "gain": 0,
+              "id": 2,
+              "length": 20,
+              "name": null,
+              "nudge": 0,
+              "offset": 0,
+              "pitch": 0,
+              "soundId": null,
+              "start": 30,
+              "takes": [],
+              "tempo": 1
+            }
+          ],
+          "colour": 1,
+          "id": 1,
+          "muted": false,
+          "name": "Track 1",
+          "soloed": false,
+          "volume": 0
+        },
+        {
+          "clips": [],
+          "colour": 2,
+          "id": 2,
+          "muted": false,
+          "name": "Adlibs",
+          "soloed": false,
+          "volume": 0
+        }
+      ],
+      "updatedAt": "2026-01-01T00:00:00Z",
+      "version": 5
+    },
+    "after": {
+      "beats": [
+        {
+          "bpm": null,
+          "duration": 10,
+          "fileName": "Short.mp3",
+          "id": 1,
+          "size": 65,
+          "title": "Short"
+        },
+        {
+          "bpm": null,
+          "duration": 20,
+          "fileName": "Long.mp3",
+          "id": 2,
+          "size": 64,
+          "title": "Long"
+        }
+      ],
+      "loop": null,
+      "songId": 1,
+      "sounds": [],
+      "tracks": [
+        {
+          "clips": [
+            {
+              "activeTakeId": null,
+              "beatId": 1,
+              "fadeIn": 0,
+              "fadeOut": 0,
+              "gain": 0,
+              "id": 1,
+              "length": 10,
+              "name": null,
+              "nudge": 0,
+              "offset": 0,
+              "pitch": 0,
+              "soundId": null,
+              "start": 0,
+              "takes": [],
+              "tempo": 1
+            },
+            {
+              "activeTakeId": null,
+              "beatId": 2,
+              "fadeIn": 0,
+              "fadeOut": 0,
+              "gain": 0,
+              "id": 2,
+              "length": 20,
+              "name": null,
+              "nudge": 0,
+              "offset": 0,
+              "pitch": 0,
+              "soundId": null,
+              "start": 30,
+              "takes": [],
+              "tempo": 1
+            }
+          ],
+          "colour": 1,
+          "id": 1,
+          "muted": false,
+          "name": "Track 1",
+          "soloed": false,
+          "volume": 0
+        },
+        {
+          "clips": [
+            {
+              "activeTakeId": null,
+              "beatId": 2,
+              "fadeIn": 0,
+              "fadeOut": 0,
+              "gain": 0,
+              "id": 4,
+              "length": 6,
+              "name": null,
+              "nudge": 0,
+              "offset": 4,
+              "pitch": 0,
+              "soundId": null,
+              "start": 3,
+              "takes": [],
+              "tempo": 1
+            }
+          ],
+          "colour": 2,
+          "id": 2,
+          "muted": false,
+          "name": "Adlibs",
+          "soloed": false,
+          "volume": 0
+        },
+        {
+          "clips": [
+            {
+              "activeTakeId": null,
+              "beatId": 1,
+              "fadeIn": 0,
+              "fadeOut": 0,
+              "gain": 0,
+              "id": 3,
+              "length": 10,
+              "name": null,
+              "nudge": 0,
+              "offset": 0,
+              "pitch": 0,
+              "soundId": null,
+              "start": 0,
+              "takes": [],
+              "tempo": 1
+            }
+          ],
+          "colour": 4,
+          "id": 3,
+          "muted": false,
+          "name": "Adlibs 2",
+          "soloed": false,
+          "volume": 0
+        }
+      ],
+      "updatedAt": "2026-01-01T00:00:00Z",
+      "version": 6
+    }
+  },
+  {
     "name": "replace a Clip with others",
     "of": "timeline",
     "change": {
@@ -1969,9 +2465,11 @@
       "kind": "pasteClips",
       "newTracks": [
         {
+          "colour": 5,
           "name": "Adlibs 2"
         },
         {
+          "colour": 1,
           "name": " Adlibs 3 "
         }
       ]
@@ -2005,9 +2503,11 @@
         ],
         "newTracks": [
           {
+            "colour": 5,
             "name": "Adlibs 2"
           },
           {
+            "colour": 1,
             "name": " Adlibs 3 "
           }
         ]
@@ -2207,7 +2707,7 @@
               "tempo": 1
             }
           ],
-          "colour": 3,
+          "colour": 5,
           "id": 3,
           "muted": false,
           "name": "Adlibs 2",
@@ -2234,7 +2734,7 @@
               "tempo": 1
             }
           ],
-          "colour": 4,
+          "colour": 1,
           "id": 4,
           "muted": false,
           "name": "Adlibs 3",

@@ -8,9 +8,12 @@ import {
   gainLine,
   heroSong,
   middleOf,
+  namedClip,
+  redoButton,
   serverClips,
   timeline,
   trackHead,
+  undoButton,
 } from '../songPage';
 
 // A Clip's border in its Track's Track Colour, on the demo Backup's hero
@@ -96,6 +99,57 @@ test("a Clip moved to another Track takes that Track's colour", async ({ page, b
     (await bandmate.timeline(hero.id)).tracks.find((t) => t.name === 'Track 3')!.clips.length;
   await expect.poll(clipsOnTheNewTrack).toBe(1);
   await expectBorderIn(page, take, '--track-colour-3');
+});
+
+test("a Track a paste adds takes its source Track's colour, through undo and redo", async ({ page, bandmate }) => {
+  const hero = await heroSong(bandmate);
+  await page.goto(`/songs/${hero.id}`);
+  await expect(clip(page, 'Take 2')).toBeVisible();
+
+  // Pasted from Lead vox, the last Track, Take 2 runs a row past it.
+  await clip(page, 'Take 2').click();
+  await clip(page, 'Lorem Click').click({ modifiers: ['ControlOrMeta'] });
+  await page.keyboard.press('ControlOrMeta+c');
+  await page.keyboard.press('End');
+  await page.keyboard.press('ControlOrMeta+v');
+  const pasted = namedClip(page, 'Take 2, selected, 1:34 to 1:55');
+  await expect(pasted).toBeVisible();
+  await expectBorderIn(page, pasted, '--track-colour-2');
+
+  await undoButton(page).click();
+  await expect(pasted).toBeHidden();
+
+  await redoButton(page).click();
+  const redone = namedClip(page, 'Take 2, 1:34 to 1:55');
+  await expect(redone).toBeVisible();
+  await expectBorderIn(page, redone, '--track-colour-2');
+});
+
+test("undoing a Track's deletion brings its colour back", async ({ page, bandmate }) => {
+  const hero = await heroSong(bandmate);
+  await page.goto(`/songs/${hero.id}`);
+  await expect(clip(page, 'Take 2')).toBeVisible();
+  const addATrack = timeline(page).getByRole('button', { name: 'Add a Track' });
+  const deleteTrack = (name: string) => timeline(page).getByRole('button', { name: `Delete ${name} and its Clips` });
+  await addATrack.click();
+  await expect(trackHead(page, 'Track 3')).toBeVisible();
+  await addATrack.click();
+  await expect(trackHead(page, 'Track 4')).toBeVisible();
+
+  await deleteTrack('Lead vox').click();
+  await expect(clip(page, 'Take 2')).toBeHidden();
+  await deleteTrack('Track 3').click();
+  await expect(trackHead(page, 'Track 3')).toBeHidden();
+
+  // Lead vox's colour is the least used by now, so Track 3 only comes back
+  // in its own if it keeps it.
+  await undoButton(page).click();
+  await expect(trackHead(page, 'Track 3')).toBeVisible();
+  await undoButton(page).click();
+
+  await expectBorderIn(page, clip(page, 'Take 2'), '--track-colour-2');
+  const tracks = (await bandmate.timeline(hero.id)).tracks;
+  expect(tracks.map((t) => t.colour)).toEqual([1, 2, 3, 4]);
 });
 
 test("a Track's header shows no colour, and the Chosen Track's is marked in the accent", async ({ page, bandmate }) => {

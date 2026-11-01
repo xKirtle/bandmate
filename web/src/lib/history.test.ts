@@ -595,6 +595,7 @@ describe('History', () => {
       name: 'Beat',
       volume: -4.5,
       muted: true,
+      colour: 4,
     });
     const t0 = timeline([track(2), beat, track(3)]);
     const t1 = timeline([track(2), { ...beat, clips: [clip(5, 0), clip(6, 40, { offset: 2, length: 15 })] }, track(3)]);
@@ -610,6 +611,7 @@ describe('History', () => {
         volume: -4.5,
         muted: true,
         soloed: false,
+        colour: 4,
         clips: [
           { beatId: 100, start: 0, offset: 0, length: 10 },
           { beatId: 100, start: 40, offset: 2, length: 15 },
@@ -952,6 +954,7 @@ describe('History of Takes', () => {
         volume: 0,
         muted: false,
         soloed: false,
+        colour: 1,
         clips: [{ takeIds: [40], activeTakeId: 40, start: 10, offset: 2, length: 10 }],
       },
     });
@@ -1080,12 +1083,16 @@ describe('History of pasting', () => {
     const h = new History();
     const t0 = timeline([track(1), track(2, [clip(6, 0)])]);
     // Pasted from Track 2: one Clip there, and one on a Track added for it.
-    const t1 = timeline([track(1), track(2, [clip(6, 0), clip(7, 30)]), track(3, [clip(8, 35)], { name: 'Adlibs' })]);
+    const t1 = timeline([
+      track(1),
+      track(2, [clip(6, 0), clip(7, 30)]),
+      track(3, [clip(8, 35)], { name: 'Adlibs', colour: 5 }),
+    ]);
 
     h.record(
       {
         kind: 'pasteClips',
-        newTracks: [{ name: 'Adlibs' }],
+        newTracks: [{ name: 'Adlibs', colour: 5 }],
         clips: [
           { trackId: 2, clip: { beatId: 100, start: 30, offset: 0, length: 10 } },
           { newTrack: 0, clip: { beatId: 100, start: 35, offset: 0, length: 10 } },
@@ -1099,7 +1106,7 @@ describe('History of pasting', () => {
     h.undone(t1, t0);
     expect(h.nextRedo()).toEqual({
       kind: 'placeClips',
-      newTracks: [{ name: 'Adlibs' }],
+      newTracks: [{ name: 'Adlibs', colour: 5 }],
       clips: [
         { trackId: 2, clip: { beatId: 100, start: 30, offset: 0, length: 10 } },
         { newTrack: 0, clip: { beatId: 100, start: 35, offset: 0, length: 10 } },
@@ -1109,7 +1116,11 @@ describe('History of pasting', () => {
     // Redone, the Track and Clips come back with new ids, which undo then names.
     h.redone(
       t0,
-      timeline([track(1), track(2, [clip(6, 0), clip(9, 30)]), track(4, [clip(10, 35)], { name: 'Adlibs' })]),
+      timeline([
+        track(1),
+        track(2, [clip(6, 0), clip(9, 30)]),
+        track(4, [clip(10, 35)], { name: 'Adlibs', colour: 5 }),
+      ]),
     );
     expect(h.nextUndo()).toEqual({ kind: 'deleteClips', clipIds: [9, 10], trackIds: [4] });
   });
@@ -1117,11 +1128,11 @@ describe('History of pasting', () => {
   it('keeps naming a Track a paste added after it’s brought back by undoing its deletion', () => {
     const h = new History();
     const t0 = timeline([track(1)]);
-    const t1 = timeline([track(1), track(3, [clip(8, 0)], { name: 'Adlibs' })]);
+    const t1 = timeline([track(1), track(3, [clip(8, 0)], { name: 'Adlibs', colour: 5 })]);
     h.record(
       {
         kind: 'pasteClips',
-        newTracks: [{ name: 'Adlibs' }],
+        newTracks: [{ name: 'Adlibs', colour: 5 }],
         clips: [{ newTrack: 0, clip: { beatId: 100, start: 0, offset: 0, length: 10 } }],
       },
       t0,
@@ -1129,7 +1140,7 @@ describe('History of pasting', () => {
     );
     h.record({ kind: 'updateTrack', trackId: 3, changes: { muted: true } }, t1, {
       ...t1,
-      tracks: [track(1), track(3, [clip(8, 0)], { name: 'Adlibs', muted: true })],
+      tracks: [track(1), track(3, [clip(8, 0)], { name: 'Adlibs', colour: 5, muted: true })],
     });
 
     // Undo the mute, then the paste, then redo the paste: the mute's redo

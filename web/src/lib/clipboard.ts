@@ -22,11 +22,11 @@ export interface CopiedClip {
 
 export interface Clipboard {
   /**
-   * The names of the Tracks the Clips came from, in order: from the topmost
-   * Clip's Track to the bottommost's, those between included, to name the
-   * Tracks a paste adds.
+   * The Tracks the Clips came from, in order: from the topmost Clip's Track
+   * to the bottommost's, those between included, each as it was then, to
+   * name and colour the Tracks a paste adds.
    */
-  tracks: readonly string[];
+  tracks: readonly TrackToAdd[];
   /** The Clips copied, in Timeline order. */
   clips: readonly CopiedClip[];
 }
@@ -65,7 +65,7 @@ export function copy(tracks: readonly Track[], selected: ClipIds): Clipboard | n
   const top = copied[0].trackIndex;
   const bottom = copied[copied.length - 1].trackIndex;
   return {
-    tracks: tracks.slice(top, bottom + 1).map((t) => t.name),
+    tracks: tracks.slice(top, bottom + 1).map(({ name, colour }) => ({ name, colour })),
     clips: copied.map(({ trackIndex, clip }) => ({ below: trackIndex - top, clip })),
   };
 }
@@ -75,11 +75,11 @@ export function copy(tracks: readonly Track[], selected: ClipIds): Clipboard | n
  * Track: its earliest Clip starts at the playhead, its topmost Clip goes on
  * the Chosen Track, and the rest keep their places relative to those, in
  * time and in Tracks. Rows that run past the last Track go on new Tracks,
- * added at the bottom and named after the Tracks they came from. Where that
- * would land any Clip on another, the whole paste goes later, together, to
- * the first place where every Clip fits, so pasting again at the same
- * playhead lays copies end to end. Null if there's nothing to paste, or
- * nowhere to paste it.
+ * added at the bottom with the names and colours of the Tracks they came
+ * from. Where that would land any Clip on another, the whole paste goes
+ * later, together, to the first place where every Clip fits, so pasting
+ * again at the same playhead lays copies end to end. Null if there's nothing
+ * to paste, or nowhere to paste it.
  */
 export function paste(
   clipboard: Clipboard,
@@ -114,7 +114,7 @@ export function paste(
   }
   const adding = Math.max(chosen + clipboard.tracks.length - tracks.length, 0);
   return {
-    newTracks: clipboard.tracks.slice(clipboard.tracks.length - adding).map((name) => ({ name })),
+    newTracks: clipboard.tracks.slice(clipboard.tracks.length - adding),
     clips: laid.map(({ clip, after, on, newTrack }) => {
       const placed = { ...clip, start: at + after };
       return on ? { trackId: on.id, clip: placed } : { newTrack, clip: placed };

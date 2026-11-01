@@ -237,15 +237,15 @@ func (a *App) placeClip(w http.ResponseWriter, r *http.Request) {
 
 func (a *App) placeClips(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		NewTracks []newTrack    `json:"newTracks"`
-		Clips     []clipToPlace `json:"clips"`
+		NewTracks []timeline.TrackToAdd `json:"newTracks"`
+		Clips     []clipToPlace         `json:"clips"`
 	}
 	a.changeTimeline(w, r, &req, func(id int64, based songversion.Version) (timeline.Timeline, error) {
 		clips, err := placedClips(req.Clips)
 		if err != nil {
 			return timeline.Timeline{}, err
 		}
-		return a.timelines.PlaceClips(r.Context(), id, based, trackNames(req.NewTracks), clips)
+		return a.timelines.PlaceClips(r.Context(), id, based, req.NewTracks, clips)
 	})
 }
 
@@ -303,21 +303,6 @@ func (a *App) duplicateClip(w http.ResponseWriter, r *http.Request) {
 	a.changeClip(w, r, nil, a.timelines.DuplicateClip)
 }
 
-// newTrack is a Track to add at the bottom for Clips placed or pasted at
-// once to go on, as a request gives it.
-type newTrack struct {
-	Name string `json:"name"`
-}
-
-// trackNames is the names of the Tracks to add.
-func trackNames(tracks []newTrack) []string {
-	names := make([]string, len(tracks))
-	for i, t := range tracks {
-		names[i] = t.Name
-	}
-	return names
-}
-
 // clipToPaste is a Clip as it was copied, to paste on a Track, as a request
 // gives it: as a Clip to place, but with a Clip of Takes' Takes as they
 // were, rather than their ids.
@@ -339,8 +324,8 @@ func (c clipToPaste) copied() (timeline.ClipCopy, error) {
 
 func (a *App) pasteClips(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		NewTracks []newTrack    `json:"newTracks"`
-		Clips     []clipToPaste `json:"clips"`
+		NewTracks []timeline.TrackToAdd `json:"newTracks"`
+		Clips     []clipToPaste         `json:"clips"`
 	}
 	a.changeTimeline(w, r, &req, func(id int64, based songversion.Version) (timeline.Timeline, error) {
 		clips := make([]timeline.ClipCopy, len(req.Clips))
@@ -351,7 +336,7 @@ func (a *App) pasteClips(w http.ResponseWriter, r *http.Request) {
 			}
 			clips[i] = copied
 		}
-		return a.timelines.PasteClips(r.Context(), id, based, trackNames(req.NewTracks), clips)
+		return a.timelines.PasteClips(r.Context(), id, based, req.NewTracks, clips)
 	})
 }
 
