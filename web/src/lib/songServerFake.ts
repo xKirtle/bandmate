@@ -11,6 +11,7 @@ import {
   type ClipMerge,
   type ClipMove,
   type NewClip,
+  type OnTrack,
   type OwnOfClip,
   type Section,
   type Song,
@@ -20,6 +21,7 @@ import {
   type TakePlacement,
   type Timeline,
   type Track,
+  type TrackToAdd,
 } from './api';
 import { sourceAt } from './clipTime';
 import { isFree } from './trackPlacement';
@@ -219,7 +221,7 @@ export class FakeSongServer implements SongServer {
 
   /**
    * What a Timeline edit does, for the edits the fake models: the Loop's,
-   * adding, changing and deleting a Track, and placing, pasting (adding
+   * adding, changing and deleting a Track, and placing and pasting (adding
    * Tracks at the bottom for rows past the last), duplicating, moving,
    * splitting, renaming, setting the Gain, Fades, Tempo and Pitch of and
    * deleting Clips of a Beat or a Sound. A Track changed or a Clip renamed
@@ -243,11 +245,15 @@ export class FakeSongServer implements SongServer {
       case 'clearLoop':
         return (tl) => ({ ...tl, loop: null });
       case 'addTrack': {
-        // A Track brought back as it was, where it was, isn't modelled.
-        const { name, ...asItWas } = edit.track;
-        if (Object.keys(asItWas).length > 0) throw notModelled(edit);
+        // Empty at the bottom, or brought back as it was, where it was. One
+        // with a Clip of Takes isn't modelled.
+        const { name, position, volume = 0, muted = false, soloed = false, colour, clips = [] } = edit.track;
+        if (clips.some((c) => 'takeIds' in c)) throw notModelled(edit);
         return (tl) => {
-          return { ...tl, tracks: [...tl.tracks, emptyTrack(this.#nextTrackId++, name)] };
+          const added = { ...emptyTrack(this.#nextTrackId++, name, tl.tracks, colour), volume, muted, soloed };
+          const at = position ?? tl.tracks.length;
+          const tracks = [...tl.tracks.slice(0, at), added, ...tl.tracks.slice(at)];
+          return clips.reduce((t, c) => place(t, added.id, c), { ...tl, tracks });
         };
       }
       case 'updateTrack': {
@@ -266,27 +272,29 @@ export class FakeSongServer implements SongServer {
         return (tl) => place(tl, edit.trackId, edit.clip);
       case 'placeClips':
       case 'replaceClips': {
-        if (edit.newTracks || ('trackIds' in edit && edit.trackIds)) throw notModelled(edit);
-        const placed = edit.clips.map((c) => {
-          if (!('trackId' in c) || 'takeIds' in c.clip) throw notModelled(edit);
-          return c;
-        });
+        // A Merge's Track, added or deleted by replacing Clips, isn't modelled.
+        if (
+          edit.kind === 'replaceClips' &&
+          (edit.newTracks || edit.trackIds || edit.clips.some((c) => 'newTrack' in c))
+        ) {
+          throw notModelled(edit);
+        }
+        if (edit.clips.some((c) => 'takeIds' in c.clip)) throw notModelled(edit);
         const replaced = edit.kind === 'replaceClips' ? edit.clipIds : [];
-        return (tl) => placed.reduce((t, c) => place(t, c.trackId, c.clip), withoutClips(tl, replaced));
+        const newTracks = edit.kind === 'placeClips' ? (edit.newTracks ?? []) : [];
+        return (tl) => {
+          const { withAdded, trackOf } = this.#addedAtTheBottom(withoutClips(tl, replaced), newTracks);
+          return edit.clips.reduce((t, c) => place(t, trackOf(c), c.clip), withAdded);
+        };
       }
       case 'pasteClips': {
-        // Tracks it adds go at the bottom first, for Clips that run past the last.
         const pasted = edit.clips.map((c) => {
           if ('takes' in c.clip) throw notModelled(edit);
           return { on: c, clip: c.clip as NewClip };
         });
         return (tl) => {
-          const added = edit.newTracks.map(({ name }) => emptyTrack(this.#nextTrackId++, name));
-          const withAdded = { ...tl, tracks: [...tl.tracks, ...added] };
-          return pasted.reduce(
-            (t, { on, clip }) => place(t, 'trackId' in on ? on.trackId : added[on.newTrack].id, clip),
-            withAdded,
-          );
+          const { withAdded, trackOf } = this.#addedAtTheBottom(tl, edit.newTracks);
+          return pasted.reduce((t, { on, clip }) => place(t, trackOf(on), clip), withAdded);
         };
       }
       case 'duplicateClip': {
@@ -523,6 +531,21 @@ export class FakeSongServer implements SongServer {
     return { ...song, sections };
   }
 
+  /**
+   * A Timeline with Tracks added at the bottom, first, for Clips placed or
+   * pasted at once to go on, and the id of the Track each of those goes on.
+   */
+  #addedAtTheBottom(tl: Timeline, newTracks: TrackToAdd[]) {
+    const added: Track[] = [];
+    for (const { name, colour } of newTracks) {
+      added.push(emptyTrack(this.#nextTrackId++, name, [...tl.tracks, ...added], colour));
+    }
+    return {
+      withAdded: { ...tl, tracks: [...tl.tracks, ...added] },
+      trackOf: (on: OnTrack) => ('trackId' in on ? on.trackId : added[on.newTrack].id),
+    };
+  }
+
   /** A Clip placed, with the next id. */
   #clip(placed: NewClip): Clip {
     const { start, offset, length } = placed;
@@ -620,7 +643,7 @@ export class FakeSongServer implements SongServer {
       else {
         const { name, position } = merge.newTrack;
         trackId = this.#nextTrackId++;
-        const added: Track = { id: trackId, name, volume: 0, muted: false, soloed: false, clips: [] };
+        const added = emptyTrack(trackId, name, tracks);
         tracks = [...tracks.slice(0, position), added, ...tracks.slice(position)];
       }
       const soundId = this.#sound('Merged Clip', 'Merged Clip.wav', wav.size, end - start);
@@ -702,9 +725,18 @@ const noSuchTrack = () => new ApiError(400, "there's no such Track on this Timel
 
 const notModelled = (change: Edit | LyricSheetChange) => new Error(`${change.kind} is not modelled`);
 
-/** A new Track, empty, at 0 dB, neither muted nor soloed, its name trimmed. */
-function emptyTrack(id: number, name: string): Track {
-  return { id, name: name.trim(), volume: 0, muted: false, soloed: false, clips: [] };
+/**
+ * A new Track among tracks, empty, at 0 dB, neither muted nor soloed, its
+ * name trimmed, in the colour given, or else the one least used among them.
+ */
+function emptyTrack(id: number, name: string, tracks: Track[], colour = leastUsedColour(tracks)): Track {
+  return { id, name: name.trim(), volume: 0, muted: false, soloed: false, colour, clips: [] };
+}
+
+/** The Track Colour on the fewest of tracks, the earliest in the set if several tie. */
+function leastUsedColour(tracks: Track[]): number {
+  const uses = (colour: number) => tracks.filter((t) => t.colour === colour).length;
+  return [2, 3, 4, 5, 6].reduce((least, colour) => (uses(colour) < uses(least) ? colour : least), 1);
 }
 
 /**

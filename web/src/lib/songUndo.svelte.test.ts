@@ -27,8 +27,16 @@ const beatClip = (id: number, start: number, end: number): Clip => ({
 
 /** Two Tracks: a Beat in Clips 1 (0–10 s) and 2 (20–30 s), and an empty one. */
 const twoTracks = (): Track[] => [
-  { id: 1, name: 'Track 1', volume: 0, muted: false, soloed: false, clips: [beatClip(1, 0, 10), beatClip(2, 20, 30)] },
-  { id: 2, name: 'Track 2', volume: 0, muted: false, soloed: false, clips: [] },
+  {
+    id: 1,
+    name: 'Track 1',
+    volume: 0,
+    muted: false,
+    soloed: false,
+    colour: 1,
+    clips: [beatClip(1, 0, 10), beatClip(2, 20, 30)],
+  },
+  { id: 2, name: 'Track 2', volume: 0, muted: false, soloed: false, colour: 1, clips: [] },
 ];
 
 /**

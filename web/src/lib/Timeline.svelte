@@ -1814,6 +1814,7 @@
           <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_noninteractive_element_interactions -->
           <div
             class="head"
+            style:--row-colour="var(--track-colour-{track.colour})"
             class:chosen={track.id === chosen}
             class:file-target={track.id === fileTarget}
             class:dragged={trackDrag.current?.dragged === i}
@@ -2010,6 +2011,7 @@
               <!-- svelte-ignore a11y_no_static_element_interactions -->
               <div
                 class="lane"
+                style:--row-colour="var(--track-colour-{track.colour})"
                 class:file-target={track.id === fileTarget}
                 class:dragged={trackDrag.current?.dragged === t}
                 class:drop-above={trackGap === t}
@@ -2044,6 +2046,7 @@
                     class:fading={editing && isFadeEnd(clipDrag.mode)}
                     class:retaking={clip.id === recorder.clipId}
                     class:selected={isSelected}
+                    style:--clip-colour="var(--track-colour-{track.colour})"
                     style:left="{percent(at.start)}%"
                     style:width="{percent(at.length)}%"
                     {title}
@@ -2364,8 +2367,6 @@
     --timeline-rem: calc(var(--timeline-scale) * 1rem);
     /* The page's control size, scaled, and never smaller than it. */
     --touch: max(var(--control), calc(var(--timeline-scale) * var(--control)));
-    /* The shared edge, scaled to the room left for it on a Track's header. */
-    --selected-edge: inset calc(0.1875 * var(--timeline-rem)) 0 0 var(--accent);
     /* Docked at the bottom of the window, directly above the tab bar if there is one. */
     position: sticky;
     bottom: var(--nav-bottom-space);
@@ -2578,16 +2579,18 @@
   .lane.drop-below::after {
     bottom: -2px;
   }
-  /* Marked along its left edge, in the room left for it. */
+  /* Marked along its left edge, in the room left for it, and tinted, both in its Track Colour. */
   .head.chosen {
+    --selected-edge: inset calc(0.1875 * var(--timeline-rem)) 0 0 var(--row-colour);
     box-shadow: var(--selected-edge);
-    background: color-mix(in srgb, var(--accent) 8%, transparent);
+    background: color-mix(in srgb, var(--row-colour) 8%, transparent);
   }
-  /* The Track audio files dragged over the Timeline would be imported onto, across its header and lane. */
+  /* The Track audio files dragged over the Timeline would be imported onto, across its header and lane, in its Track Colour. */
   .head.file-target,
   .lane.file-target {
+    --selected-outline: inset 0 0 0 2px var(--row-colour);
     box-shadow: var(--selected-outline);
-    background: color-mix(in srgb, var(--accent) 16%, transparent);
+    background: color-mix(in srgb, var(--row-colour) 16%, transparent);
   }
   .head-row {
     display: flex;
@@ -2665,7 +2668,7 @@
     min-width: 0;
     min-height: 0;
     padding: 0;
-    accent-color: var(--accent);
+    accent-color: var(--row-colour);
     /* The browser draws the slider at its own size, so it's zoomed instead. */
     zoom: var(--timeline-scale);
   }
@@ -2917,7 +2920,7 @@
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    border: 1px solid var(--accent);
+    border: 1px solid var(--clip-colour);
     border-radius: calc(0.375 * var(--timeline-rem));
     background: var(--surface-1);
     /* A long press opens the Clip's menu, not the browser's text selection or callout. */
@@ -2931,16 +2934,17 @@
   }
   .clip:focus-visible,
   .clip.editing {
-    outline: 2px solid var(--accent);
+    outline: 2px solid var(--clip-colour);
     outline-offset: 1px;
   }
   .clip.editing {
     z-index: 1;
   }
-  /* Selected: ringed inside its border and the focus ring, and a brighter fill. */
+  /* Selected: ringed inside its border and the focus ring, and a brighter fill, both in its Track Colour. */
   .clip.selected {
+    --selected-outline: inset 0 0 0 2px var(--clip-colour);
     box-shadow: var(--selected-outline);
-    background: color-mix(in srgb, var(--accent) 16%, var(--surface-1));
+    background: color-mix(in srgb, var(--clip-colour) 16%, var(--surface-1));
   }
   .clip.moving {
     cursor: grabbing;
@@ -2959,6 +2963,7 @@
     pointer-events: none;
   }
   .clip.taking {
+    --clip-colour: var(--accent);
     border-color: var(--danger);
     background: color-mix(in srgb, var(--danger) 15%, var(--surface-1));
     cursor: default;
@@ -3013,7 +3018,7 @@
   }
   .clip-more:hover,
   :global(:root:not([data-pointer-focus]) :focus-visible) > .clip-more {
-    color: var(--accent);
+    color: var(--clip-colour);
   }
   .trim {
     position: absolute;
@@ -3029,7 +3034,7 @@
     right: 0;
   }
   .trim:hover {
-    background: var(--accent);
+    background: var(--clip-colour);
     opacity: 0.4;
   }
   .wave {
@@ -3043,7 +3048,7 @@
     height: 100%;
   }
   rect {
-    fill: var(--accent);
+    fill: var(--clip-colour);
     opacity: 0.7;
   }
   /*
@@ -3073,14 +3078,14 @@
     opacity: 0.35;
   }
   .gain-line.changed::before {
-    background: var(--accent);
+    background: var(--clip-colour);
     opacity: 0.8;
   }
   .gain-line:hover::before,
   .clip.gaining .gain-line::before {
     height: 2px;
     margin-top: -0.5px;
-    background: var(--accent);
+    background: var(--clip-colour);
     opacity: 1;
   }
   /* A Clip's Fades, drawn as straight slopes over its waveform, whatever their curve. */
@@ -3091,7 +3096,7 @@
     pointer-events: none;
   }
   .fade-slopes line {
-    stroke: var(--accent);
+    stroke: var(--clip-colour);
     stroke-width: 1.5px;
     vector-effect: non-scaling-stroke;
     opacity: 0.8;
@@ -3124,7 +3129,7 @@
     inset: 25%;
     border: 1px solid var(--bg);
     border-radius: var(--radius-full);
-    background: var(--accent);
+    background: var(--clip-colour);
   }
   .fade-dot:hover::before,
   .clip.fading .fade-dot::before {

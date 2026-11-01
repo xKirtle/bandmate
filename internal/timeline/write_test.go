@@ -109,8 +109,8 @@ func TestWriteTimelineRoundTrip(t *testing.T) {
 	riff.Name, riff.Gain, riff.Pitch, riff.FadeIn = &named, -6, 2, 1.5
 	takeClip := Clip{ID: 2, Tempo: 1, Takes: takes, ActiveTakeID: &takes[1].ID, Start: 70, Length: 10}
 	first := Timeline{Tracks: []Track{
-		{ID: trackID, Name: "Track 1", Clips: []Clip{riff}},
-		{ID: 2, Name: "Harmony", Volume: -3, Muted: true, Clips: []Clip{takeClip}},
+		{ID: trackID, Name: "Track 1", Colour: 1, Clips: []Clip{riff}},
+		{ID: 2, Name: "Harmony", Volume: -3, Muted: true, Colour: 4, Clips: []Clip{takeClip}},
 	}}
 	if got := writeAndRead(t, conn, songID, first); !reflect.DeepEqual(got, first.Tracks) {
 		t.Fatalf("after writing new rows, loaded\n%+v\nwant\n%+v", got, first.Tracks)
@@ -124,7 +124,7 @@ func TestWriteTimelineRoundTrip(t *testing.T) {
 	kept.Position = 2
 	takeClip.Takes = []Take{kept}
 	second := Timeline{Tracks: []Track{
-		{ID: 2, Name: "Harmony", Volume: -3, Muted: true, Clips: []Clip{moved, takeClip}},
+		{ID: 2, Name: "Harmony", Volume: -3, Muted: true, Colour: 4, Clips: []Clip{moved, takeClip}},
 	}}
 	if got := writeAndRead(t, conn, songID, second); !reflect.DeepEqual(got, second.Tracks) {
 		t.Fatalf("after writing changed rows, loaded\n%+v\nwant\n%+v", got, second.Tracks)
@@ -154,12 +154,12 @@ func TestWriteTimelineRoundTrip(t *testing.T) {
 func TestStoredIDsNeverReuseAnID(t *testing.T) {
 	conn, songID, trackID, beat := newSong(t)
 	writeAndRead(t, conn, songID, Timeline{Tracks: []Track{
-		{ID: trackID, Name: "Track 1", Clips: []Clip{clipOfBeat(1, beat, 0), clipOfBeat(2, beat, 70)}},
-		{ID: 2, Name: "Harmony", Clips: []Clip{}},
+		{ID: trackID, Name: "Track 1", Colour: 1, Clips: []Clip{clipOfBeat(1, beat, 0), clipOfBeat(2, beat, 70)}},
+		{ID: 2, Name: "Harmony", Colour: 2, Clips: []Clip{}},
 	}})
 	// The last-used ids are deleted, so the next ones mustn't take them.
 	writeAndRead(t, conn, songID, Timeline{Tracks: []Track{
-		{ID: trackID, Name: "Track 1", Clips: []Clip{clipOfBeat(1, beat, 0)}},
+		{ID: trackID, Name: "Track 1", Colour: 1, Clips: []Clip{clipOfBeat(1, beat, 0)}},
 	}})
 
 	ctx := context.Background()

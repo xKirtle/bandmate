@@ -30,7 +30,7 @@ Colours are named by role, never by hue, so a component reads the same in every 
 - **Ink**: fountain-pen blue on cream, or blue-black.
 - **Olive**: muted green on stone.
 
-The user picks a Palette, and System, Light or Dark, in Settings, kept per device (`appearance.ts`) and falling back to Terracotta and System without storage. The `data-palette` attribute on the root element shows one (`ink` or `olive`; Terracotta when it's absent), and `data-theme` shows `light` or `dark`, set from the system under System; a script in `index.html` sets both before the first paint, so the page never flashes the default. `data-palette` on an element inside the page shows another Palette there, as Settings' swatches do. Light or dark is picked by attribute alone, never `light-dark()`, which breaks every colour on Safari before 17.5. All Clips on the Timeline use the one accent, and the Chosen Track is marked by an accent edge on its header.
+The user picks a Palette, and System, Light or Dark, in Settings, kept per device (`appearance.ts`) and falling back to Terracotta and System without storage. The `data-palette` attribute on the root element shows one (`ink` or `olive`; Terracotta when it's absent), and `data-theme` shows `light` or `dark`, set from the system under System; a script in `index.html` sets both before the first paint, so the page never flashes the default. `data-palette` on an element inside the page shows another Palette there, as Settings' swatches do. Light or dark is picked by attribute alone, never `light-dark()`, which breaks every colour on Safari before 17.5. A Clip's border, waveform, Fade slopes and changed Gain line are in its Track's Track Colour, which it sets on the Clip as `--clip-colour`, whichever Track it's dragged over. A Track's header and lane set it as `--row-colour`, for its volume slider's `accent-color`, the edge and tint that mark the Chosen Track, and the outline and tint on a Track a file is dragged over. A selected Clip's ring and fill, its focus outline, its fade dots, and its controls in use (a Gain line hovered or dragged, a trim edge or its ⋯ hovered) are in its Track Colour too, as a Palette's accent looks wrong over another colour; an unchanged Gain line stays neutral at rest. On a Clip the accent is left to the waveform of one being recorded, and in a Track's header Mute and Solo keep it while on. The Clip being recorded has the danger colour's border and fill, and its waveform stays in the accent, so the danger bars that mark clipped peaks show against it.
 
 | Token                          | For                                                                     |
 | ------------------------------ | ----------------------------------------------------------------------- |
@@ -43,6 +43,7 @@ The user picks a Palette, and System, Light or Dark, in Settings, kept per devic
 | `--drafting-*`, `--finished-*` | The drafting and finished Status badges (`-bg` and `-fg`)               |
 | `--shelved-*`                  | The shelved Status badge (`-bg` and `-fg`)                              |
 | `--piano-white`, `--piano-black` | A piano's white and black keys in a keyboard drawing, the black also edging every key                           |
+| `--track-colour-1` to `--track-colour-6` | The six Track Colours: what tells one Track from another, on its Clips and its header, numbered rather than named by hue, as each Palette has its own shades |
 
 Shared by every Palette, the scrim and the only shadows there are:
 
@@ -53,9 +54,11 @@ Shared by every Palette, the scrim and the only shadows there are:
 | `--on-scrim`         | Drawn on the scrim, whatever the theme, e.g. the Cover crop's frame        |
 | `--paper`, `--ink`   | A Print's white and black: under print media every colour token on the paper is one of them |
 | `--shadow-float`     | Lifts a floating layer (a popover, menu or floating bar) off the page      |
-| `--selected-outline` | Rings what's selected, such as a Clip, or what a drop would land on        |
-| `--selected-edge`    | Marks the current or chosen row along its left edge, e.g. the Chosen Track |
+| `--selected-outline` | Rings what's selected, or what a drop would land on; a selected Clip, or a Track a file is dragged over, sets its own, in its Track Colour |
+| `--selected-edge`    | Marks the current or chosen row along its left edge; the Chosen Track's header sets its own, in its Track Colour |
 | `--invalid-outline`  | Rings a field holding an invalid value, inside its danger border           |
+
+**Track Colours** are muted, and never near the accent, which is left to what's active. Each shade is held to 3:1 against a Clip's background, selected or not, even at the opacity a waveform is drawn at, and against its Track's header, tinted or not, for its volume slider and the Chosen Track's edge; its OKLCH chroma stays at 0.1 or under, so it's low in saturation and not in contrast; and it sits at least 50° of OKLCH hue and 0.1 of OKLab difference from its Palette's accent, so no Clip looks like the one being recorded. The set is in the order Tracks take it, and most Songs only ever show the first two, so in each Palette and theme those are its most distinct pair. `palettes.test.ts` checks all of this.
 
 A literal colour is written only in `palettes.css`, and a `box-shadow` is always one of these tokens: Stylelint fails anything else. A tint of a token, such as `color-mix(in srgb, var(--accent) 12%, transparent)`, is allowed.
 

@@ -27,6 +27,7 @@ const track = (id: number, clips: Clip[] = []): Track => ({
   volume: 0,
   muted: false,
   soloed: false,
+  colour: 1,
   clips,
 });
 
@@ -106,11 +107,15 @@ describe('copy', () => {
     ]);
   });
 
-  it('holds how far below the topmost copied each Clip was, and the names of the Tracks they came from, those between included', () => {
+  it('holds how far below the topmost copied each Clip was, and the names and colours of the Tracks they came from, those between included', () => {
     const tracks = [track(1), track(2, [clip(5, 0)]), track(3), track(4, [clip(6, 30)])];
 
     expect(copy(tracks, new Set([5, 6]))).toEqual({
-      tracks: ['Track 2', 'Track 3', 'Track 4'],
+      tracks: [
+        { name: 'Track 2', colour: 1 },
+        { name: 'Track 3', colour: 1 },
+        { name: 'Track 4', colour: 1 },
+      ],
       clips: [
         { below: 0, clip: { beatId: 100, start: 0, offset: 0, length: 10 } },
         { below: 2, clip: { beatId: 100, start: 30, offset: 0, length: 10 } },
@@ -247,7 +252,23 @@ describe('paste', () => {
       const pasted = paste(clipboard, tracks, 0, 2)!;
 
       expect(landing(pasted)).toEqual(['2:6', 'new 1:0']);
-      expect(pasted.newTracks).toEqual([{ name: 'Track 3' }, { name: 'Track 4' }]);
+      expect(pasted.newTracks).toEqual([
+        { name: 'Track 3', colour: 1 },
+        { name: 'Track 4', colour: 1 },
+      ]);
+    });
+
+    it('adds them in the colours their Tracks had when copied, whatever has happened to those since', () => {
+      const tracks: Track[] = [
+        { ...track(1, [clip(5, 0)]), name: 'Beat', colour: 3 },
+        { ...track(2, [clip(6, 0)]), name: 'Vox', colour: 5 },
+      ];
+      const clipboard = copy(tracks, new Set([5, 6]))!;
+
+      // Beat renamed and Vox deleted, with another Track added.
+      const since = [{ ...tracks[0], name: 'Drums' }, track(3)];
+
+      expect(paste(clipboard, since, 0, 3)!.newTracks).toEqual([{ name: 'Vox', colour: 5 }]);
     });
 
     it('goes later as a whole to the first place every Clip fits, on every Track it touches', () => {

@@ -436,6 +436,8 @@ export interface Track {
   muted: boolean;
   /** When any Track is soloed, only the soloed ones are heard. */
   soloed: boolean;
+  /** Which of the Track Colours it has, from 1 to 6: the shade is --track-colour-N in this Device's Palette. */
+  colour: number;
   /** In the order they start; they never overlap. */
   clips: Clip[];
 }
@@ -586,8 +588,12 @@ export interface TakePlacement extends Captured {
  */
 export type OnTrack = { trackId: number } | { newTrack: number };
 
-/** A Track added at the bottom for Clips placed or pasted at once to go on: empty, at 0 dB, neither muted nor soloed. */
-export type TrackToAdd = Pick<NewTrack, 'name'>;
+/**
+ * A Track added at the bottom for Clips placed or pasted at once to go on:
+ * empty, at 0 dB, neither muted nor soloed, in the Track Colour of the Track
+ * it carries on the Clips of.
+ */
+export type TrackToAdd = Pick<Track, 'name' | 'colour'>;
 
 /** A Clip to place, and the Track it goes on. */
 export type PlacedClip = OnTrack & { clip: NewClip };
@@ -657,7 +663,8 @@ export type ClipFades = Pick<Clip, 'fadeIn' | 'fadeOut'>;
 
 /**
  * A Track to add: by default empty, at the bottom, at 0 dB and neither muted
- * nor soloed. Undo uses the rest to bring a deleted Track back as it was.
+ * nor soloed, in a Track Colour of its own. Undo uses the rest to bring a
+ * deleted Track back as it was.
  */
 export interface NewTrack {
   name: string;
@@ -666,6 +673,7 @@ export interface NewTrack {
   volume?: number;
   muted?: boolean;
   soloed?: boolean;
+  colour?: number;
   clips?: NewClip[];
 }
 

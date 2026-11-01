@@ -111,7 +111,7 @@ const timeline = (clips: Clip[], beats: ClipBeat[], sounds: Sound[] = []): Timel
   songId: 1,
   version: 1,
   updatedAt: '',
-  tracks: [{ id: 1, name: 'Beat', volume: 0, muted: false, soloed: false, clips }],
+  tracks: [{ id: 1, name: 'Beat', volume: 0, muted: false, soloed: false, colour: 1, clips }],
   beats,
   sounds,
   loop: null,

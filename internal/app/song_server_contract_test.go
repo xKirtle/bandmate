@@ -295,6 +295,12 @@ func contractCases() []contractCase {
 			track := obj{"name": " Keys  "}
 			return sends(p.song.ID, "addTrack", obj{"track": track}, http.MethodPost, "/timeline/tracks", track)
 		}},
+		{"bring a Track back as it was, where it was", func(ts *testServer) contractChange {
+			p := twoClipsOf(ts)
+			track := obj{"name": "Beat", "position": 1, "volume": -3, "muted": true, "soloed": false, "colour": 5,
+				"clips": []obj{beatClip(p.short.ID, 2, 1, 4)}}
+			return sends(p.song.ID, "addTrack", obj{"track": track}, http.MethodPost, "/timeline/tracks", track)
+		}},
 		{"rename a Track and set its levels", func(ts *testServer) contractChange {
 			p := twoClipsOf(ts)
 			changes := obj{"name": "  Vocals ", "volume": -6.5, "muted": true, "soloed": true}
@@ -323,6 +329,14 @@ func contractCases() []contractCase {
 			return sends(p.song.ID, "placeClips", obj{"clips": []obj{a, b}},
 				http.MethodPost, "/timeline/clips/place", obj{"newTracks": []obj{}, "clips": []obj{sentA, sentB}})
 		}},
+		{"place Clips onto Tracks added at the bottom, in their colours", func(ts *testServer) contractChange {
+			p := twoClipsOf(ts)
+			a, sentA := onTrack(obj{"newTrack": 0}, beatClip(p.short.ID, 0, 0, 10))
+			b, sentB := onTrack(obj{"trackId": adlibs(p)}, beatClip(p.long.ID, 3, 4, 6))
+			newTracks := []obj{{"name": "Adlibs 2", "colour": 4}}
+			return sends(p.song.ID, "placeClips", obj{"clips": []obj{a, b}, "newTracks": newTracks},
+				http.MethodPost, "/timeline/clips/place", obj{"newTracks": newTracks, "clips": []obj{sentA, sentB}})
+		}},
 		{"replace a Clip with others", func(ts *testServer) contractChange {
 			p := twoClipsOf(ts)
 			a, sentA := onTrack(obj{"trackId": adlibs(p)}, beatClip(p.short.ID, 2, 0, 8))
@@ -345,7 +359,7 @@ func contractCases() []contractCase {
 			a, sentA := onTrack(obj{"newTrack": 1}, beatClip(p.short.ID, 3, 0, 10))
 			b, sentB := onTrack(obj{"trackId": adlibs(p)}, beatClip(p.long.ID, 3, 4, 6))
 			c, sentC := onTrack(obj{"newTrack": 0}, beatClip(p.long.ID, 0, 0, 20))
-			newTracks := []obj{{"name": "Adlibs 2"}, {"name": " Adlibs 3 "}}
+			newTracks := []obj{{"name": "Adlibs 2", "colour": 5}, {"name": " Adlibs 3 ", "colour": 1}}
 			return sends(p.song.ID, "pasteClips", obj{"clips": []obj{a, b, c}, "newTracks": newTracks},
 				http.MethodPost, "/timeline/clips/paste", obj{"newTracks": newTracks, "clips": []obj{sentA, sentB, sentC}})
 		}},

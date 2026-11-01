@@ -56,6 +56,9 @@ type Track struct {
 	Muted  bool    `json:"muted"`
 	// Soloed Tracks are the only ones heard, when there are any.
 	Soloed bool `json:"soloed"`
+	// Colour is which of the Track Colours it has, from 1 to TrackColours.
+	// It's set when the Track is made, and never changes.
+	Colour int `json:"colour"`
 	// Clips are in the order they start, and never overlap.
 	Clips []Clip `json:"clips"`
 }
@@ -119,6 +122,10 @@ type Beat struct {
 	Size     int64   `json:"size"`
 	Duration float64 `json:"duration"`
 }
+
+// TrackColours is how many Track Colours there are. The tracks table's CHECK
+// and web/src/palettes.css's --track-colour-* tokens hold the same number.
+const TrackColours = 6
 
 // MinVolume and MaxVolume are a Track's lowest and highest volume, in dB.
 // Even at its lowest a Track is heard: muting it is what silences it. The
@@ -196,11 +203,11 @@ func read(ctx context.Context, tx *sql.Tx, songID int64) (Timeline, error) {
 	}
 
 	trackAt := map[int64]int{}
-	err = query(ctx, tx, `SELECT id, name, volume, muted, soloed FROM tracks
+	err = query(ctx, tx, `SELECT id, name, volume, muted, soloed, colour FROM tracks
 		WHERE song_id = ? ORDER BY position, id`, []any{songID},
 		func(rows *sql.Rows) error {
 			t := Track{Clips: []Clip{}}
-			if err := rows.Scan(&t.ID, &t.Name, &t.Volume, &t.Muted, &t.Soloed); err != nil {
+			if err := rows.Scan(&t.ID, &t.Name, &t.Volume, &t.Muted, &t.Soloed, &t.Colour); err != nil {
 				return err
 			}
 			trackAt[t.ID] = len(tl.Tracks)
@@ -354,9 +361,18 @@ func checkVolume(volume float64) error {
 // errTrackNameRequired refuses a Track without a name.
 var errTrackNameRequired = domain.Invalid("a Track's name is required")
 
+// checkColour checks the Track Colour a Track to add is to keep: one of the
+// set, or 0 for a Track that gets its own.
+func checkColour(colour int) error {
+	if colour < 0 || colour > TrackColours {
+		return domain.Invalid(fmt.Sprintf("a Track's colour goes from 1 to %d", TrackColours))
+	}
+	return nil
+}
+
 // NewTrack is a Track to add: by default empty, at the bottom of the
-// Timeline, at 0 dB and neither muted nor soloed. Undo uses the rest to
-// bring a deleted Track back as it was.
+// Timeline, at 0 dB and neither muted nor soloed, in a Track Colour of its
+// own. Undo uses the rest to bring a deleted Track back as it was.
 type NewTrack struct {
 	Name string `json:"name"`
 	// Position is where it goes, from 0 (the top) to the number of Tracks
@@ -365,18 +381,22 @@ type NewTrack struct {
 	Volume   float64   `json:"volume"`
 	Muted    bool      `json:"muted"`
 	Soloed   bool      `json:"soloed"`
+	Colour   int       `json:"colour"`
 	Clips    []NewClip `json:"clips"`
 }
 
 // AddTrack adds a Track to the Timeline. Its name can't be blank, its
-// volume must be from MinVolume to MaxVolume, and its Clips follow the same
-// rules as placing a Clip.
+// volume must be from MinVolume to MaxVolume, its colour must be one of the
+// set, if it has one, and its Clips follow the same rules as placing a Clip.
 func (s *Store) AddTrack(ctx context.Context, songID int64, based songversion.Version, t NewTrack) (Timeline, error) {
 	name, err := trackName(t.Name)
 	if err != nil {
 		return Timeline{}, err
 	}
 	if err := checkVolume(t.Volume); err != nil {
+		return Timeline{}, err
+	}
+	if err := checkColour(t.Colour); err != nil {
 		return Timeline{}, err
 	}
 	t.Name = name
@@ -596,16 +616,30 @@ func trackName(name string) (string, error) {
 	return name, nil
 }
 
-// checkTrackNames checks the names of Tracks to add, returning them trimmed.
-func checkTrackNames(names []string) ([]string, error) {
-	trimmed := make([]string, len(names))
-	for i, n := range names {
-		var err error
-		if trimmed[i], err = trackName(n); err != nil {
+// TrackToAdd is an empty Track to add at the bottom for Clips placed or
+// pasted at once to go on, at 0 dB and neither muted nor soloed.
+type TrackToAdd struct {
+	Name string `json:"name"`
+	// Colour is the Track Colour of the Track it carries on the Clips of;
+	// 0 for one of its own.
+	Colour int `json:"colour"`
+}
+
+// checkTracksToAdd checks Tracks to add, returning them with their names
+// trimmed.
+func checkTracksToAdd(tracks []TrackToAdd) ([]TrackToAdd, error) {
+	checked := make([]TrackToAdd, len(tracks))
+	for i, t := range tracks {
+		name, err := trackName(t.Name)
+		if err != nil {
 			return nil, err
 		}
+		if err := checkColour(t.Colour); err != nil {
+			return nil, err
+		}
+		checked[i] = TrackToAdd{Name: name, Colour: t.Colour}
 	}
-	return trimmed, nil
+	return checked, nil
 }
 
 // TrackAt is an empty Track to add at a position, from 0 (the top) to the
@@ -623,16 +657,16 @@ type PlacedClip struct {
 }
 
 // PlaceClips places several Clips at once, each as PlaceClip does, e.g. to
-// bring back Clips deleted together, or to redo a paste. Tracks named
+// bring back Clips deleted together, or to redo a paste. The Tracks
 // newTracks are added at the bottom first, in order, for Clips to go on, as
 // a paste adds them. None may overlap a Clip already there, or another of
 // them. If any can't be placed, none is, and no Track is added.
-func (s *Store) PlaceClips(ctx context.Context, songID int64, based songversion.Version, newTracks []string,
+func (s *Store) PlaceClips(ctx context.Context, songID int64, based songversion.Version, newTracks []TrackToAdd,
 	clips []PlacedClip) (Timeline, error) {
 	if len(clips) == 0 {
 		return Timeline{}, domain.Invalid("clips are required")
 	}
-	names, err := checkTrackNames(newTracks)
+	tracks, err := checkTracksToAdd(newTracks)
 	if err != nil {
 		return Timeline{}, err
 	}
@@ -643,7 +677,7 @@ func (s *Store) PlaceClips(ctx context.Context, songID int64, based songversion.
 				return nil, err
 			}
 			return func(tl Timeline, ids *ids) (Timeline, error) {
-				tl, added := tl.addingTracks(names, ids)
+				tl, added := tl.addingTracks(tracks, ids)
 				for i, c := range clips {
 					trackID, err := c.trackOf(added)
 					if err != nil {
@@ -717,19 +751,19 @@ type ClipCopy struct {
 }
 
 // PasteClips adds new Clips copied from others, as they were copied, each
-// on its Track: the Clipboard's, pasted. Tracks named newTracks are added
-// at the bottom first, in order, for Clips that run past the last Track to
-// go on. A Clip of Takes gets copies of the Takes, sharing their files,
+// on its Track: the Clipboard's, pasted. The Tracks newTracks are added at
+// the bottom first, in order, for Clips that run past the last Track to go
+// on. A Clip of Takes gets copies of the Takes, sharing their files,
 // which may be in a Clip still or detached, as a Clip cut is. Each must stay
 // within its source, start on the Timeline and not overlap a Clip already
 // there, or another of them. If any can't be pasted, none is, and no Track
 // is added.
-func (s *Store) PasteClips(ctx context.Context, songID int64, based songversion.Version, newTracks []string,
+func (s *Store) PasteClips(ctx context.Context, songID int64, based songversion.Version, newTracks []TrackToAdd,
 	clips []ClipCopy) (Timeline, error) {
 	if len(clips) == 0 {
 		return Timeline{}, domain.Invalid("clips are required")
 	}
-	names, err := checkTrackNames(newTracks)
+	tracks, err := checkTracksToAdd(newTracks)
 	if err != nil {
 		return Timeline{}, err
 	}
@@ -758,7 +792,7 @@ func (s *Store) PasteClips(ctx context.Context, songID int64, based songversion.
 				}
 			}
 			return func(tl Timeline, ids *ids) (Timeline, error) {
-				return tl.pasting(names, clips, srcs, ids)
+				return tl.pasting(tracks, clips, srcs, ids)
 			}, nil
 		})
 }

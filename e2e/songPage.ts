@@ -12,6 +12,16 @@ export async function heroSong(bandmate: Bandmate): Promise<Song> {
   return bandmate.getSong(hero.id);
 }
 
+/** A colour token as the browser draws it, whichever way the token is written. */
+export const drawnColour = (page: Page, token: string) =>
+  page.evaluate((token) => {
+    const probe = document.body.appendChild(document.createElement('i'));
+    probe.style.color = `var(${token})`;
+    const { color } = getComputedStyle(probe);
+    probe.remove();
+    return color;
+  }, token);
+
 /** The docked Timeline. */
 export const timeline = (page: Page) => page.getByRole('region', { name: 'Timeline' });
 

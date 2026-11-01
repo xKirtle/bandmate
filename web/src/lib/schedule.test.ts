@@ -263,8 +263,8 @@ describe('schedule of a Take Clip', () => {
       version: 1,
       updatedAt: '',
       tracks: [
-        { id: 1, name: 'Beat', volume: 0, muted: false, soloed: false, clips: [beat] },
-        { id: 2, name: 'Vox', volume: 0, muted: false, soloed: false, clips: [clip] },
+        { id: 1, name: 'Beat', volume: 0, muted: false, soloed: false, colour: 1, clips: [beat] },
+        { id: 2, name: 'Vox', volume: 0, muted: false, soloed: false, colour: 1, clips: [clip] },
       ],
       beats: [{ id: 5, title: 'Beat', bpm: null, fileName: 'b.mp3', size: 1, duration: 60 }],
       sounds: [],
