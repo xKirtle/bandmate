@@ -37,6 +37,14 @@
   --shelved-fg: #5f4566;
   --piano-white: #fffefd;
   --piano-black: #1c1b1a;
+  /* The Track Colours, numbered rather than named by hue, as each Palette
+     has its own shades. The first two are the most distinct pair. */
+  --track-colour-1: #64558e;
+  --track-colour-2: #1e4913;
+  --track-colour-3: #023f6f;
+  --track-colour-4: #725a21;
+  --track-colour-5: #5c264d;
+  --track-colour-6: #086b6c;
 }
 
 /* Shared by every Palette, and the only shadows there are. */
@@ -90,6 +98,12 @@
   --shelved-fg: #4f4869;
   --piano-white: #fffdf8;
   --piano-black: #1a1f2b;
+  --track-colour-1: #5f5f06;
+  --track-colour-2: #4f2c5d;
+  --track-colour-3: #5d3000;
+  --track-colour-4: #794f5f;
+  --track-colour-5: #076b6f;
+  --track-colour-6: #20462f;
 }
 
 /* Olive: muted green on stone. */
@@ -112,6 +126,12 @@
   --shelved-fg: #574a5a;
   --piano-white: #fefdf8;
   --piano-black: #1c1e19;
+  --track-colour-1: #5d3000;
+  --track-colour-2: #13658b;
+  --track-colour-3: #804a7b;
+  --track-colour-4: #05454e;
+  --track-colour-5: #622344;
+  --track-colour-6: #413c75;
 }
 
 /* Dark, under `data-theme='dark'` on the root. Each selector here is more
@@ -138,6 +158,12 @@
   --shelved-fg: #d3bcdc;
   --piano-white: #e6e4e0;
   --piano-black: #0c0c0e;
+  --track-colour-1: #b3d492;
+  --track-colour-2: #9786c9;
+  --track-colour-3: #f2afdb;
+  --track-colour-4: #aa8f44;
+  --track-colour-5: #31a5a5;
+  --track-colour-6: #88d2fc;
 }
 
 /* Ink: blue on blue-black. */
@@ -161,6 +187,12 @@
   --shelved-fg: #c4bee2;
   --piano-white: #e4e6ec;
   --piano-black: #0a0b0f;
+  --track-colour-1: #c5cf83;
+  --track-colour-2: #ad7eb8;
+  --track-colour-3: #48a689;
+  --track-colour-4: #f0b4ca;
+  --track-colour-5: #b68947;
+  --track-colour-6: #71d9eb;
 }
 
 /* Olive: green on dark stone. */
@@ -184,4 +216,10 @@
   --shelved-fg: #cbbccf;
   --piano-white: #e5e6df;
   --piano-black: #0b0c0a;
+  --track-colour-1: #b17db4;
+  --track-colour-2: #74ddd0;
+  --track-colour-3: #f9add0;
+  --track-colour-4: #4fa0a9;
+  --track-colour-5: #b68852;
+  --track-colour-6: #98b7f8;
 }
