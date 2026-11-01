@@ -58,7 +58,7 @@ Shared by every Palette, the scrim and the only shadows there are:
 | `--selected-edge`    | Marks the current or chosen row along its left edge, e.g. the Chosen Track |
 | `--invalid-outline`  | Rings a field holding an invalid value, inside its danger border           |
 
-**Track Colours** are muted, and never near the accent, which is left to what's active. Each shade is held to 3:1 against a Clip's background, selected or not; its OKLCH chroma stays at 0.1 or under, so it's low in saturation and not in contrast; and it sits at least 50° of OKLCH hue and 0.1 of OKLab difference from its Palette's accent, so an unselected Clip can't look selected. The set is in the order Tracks take it, and most Songs only ever show the first two, so in each Palette and theme those are its most distinct pair. `palettes.test.ts` checks all of this.
+**Track Colours** are muted, and never near the accent, which is left to what's active. Each shade is held to 3:1 against a Clip's background, selected or not, even at the opacity a waveform is drawn at; its OKLCH chroma stays at 0.1 or under, so it's low in saturation and not in contrast; and it sits at least 50° of OKLCH hue and 0.1 of OKLab difference from its Palette's accent, so an unselected Clip can't look selected. The set is in the order Tracks take it, and most Songs only ever show the first two, so in each Palette and theme those are its most distinct pair. `palettes.test.ts` checks all of this.
 
 A literal colour is written only in `palettes.css`, and a `box-shadow` is always one of these tokens: Stylelint fails anything else. A tint of a token, such as `color-mix(in srgb, var(--accent) 12%, transparent)`, is allowed.
 

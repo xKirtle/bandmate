@@ -11,12 +11,13 @@ type Theme = (typeof THEMES)[number];
 type Tokens = Record<string, string>;
 
 const TRACK_COLOURS = [1, 2, 3, 4, 5, 6].map((n) => `--track-colour-${n}`);
-// What docs/design.md holds a Track Colour to, in OKLab terms: how far its
-// hue is from the accent's, how different it looks from the accent, and the
-// most chroma it may have.
-const TRACK_COLOUR_HUE_GAP = 50;
-const TRACK_COLOUR_DIFFERENCE = 0.1;
-const TRACK_COLOUR_CHROMA = 0.1;
+// What docs/design.md holds a Track Colour to: its contrast on a Clip, how far
+// its OKLCH hue is from the accent's, its OKLab difference from the accent, and
+// the most OKLCH chroma it may have.
+const MIN_TRACK_COLOUR_CONTRAST = 3;
+const MIN_TRACK_COLOUR_HUE_GAP = 50;
+const MIN_TRACK_COLOUR_DIFFERENCE = 0.1;
+const MAX_TRACK_COLOUR_CHROMA = 0.1;
 
 // The pairs that carry meaning: [foreground, background, floor, what].
 const PAIRS: [string, string, number, string][] = [
@@ -40,8 +41,8 @@ const PAIRS: [string, string, number, string][] = [
   ...TRACK_COLOURS.map((token): [string, string, number, string] => [
     token,
     '--surface-1',
-    3,
-    "A Clip's border and waveform",
+    MIN_TRACK_COLOUR_CONTRAST,
+    "A Clip's border",
   ]),
 ];
 
@@ -134,30 +135,43 @@ function difference(a: string, b: string): number {
   return Math.hypot(from[0] - to[0], from[1] - to[1], from[2] - to[2]);
 }
 
-/** How saturated a colour looks, however light or dark it is: OKLCH's chroma. */
+/** A colour's OKLCH chroma: how far it is from grey. Capping it keeps a
+    shade from being vivid, though a very dark shade can reach the cap while
+    being as saturated as sRGB allows at that lightness. */
 function chroma(hex: string): number {
   const [, a, b] = oklab(hex);
   return Math.hypot(a, b);
 }
 
 /** How far apart two colours' hues are round the wheel, from 0 to 180 degrees. */
-function hueGap(x: string, y: string): number {
+function hueGap(first: string, second: string): number {
   const hue = (hex: string) => {
     const [, a, b] = oklab(hex);
     return (Math.atan2(b, a) * 180) / Math.PI;
   };
-  const gap = Math.abs(hue(x) - hue(y));
+  const gap = Math.abs(hue(first) - hue(second));
   return gap > 180 ? 360 - gap : gap;
 }
 
-/** How much of the accent tints a selected Clip's background, from Timeline.svelte. */
-function selectedClipTint(): number {
+/** A number from a rule in Timeline.svelte, so these checks follow how a Clip is drawn. */
+function fromTimeline(pattern: RegExp, what: string): number {
   const timeline = readFileSync(new URL('./lib/Timeline.svelte', import.meta.url), 'utf8');
-  const tint = timeline.match(
+  const found = timeline.match(pattern);
+  expect(found, what).not.toBeNull();
+  return Number(found![1]);
+}
+
+/** How much of the accent tints a selected Clip's background, as a percentage. */
+function selectedClipTint(): number {
+  return fromTimeline(
     /\.clip\.selected \{[^}]*color-mix\(in srgb, var\(--accent\) (\d+)%, var\(--surface-1\)\)/,
+    "a selected Clip's background is a tint of the accent on --surface-1",
   );
-  expect(tint, "a selected Clip's background is a tint of the accent on --surface-1").not.toBeNull();
-  return Number(tint![1]);
+}
+
+/** How strongly a Clip's waveform is drawn over its background, as a percentage. */
+function waveformStrength(): number {
+  return fromTimeline(/\n {2}rect \{[^}]*opacity: ([\d.]+);/, 'a waveform is drawn at an opacity') * 100;
 }
 
 describe('contrast', () => {
@@ -228,41 +242,47 @@ describe('Palettes', () => {
 
   for (const name of PALETTES) {
     for (const theme of THEMES) {
+      const colours = palettes[name][theme].tokens;
+      const shades = TRACK_COLOURS.map((token) => colours[token]);
+
       it.each(PAIRS)(`${name} ${theme}: %s on %s is at least %d:1 (%s)`, (fg, bg, floor) => {
-        const colours = palettes[name][theme].tokens;
         expect(contrast(colours[fg], colours[bg])).toBeGreaterThanOrEqual(floor);
       });
 
-      const shades = () => TRACK_COLOURS.map((token) => palettes[name][theme].tokens[token]);
-
       it(`${name} ${theme}: has only the six Track Colours`, () => {
-        const named = Object.keys(palettes[name][theme].tokens).filter((token) => token.startsWith('--track-colour'));
+        const named = Object.keys(colours).filter((token) => token.startsWith('--track-colour'));
         expect(named.sort()).toEqual(TRACK_COLOURS);
       });
 
-      it(`${name} ${theme}: every Track Colour is at least 3:1 on a selected Clip's background`, () => {
-        const colours = palettes[name][theme].tokens;
-        const background = mix(colours['--accent'], selectedClipTint(), colours['--surface-1']);
-        for (const shade of shades()) expect(contrast(shade, background), shade).toBeGreaterThanOrEqual(3);
+      it(`${name} ${theme}: a waveform in any Track Colour is at least 3:1 on a Clip, selected or not`, () => {
+        const selected = mix(colours['--accent'], selectedClipTint(), colours['--surface-1']);
+        for (const background of [colours['--surface-1'], selected]) {
+          for (const shade of shades) {
+            const drawn = mix(shade, waveformStrength(), background);
+            expect(contrast(drawn, background), `${shade} on ${background}`).toBeGreaterThanOrEqual(
+              MIN_TRACK_COLOUR_CONTRAST,
+            );
+          }
+        }
       });
 
       it(`${name} ${theme}: no Track Colour is close to the accent, so an unselected Clip can't look selected`, () => {
-        const accent = palettes[name][theme].tokens['--accent'];
-        for (const shade of shades()) {
-          expect(hueGap(shade, accent), shade).toBeGreaterThanOrEqual(TRACK_COLOUR_HUE_GAP);
-          expect(difference(shade, accent), shade).toBeGreaterThanOrEqual(TRACK_COLOUR_DIFFERENCE);
+        for (const shade of shades) {
+          expect(hueGap(shade, colours['--accent']), shade).toBeGreaterThanOrEqual(MIN_TRACK_COLOUR_HUE_GAP);
+          expect(difference(shade, colours['--accent']), shade).toBeGreaterThanOrEqual(MIN_TRACK_COLOUR_DIFFERENCE);
         }
       });
 
       it(`${name} ${theme}: the Track Colours stay muted`, () => {
-        for (const shade of shades()) expect(chroma(shade), shade).toBeLessThanOrEqual(TRACK_COLOUR_CHROMA);
+        for (const shade of shades) expect(chroma(shade), shade).toBeLessThanOrEqual(MAX_TRACK_COLOUR_CHROMA);
       });
 
       it(`${name} ${theme}: the first two Track Colours are the most distinct pair`, () => {
-        const set = shades();
-        const others = set.flatMap((a, i) => set.slice(i + 1).map((b) => [a, b])).slice(1);
-        const first = difference(set[0], set[1]);
-        for (const [a, b] of others) expect(first, `${a} and ${b}`).toBeGreaterThan(difference(a, b));
+        const pairs = shades.flatMap((a, i) => shades.slice(i + 1).map((b) => [a, b]));
+        const [firstTwo, ...others] = pairs;
+        for (const [a, b] of others) {
+          expect(difference(...(firstTwo as [string, string])), `${a} and ${b}`).toBeGreaterThan(difference(a, b));
+        }
       });
     }
   }
