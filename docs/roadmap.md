@@ -31,8 +31,14 @@ Each feature gets a spec, as an issue, before it's built. Using a new feature fo
 
 ## Track colours
 
-- Each Track gets a muted colour of its own, assigned automatically from a small palette in the visual identity's tokens, so Clips on different Tracks can be told apart at a glance. Today every Clip is in the one accent colour.
-- The colours stay muted so the Timeline doesn't take on the busy look of a DAW. Whether the user can pick a Track's colour, and how the Chosen Track still stands out, are for the spec.
+- Each Track gets a Track Colour of its own automatically, so Clips on different Tracks can be told apart at a glance. Today every Clip is in the one accent colour.
+- The Track keeps its colour however Tracks are added, deleted or reordered, and the user doesn't pick it. A later picker from the same set stays possible, if using the feature shows a need.
+- Each Palette has its own shades of the set, in light and dark, so the colours follow the Palette, and a Track stores which colour of the set it has, not a colour value.
+- There are six, enough for every Song so far without a repeat. A new Track gets the one least used on the Song's Tracks, ties going to the earliest in the set, so a Song's first Track is always the first colour. The first two are chosen with most care, as most Songs only ever show those.
+- The Tracks a paste makes, and the one a Clip moves to when slowed by its Tempo, take the source Track's colour. The Track a Merge makes gets one like any new Track, and undoing a Track's deletion brings its colour back.
+- Existing Tracks, older Backups and the Demo Song get theirs in one upgrade step, in order from the top of each Song.
+- The colours stay muted so the Timeline doesn't take on the busy look of a DAW: only a Clip's border and waveform take the colour, and the Track header doesn't show it. They're held to the 3:1 contrast floor against a Clip's background all the same.
+- The accent is left to what's active, so the Chosen Track's marking, the Selection and focus stay as they are, and the Clip being recorded stays in the danger colour. No Track Colour can be close to the accent.
 
 ## A language data project
 
