@@ -16,7 +16,7 @@ export interface Levels {
 export const minVolume = -36;
 /**
  * A Track's highest volume, in dB. Nothing stops it distorting up there, but
- * its fader marks where it starts to (see trackClipping).
+ * its Clips' waveforms show where it does (see clipBars).
  */
 export const maxVolume = 24;
 
@@ -32,11 +32,6 @@ export function trackGains(tracks: readonly Levels[]): Map<number, number> {
       return [t.id, heard ? 10 ** (t.volume / 20) : 0];
     }),
   );
-}
-
-/** How far along its fader a volume is, from 0 (the bottom) to 1 (the top). */
-export function faderAt(volume: number): number {
-  return (volume - minVolume) / (maxVolume - minVolume);
 }
 
 /** A volume as shown next to its fader. */

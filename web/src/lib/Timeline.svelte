@@ -35,8 +35,7 @@
   import { editHint, type Freeze } from './freeze';
   import { draggedFiles } from './fileDrop';
   import { keyHints } from './keyHints';
-  import { faderAt, formatVolume, maxVolume, minVolume, trackGains } from './mixer';
-  import { clipsAbove, onFader } from './trackClipping';
+  import { formatVolume, maxVolume, minVolume, trackGains } from './mixer';
   import type { MenuAction } from './menu';
   import { keyActedOnPage } from './pointerFocus';
   import { longPressDelay, type Point } from './press';
@@ -407,10 +406,6 @@
   // they're saved, and a fader's level while it's dragged, so it follows
   // the hand: see the Timeline as shown.
   $effect(() => player.setGains(trackGains(timeline.tracks)));
-  // The volume each Track starts to clip above, by id, which its fader marks.
-  const clipLimits = $derived(
-    new Map(timeline.tracks.map((t) => [t.id, clipsAbove(t, sources, (s) => peaks[s.key] ?? [])])),
-  );
 
   function setLevels(track: Track, changes: Omit<TrackChanges, 'name'>) {
     // If it fails, the Track goes back to how it's saved.
@@ -1815,9 +1810,6 @@
           >
         </div>
         {#each timeline.tracks as track, i (track.id)}
-          {@const limit = clipLimits.get(track.id) ?? null}
-          {@const clips = limit !== null && track.volume > limit}
-          {@const level = `${formatVolume(track.volume)}${clips ? ', clips' : ''}`}
           <!-- Clicking it outside its controls chooses the Track, pointer only for now, like dragging Clips. -->
           <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_noninteractive_element_interactions -->
           <div
@@ -1924,26 +1916,21 @@
                 aria-label="Solo {track.name}"
                 title="Solo">S</button
               >
-              <span class="fader" class:clips>
-                <input
-                  class="volume"
-                  type="range"
-                  min={minVolume}
-                  max={maxVolume}
-                  step="0.5"
-                  value={track.volume}
-                  aria-label="Volume of {track.name}"
-                  aria-valuetext={level}
-                  title="{level} (double-click for 0 dB)"
-                  oninput={(e) => editing.moveFader(track.id, Number(e.currentTarget.value))}
-                  onchange={(e) => editing.letGoFader(track.id, Number(e.currentTarget.value))}
-                  onpointerdown={(e) => grabFader(track.id, e.currentTarget, e.pointerId)}
-                  ondblclick={() => setLevels(track, { volume: 0 })}
-                />
-                {#if onFader(limit)}
-                  <span class="clip-mark" style:--at={faderAt(limit)}></span>
-                {/if}
-              </span>
+              <input
+                class="volume"
+                type="range"
+                min={minVolume}
+                max={maxVolume}
+                step="0.5"
+                value={track.volume}
+                aria-label="Volume of {track.name}"
+                aria-valuetext={formatVolume(track.volume)}
+                title="{formatVolume(track.volume)} (double-click for 0 dB)"
+                oninput={(e) => editing.moveFader(track.id, Number(e.currentTarget.value))}
+                onchange={(e) => editing.letGoFader(track.id, Number(e.currentTarget.value))}
+                onpointerdown={(e) => grabFader(track.id, e.currentTarget, e.pointerId)}
+                ondblclick={() => setLevels(track, { volume: 0 })}
+              />
             </div>
           </div>
         {/each}
@@ -2127,7 +2114,7 @@
                           aria-hidden="true"
                         >
                           <!-- Drawn as it sounds, at the Clip's Gain, shaped by its Fades. -->
-                          {#each clipBars(clip, at, wave, view.scale, peaks[sources.of(clip).key] ?? []) as { height, clipped }, i (i)}
+                          {#each clipBars(clip, at, wave, view.scale, peaks[sources.of(clip).key] ?? [], track.volume) as { height, clipped }, i (i)}
                             <rect class:clipped x={i + 0.15} y={(100 - height) / 2} width="0.7" {height} />
                           {/each}
                         </svg>
@@ -2673,37 +2660,14 @@
     background: var(--accent);
     color: var(--accent-text);
   }
-  .fader {
-    position: relative;
-    display: flex;
-    flex: 1;
-    align-items: center;
-    align-self: stretch;
-    min-width: 0;
-    /* The browser draws the slider at its own size, so it's zoomed instead. */
-    zoom: var(--timeline-scale);
-    /* How wide the browser draws the slider's thumb, whose middle marks its value. */
-    --thumb: var(--space-4);
-  }
   .volume {
     flex: 1;
     min-width: 0;
     min-height: 0;
     padding: 0;
     accent-color: var(--accent);
-  }
-  .fader.clips .volume {
-    accent-color: var(--warning);
-  }
-  /* Where the Track starts to clip, as far along as the thumb would be there. */
-  .clip-mark {
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    left: calc(var(--thumb) / 2 + var(--at) * (100% - var(--thumb)));
-    width: 1px;
-    background: var(--warning);
-    pointer-events: none;
+    /* The browser draws the slider at its own size, so it's zoomed instead. */
+    zoom: var(--timeline-scale);
   }
   /* The lanes, and the scroll bar over their bottom edge. */
   .lanes-wrap {
@@ -3205,7 +3169,7 @@
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
   }
-  /* A peak of a Take that clipped. */
+  /* A peak that clipped as it was recorded, or goes over full scale as it's played. */
   rect.clipped {
     fill: var(--danger);
     opacity: 1;

@@ -161,7 +161,7 @@ A Song's audio space, measured in seconds, where Tracks play together. It runs t
 _Avoid_: Session, project, mix
 
 **Track**:
-A named lane on the Timeline (e.g. "Beat", "Lead vox", "Adlibs") holding Clips, with its own volume, mute and solo. Turning its volume all the way down makes it quiet, never silent: silencing a Track is what muting it is for. Turning it up can clip: its fader marks the volume where its loudest Clip reaches full scale, and warns above it, though Tracks playing together can clip below that. A Timeline always has at least one Track: a Song starts with one, and the last Track can't be deleted.
+A named lane on the Timeline (e.g. "Beat", "Lead vox", "Adlibs") holding Clips, with its own volume, mute and solo. Turning its volume all the way down makes it quiet, never silent: silencing a Track is what muting it is for. Turning it up can clip: the peaks of its Clips' waveforms that go over full scale turn red, though Tracks playing together can clip without any showing. A Timeline always has at least one Track: a Song starts with one, and the last Track can't be deleted.
 _Avoid_: Channel, layer
 
 **Chosen Track**:

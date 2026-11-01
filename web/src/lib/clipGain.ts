@@ -47,6 +47,11 @@ export function formatGain(gain: number): string {
   return formatVolume(Math.round(gain * 10) / 10 || 0);
 }
 
+/** Whether a waveform peak goes over full scale at a Clip's Gain and its Track's volume, so it clips as it plays. */
+export function overFullScale(peak: number, gain: number, volume: number): boolean {
+  return peak * gainFactor(gain + volume) > 1;
+}
+
 /** A waveform peak, from 0 to 1, as the Clip's Gain makes it sound, drawn no higher than full scale. */
 export function heardPeak(peak: number, gain: number): number {
   return Math.min(1, peak * gainFactor(gain));

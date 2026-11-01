@@ -1336,22 +1336,19 @@ test('a refused save stays in its toast until its dismiss is pressed', async ({ 
   await expect(saveError(page)).toHaveCount(0);
 });
 
-test('a Track’s fader marks where the Track clips, and says so above it', async ({ page, bandmate }) => {
+test('a Track’s waveforms show in red what its fader takes over full scale', async ({ page, bandmate }) => {
   const song = await heroSong(bandmate);
   await page.goto(`/songs/${song.id}`);
   const fader = timeline(page).getByRole('slider', { name: 'Volume of Lead vox' });
-  const mark = fader.locator('xpath=following-sibling::*[contains(@class, "clip-mark")]');
-  await expect(mark).toBeVisible();
+  const clipping = clip(page, 'Take 2').locator('rect.clipped');
   await expect(fader).toHaveAttribute('max', '24');
+  await expect(clip(page, 'Take 2').locator('rect').first()).toBeVisible();
+  await expect(clipping).toHaveCount(0);
 
-  // The fader says so from the step above the mark, and not before.
-  const along = Number(/--at: ([\d.]+)/.exec((await mark.getAttribute('style'))!)![1]);
-  const below = Math.floor((-36 + along * 60) * 2) / 2;
-  await fader.fill(String(below));
-  await expect(fader).not.toHaveAttribute('aria-valuetext', /clips/);
-  await fader.fill(String(below + 0.5));
-  await expect(fader).toHaveAttribute('aria-valuetext', /clips$/);
-  await expect(fader).toHaveAttribute('title', /clips \(double-click for 0 dB\)$/);
+  await fader.fill('24');
+  await expect(clipping).not.toHaveCount(0);
+  await fader.fill('0');
+  await expect(clipping).toHaveCount(0);
 });
 
 test('a Track’s fader let go where it started sends nothing, so an undo of its volume shows at once, and let go elsewhere sends its level', async ({
