@@ -3075,7 +3075,7 @@
     opacity: 0.35;
   }
   .gain-line.changed::before {
-    background: var(--accent);
+    background: var(--clip-colour);
     opacity: 0.8;
   }
   .gain-line:hover::before,
@@ -3093,7 +3093,7 @@
     pointer-events: none;
   }
   .fade-slopes line {
-    stroke: var(--accent);
+    stroke: var(--clip-colour);
     stroke-width: 1.5px;
     vector-effect: non-scaling-stroke;
     opacity: 0.8;

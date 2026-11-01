@@ -174,6 +174,13 @@ function waveformStrength(): number {
   return fromTimeline(/\n {2}rect \{[^}]*opacity: ([\d.]+);/, 'a waveform is drawn at an opacity') * 100;
 }
 
+/** How strongly a Clip's Fade slopes and changed Gain line are drawn over its waveform, as percentages. */
+function clipLineStrengths(): number[] {
+  return ['\\.fade-slopes line', '\\.gain-line\\.changed::before'].map(
+    (rule) => fromTimeline(new RegExp(`\\n {2}${rule} \\{[^}]*opacity: ([\\d.]+);`), `${rule} has an opacity`) * 100,
+  );
+}
+
 describe("a Clip's Track Colour", () => {
   const timeline = readFileSync(new URL('./lib/Timeline.svelte', import.meta.url), 'utf8');
 
@@ -184,6 +191,31 @@ describe("a Clip's Track Colour", () => {
   it('draws its border and waveform', () => {
     expect(timeline).toMatch(/\n {2}\.clip \{[^}]*border: 1px solid var\(--clip-colour\);/);
     expect(timeline).toMatch(/\n {2}rect \{[^}]*fill: var\(--clip-colour\);/);
+  });
+
+  it('draws its Fade slopes and changed Gain line, as strongly as ever over its waveform', () => {
+    expect(timeline).toMatch(/\n {2}\.fade-slopes line \{[^}]*stroke: var\(--clip-colour\);/);
+    expect(timeline).toMatch(/\n {2}\.gain-line\.changed::before \{[^}]*background: var\(--clip-colour\);/);
+    expect(clipLineStrengths()).toEqual([80, 80]);
+  });
+
+  it('leaves the accent to what is active on a Clip', () => {
+    const styles = timeline.slice(timeline.indexOf('<style')).replace(/\/\*[\s\S]*?\*\//g, '');
+    const inAccent = [...styles.matchAll(/([^{}]+)\{[^{}]*var\(--accent\)[^{}]*\}/g)]
+      .map(([, selectors]) => selectors.trim().replace(/\s+/g, ' '))
+      .filter((selectors) => /clip|gain|fade|trim|rect/.test(selectors));
+
+    expect(inAccent).toEqual([
+      '.clip:focus-visible, .clip.editing',
+      '.clip.selected',
+      '.clip.taking',
+      '.clip-more:hover, :global(:root:not([data-pointer-focus]) :focus-visible) > .clip-more',
+      '.trim:hover',
+      '.gain-line:hover::before, .clip.gaining .gain-line::before',
+      '.fade-dot::before',
+    ]);
+    // Fade dots show only on a Clip hovered, selected or having a Fade dragged.
+    expect(timeline).toMatch(/\n {2}\.fade-dot \{[^}]*opacity: 0;/);
   });
 });
 
@@ -275,6 +307,20 @@ describe('Palettes', () => {
             expect(contrast(drawn, background), `${shade} on ${background}`).toBeGreaterThanOrEqual(
               MIN_TRACK_COLOUR_CONTRAST,
             );
+          }
+        }
+      });
+
+      it(`${name} ${theme}: a Fade slope or changed Gain line in any Track Colour is at least 3:1 on a Clip, selected or not`, () => {
+        const selected = mix(colours['--accent'], selectedClipTint(), colours['--surface-1']);
+        for (const background of [colours['--surface-1'], selected]) {
+          for (const shade of shades) {
+            for (const strength of clipLineStrengths()) {
+              const drawn = mix(shade, strength, background);
+              expect(contrast(drawn, background), `${shade} on ${background}`).toBeGreaterThanOrEqual(
+                MIN_TRACK_COLOUR_CONTRAST,
+              );
+            }
           }
         }
       });
