@@ -2938,10 +2938,11 @@
   .clip.editing {
     z-index: 1;
   }
-  /* Selected: ringed inside its border and the focus ring, and a brighter fill. */
+  /* Selected: ringed inside its border and the focus ring, and a brighter fill, both in its Track Colour. */
   .clip.selected {
+    --selected-outline: inset 0 0 0 2px var(--clip-colour);
     box-shadow: var(--selected-outline);
-    background: color-mix(in srgb, var(--accent) 16%, var(--surface-1));
+    background: color-mix(in srgb, var(--clip-colour) 16%, var(--surface-1));
   }
   .clip.moving {
     cursor: grabbing;
@@ -3126,7 +3127,7 @@
     inset: 25%;
     border: 1px solid var(--bg);
     border-radius: var(--radius-full);
-    background: var(--accent);
+    background: var(--clip-colour);
   }
   .fade-dot:hover::before,
   .clip.fading .fade-dot::before {

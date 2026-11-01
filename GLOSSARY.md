@@ -165,7 +165,7 @@ A named lane on the Timeline (e.g. "Beat", "Lead vox", "Adlibs") holding Clips, 
 _Avoid_: Channel, layer
 
 **Track Colour**:
-One of a set of six muted colours that sets a Track's Clips and header apart from other Tracks': its volume slider, and what marks it as the Chosen Track. Bandmate gives a Track one when it's made, the one least used on the Song's Tracks, and it keeps it wherever the Track moves and whatever happens to the other Tracks; the user doesn't pick it. A Track made to carry on another's Clips, by a paste or a Tempo change, takes that Track's, so past six Tracks, or after those, two Tracks can share one. It belongs to the Song, while the shade it shows in comes from this Device's Palette, light or dark, so a Track is the same Track Colour on every Device. It's never the accent, which marks what's active, like the Selection or focus.
+One of a set of six muted colours that sets a Track's Clips and header apart from other Tracks': its volume slider, what marks it as the Chosen Track, and what marks a Clip as selected. Bandmate gives a Track one when it's made, the one least used on the Song's Tracks, and it keeps it wherever the Track moves and whatever happens to the other Tracks; the user doesn't pick it. A Track made to carry on another's Clips, by a paste or a Tempo change, takes that Track's, so past six Tracks, or after those, two Tracks can share one. It belongs to the Song, while the shade it shows in comes from this Device's Palette, light or dark, so a Track is the same Track Colour on every Device. It's never the accent, which marks focus and controls in use.
 _Avoid_: Track palette (a Palette is what's picked in Settings), accent
 
 **Chosen Track**:

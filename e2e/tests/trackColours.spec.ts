@@ -80,19 +80,22 @@ for (const [palette, theme] of [
   });
 }
 
-test('a selected Clip keeps its Track Colour, inside the accent ring and fill', async ({ page, bandmate }) => {
+test('a selected Clip is ringed and filled in its Track Colour, not the accent', async ({ page, bandmate }) => {
   const hero = await heroSong(bandmate);
   await page.goto(`/songs/${hero.id}`);
   const take = clip(page, 'Take 2');
   await expect(take).toBeVisible();
   const unselected = await take.evaluate((el) => getComputedStyle(el).backgroundColor);
+  const colour = await drawnColour(page, '--track-colour-2');
   const accent = await drawnColour(page, '--accent');
 
   await take.click({ modifiers: ['ControlOrMeta'] });
 
   await expect(take).toHaveAccessibleName(/^Take 2, selected, /);
   await expectBorderIn(page, take, '--track-colour-2');
-  expect(await take.evaluate((el) => getComputedStyle(el).boxShadow)).toContain(accent);
+  const ring = await take.evaluate((el) => getComputedStyle(el).boxShadow);
+  expect(ring).toContain(colour);
+  expect(ring).not.toContain(accent);
   expect(await take.evaluate((el) => getComputedStyle(el).backgroundColor)).not.toBe(unselected);
 });
 
@@ -258,15 +261,15 @@ test("a Clip's Gain line is in the accent while it's hovered or dragged, and bac
   await expect.poll(() => markOf(line)).toBe(await drawnColour(page, '--track-colour-2'));
 });
 
-test("a Clip's fade dots are in the accent", async ({ page, bandmate }) => {
+test("a Clip's fade dots are in its Track's colour", async ({ page, bandmate }) => {
   const hero = await heroSong(bandmate);
   await page.goto(`/songs/${hero.id}`);
   const take = clip(page, 'Take 2');
   await expect(take).toBeVisible();
-  const accent = await drawnColour(page, '--accent');
+  const colour = await drawnColour(page, '--track-colour-2');
 
   await take.hover();
   await expect(fadeDot(take, 'Fade in')).toHaveCSS('opacity', '1');
-  expect(await markOf(fadeDot(take, 'Fade in'))).toBe(accent);
-  expect(await markOf(fadeDot(take, 'Fade out'))).toBe(accent);
+  expect(await markOf(fadeDot(take, 'Fade in'))).toBe(colour);
+  expect(await markOf(fadeDot(take, 'Fade out'))).toBe(colour);
 });

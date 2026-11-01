@@ -161,11 +161,11 @@ function fromTimeline(pattern: RegExp, what: string): number {
   return Number(found![1]);
 }
 
-/** How much of the accent tints a selected Clip's background, as a percentage. */
+/** How much of its Track Colour tints a selected Clip's background, as a percentage. */
 function selectedClipTint(): number {
   return fromTimeline(
-    /\.clip\.selected \{[^}]*color-mix\(in srgb, var\(--accent\) (\d+)%, var\(--surface-1\)\)/,
-    "a selected Clip's background is a tint of the accent on --surface-1",
+    /\.clip\.selected \{[^}]*color-mix\(in srgb, var\(--clip-colour\) (\d+)%, var\(--surface-1\)\)/,
+    "a selected Clip's background is a tint of its Track Colour on --surface-1",
   );
 }
 
@@ -215,15 +215,11 @@ describe("a Clip's Track Colour", () => {
 
     expect(inAccent).toEqual([
       '.clip:focus-visible, .clip.editing',
-      '.clip.selected',
       '.clip.taking',
       '.clip-more:hover, :global(:root:not([data-pointer-focus]) :focus-visible) > .clip-more',
       '.trim:hover',
       '.gain-line:hover::before, .clip.gaining .gain-line::before',
-      '.fade-dot::before',
     ]);
-    // Fade dots show only on a Clip hovered, selected or having a Fade dragged.
-    expect(timeline).toMatch(/\n {2}\.fade-dot \{[^}]*opacity: 0;/);
   });
 });
 
@@ -308,9 +304,9 @@ describe('Palettes', () => {
       });
 
       it(`${name} ${theme}: a waveform in any Track Colour is at least 3:1 on a Clip, selected or not`, () => {
-        const selected = mix(colours['--accent'], selectedClipTint(), colours['--surface-1']);
-        for (const background of [colours['--surface-1'], selected]) {
-          for (const shade of shades) {
+        for (const shade of shades) {
+          const selected = mix(shade, selectedClipTint(), colours['--surface-1']);
+          for (const background of [colours['--surface-1'], selected]) {
             const drawn = mix(shade, waveformStrength(), background);
             expect(contrast(drawn, background), `${shade} on ${background}`).toBeGreaterThanOrEqual(
               MIN_TRACK_COLOUR_CONTRAST,
@@ -320,9 +316,9 @@ describe('Palettes', () => {
       });
 
       it(`${name} ${theme}: a Fade slope or changed Gain line in any Track Colour is at least 3:1 on a Clip, selected or not`, () => {
-        const selected = mix(colours['--accent'], selectedClipTint(), colours['--surface-1']);
-        for (const background of [colours['--surface-1'], selected]) {
-          for (const shade of shades) {
+        for (const shade of shades) {
+          const selected = mix(shade, selectedClipTint(), colours['--surface-1']);
+          for (const background of [colours['--surface-1'], selected]) {
             for (const strength of clipLineStrengths()) {
               const drawn = mix(shade, strength, background);
               expect(contrast(drawn, background), `${shade} on ${background}`).toBeGreaterThanOrEqual(
@@ -349,7 +345,7 @@ describe('Palettes', () => {
         }
       });
 
-      it(`${name} ${theme}: no Track Colour is close to the accent, so an unselected Clip can't look selected`, () => {
+      it(`${name} ${theme}: no Track Colour is close to the accent, so focus and a Clip's controls in use stand out on a Clip`, () => {
         for (const shade of shades) {
           expect(hueGap(shade, colours['--accent']), shade).toBeGreaterThanOrEqual(MIN_TRACK_COLOUR_HUE_GAP);
           expect(difference(shade, colours['--accent']), shade).toBeGreaterThanOrEqual(MIN_TRACK_COLOUR_DIFFERENCE);
