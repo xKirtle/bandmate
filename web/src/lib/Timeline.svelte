@@ -1918,6 +1918,7 @@
               >
               <input
                 class="volume"
+                style:accent-color="var(--track-colour-{track.colour})"
                 type="range"
                 min={minVolume}
                 max={maxVolume}
@@ -2666,7 +2667,6 @@
     min-width: 0;
     min-height: 0;
     padding: 0;
-    accent-color: var(--accent);
     /* The browser draws the slider at its own size, so it's zoomed instead. */
     zoom: var(--timeline-scale);
   }
