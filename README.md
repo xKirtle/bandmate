@@ -1,3 +1,5 @@
+<div align="center">
+
 <img src="web/public/favicon.svg" alt="Bandmate's mark: a guitar pick with a flat cut out of it" width="96" height="96">
 
 # Bandmate
@@ -9,6 +11,8 @@
 [![License: AGPL-3.0](https://img.shields.io/github/license/xKirtle/bandmate)](LICENSE)
 [![Docs](https://img.shields.io/badge/docs-xkirtle.github.io%2Fbandmate-b4432c)](https://xkirtle.github.io/bandmate/)
 
+</div>
+
 ![A Song in Write mode: its Details, the Lyric Sheet with Chords and Cues, the Scrapbook, and the Timeline with a Beat and a Take](docs/screenshots/write-mode.png)
 
 Writing a song often means lyrics in a notes app, chords somewhere else, the beat in a browser tab and voice memos scattered across a phone. Bandmate puts them on one page: your lyrics and chords beside a timeline holding the beat and your takes, with each line marked at the moment it's sung.
@@ -18,11 +22,13 @@ It's built for one songwriter, and runs on your own machine or homelab. There ar
 ## What it does
 
 - **Write** lyrics with the chords right where you play them. Try a few versions of a verse, and keep the lines that didn't make it.
+- **Find** chords on guitar or piano: look one up, name the one under your fingers, or see what fits a key.
 - **Listen** to your beats on a multi-track timeline. Upload a beat, or download one from YouTube, SoundCloud or Bandcamp.
 - **Sync** your lyrics to the music: tap along to mark when each line starts, and they light up and scroll as the song plays.
 - **Record** takes over your beat in the browser, in full quality, and keep every one until you pick one.
+- **Read** the song large to play from, with the chords over the words and how to play each one, scrolling on its own if you like.
 
-If you'd like to see more, check out the [wiki](https://xkirtle.github.io/bandmate/).
+It's made for a computer or tablet, and most of it works on a phone too. If you'd like to see more, check out the [wiki](https://xkirtle.github.io/bandmate/).
 
 ## Quickstart
 
@@ -72,4 +78,10 @@ Bandmate is developed with heavy AI assistance, held to the same rules as every 
 
 ## License
 
-[GNU Affero General Public License v3.0](LICENSE). If you run a modified Bandmate as a service that others use over a network, you must offer them its source code. The image also bundles yt-dlp, ffmpeg and QuickJS under their own licenses, and Bandmate plays chords on the piano from the [Salamander Grand Piano](https://github.com/Tonejs/audio/tree/master/salamander) by Alexander Holm ([CC BY 3.0](https://creativecommons.org/licenses/by/3.0/)), trimmed and re-encoded, and on the guitar from the [University of Iowa Electronic Music Studios](https://theremin.music.uiowa.edu/MIS.html), [Musical Instrument Samples](https://theremin.music.uiowa.edu/MISguitar.html) (Raimundo 118, Brian Penkrot, 2011), trimmed, retuned and re-encoded, as the [self-hosting guide](https://xkirtle.github.io/bandmate/self-hosting#licenses) lists.
+[GNU Affero General Public License v3.0](LICENSE). If you run a modified Bandmate as a service that others use over a network, you must offer them its source code.
+
+Bandmate also includes these, each under its own license, as the [self-hosting guide](https://xkirtle.github.io/bandmate/self-hosting#licenses) lists:
+
+- **Programs in the image**: yt-dlp, ffmpeg and QuickJS.
+- **Piano recordings**: the [Salamander Grand Piano](https://github.com/Tonejs/audio/tree/master/salamander) by Alexander Holm ([CC BY 3.0](https://creativecommons.org/licenses/by/3.0/)), trimmed and re-encoded.
+- **Guitar recordings**: the [University of Iowa Electronic Music Studios](https://theremin.music.uiowa.edu/MIS.html), [Musical Instrument Samples](https://theremin.music.uiowa.edu/MISguitar.html) (Raimundo 118, Brian Penkrot, 2011), trimmed, retuned and re-encoded.
