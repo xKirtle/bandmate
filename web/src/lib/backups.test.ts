@@ -3,6 +3,8 @@ import {
   automaticName,
   backupName,
   backupSize,
+  backupDialogRoom,
+  backupDialogSize,
   beatsBrought,
   broughtNote,
   extrasNote,
@@ -417,5 +419,36 @@ describe('scheduleStatus', () => {
 
   it('says nothing before the schedule has tried to make one', () => {
     expect(scheduleStatus({ on: true, lastMadeAt: null, last: null }, now)).toBeNull();
+  });
+});
+
+describe('backupDialogRoom', () => {
+  it('wants both columns while there are Songs and Beats', () => {
+    expect(backupDialogRoom(60, 30)).toBe('both');
+  });
+
+  it('wants one column for only one kind', () => {
+    expect(backupDialogRoom(60, 0)).toBe('one');
+    expect(backupDialogRoom(0, 30)).toBe('one');
+  });
+
+  it('wants no more than a line or two when there are neither', () => {
+    expect(backupDialogRoom(0, 0)).toBe('little');
+  });
+});
+
+describe('backupDialogSize', () => {
+  const tall = 'min(48rem, calc(100dvh - 4rem))';
+
+  it('is wide and tall for two columns, within the window, and holds its size', () => {
+    expect(backupDialogSize('both')).toEqual({ width: 'min(64rem, calc(100vw - 4rem))', height: tall, fill: true });
+  });
+
+  it('is as tall but narrower for one', () => {
+    expect(backupDialogSize('one')).toEqual({ width: '36rem', height: tall, fill: true });
+  });
+
+  it('is an ordinary dialog for a line or two', () => {
+    expect(backupDialogSize('little')).toEqual({ width: '28rem', height: 'fit-content', fill: false });
   });
 });
