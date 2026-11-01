@@ -454,11 +454,29 @@ func (tl Timeline) addingTrack(t NewTrack, srcs []clipSource, ids *ids) (Timelin
 	return tl, nil
 }
 
-// insertingTrack is tl with t among its Tracks at place, from 0 (the top)
-// to the number of Tracks (the bottom), pushing those from there down.
+// insertingTrack is tl with the new Track t among its Tracks at place, from
+// 0 (the top) to the number of Tracks (the bottom), pushing those from there
+// down. It's every new Track's way in, so it's what gives one its colour.
 func (tl Timeline) insertingTrack(t Track, place int) Timeline {
+	t.Colour = tl.leastUsedColour()
 	tl.Tracks = slices.Insert(slices.Clone(tl.Tracks), place, t)
 	return tl
+}
+
+// leastUsedColour is the Track Colour on the fewest of tl's Tracks, the
+// earliest in the set if several tie.
+func (tl Timeline) leastUsedColour() int {
+	used := map[int]int{}
+	for _, t := range tl.Tracks {
+		used[t.Colour]++
+	}
+	least := 1
+	for colour := 2; colour <= TrackColours; colour++ {
+		if used[colour] < used[least] {
+			least = colour
+		}
+	}
+	return least
 }
 
 // addingTracksAt is tl with an empty Track of each of those given, in

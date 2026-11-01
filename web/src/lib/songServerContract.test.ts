@@ -149,6 +149,7 @@ function timelineOf(tl: Timeline, id: Renumber) {
       volume: num(t.volume),
       muted: t.muted,
       soloed: t.soloed,
+      colour: t.colour,
       clips: t.clips.map((c) => ({
         id: id('clip', c.id),
         beatId: c.beatId,

@@ -247,7 +247,7 @@ export class FakeSongServer implements SongServer {
         const { name, ...asItWas } = edit.track;
         if (Object.keys(asItWas).length > 0) throw notModelled(edit);
         return (tl) => {
-          return { ...tl, tracks: [...tl.tracks, emptyTrack(this.#nextTrackId++, name)] };
+          return { ...tl, tracks: [...tl.tracks, emptyTrack(this.#nextTrackId++, name, tl.tracks)] };
         };
       }
       case 'updateTrack': {
@@ -281,7 +281,10 @@ export class FakeSongServer implements SongServer {
           return { on: c, clip: c.clip as NewClip };
         });
         return (tl) => {
-          const added = edit.newTracks.map(({ name }) => emptyTrack(this.#nextTrackId++, name));
+          const added: Track[] = [];
+          for (const { name } of edit.newTracks) {
+            added.push(emptyTrack(this.#nextTrackId++, name, [...tl.tracks, ...added]));
+          }
           const withAdded = { ...tl, tracks: [...tl.tracks, ...added] };
           return pasted.reduce(
             (t, { on, clip }) => place(t, 'trackId' in on ? on.trackId : added[on.newTrack].id, clip),
@@ -620,7 +623,7 @@ export class FakeSongServer implements SongServer {
       else {
         const { name, position } = merge.newTrack;
         trackId = this.#nextTrackId++;
-        const added: Track = { id: trackId, name, volume: 0, muted: false, soloed: false, clips: [] };
+        const added = emptyTrack(trackId, name, tracks);
         tracks = [...tracks.slice(0, position), added, ...tracks.slice(position)];
       }
       const soundId = this.#sound('Merged Clip', 'Merged Clip.wav', wav.size, end - start);
@@ -702,9 +705,15 @@ const noSuchTrack = () => new ApiError(400, "there's no such Track on this Timel
 
 const notModelled = (change: Edit | LyricSheetChange) => new Error(`${change.kind} is not modelled`);
 
-/** A new Track, empty, at 0 dB, neither muted nor soloed, its name trimmed. */
-function emptyTrack(id: number, name: string): Track {
-  return { id, name: name.trim(), volume: 0, muted: false, soloed: false, clips: [] };
+/** A new Track among tracks, empty, at 0 dB, neither muted nor soloed, its name trimmed. */
+function emptyTrack(id: number, name: string, tracks: Track[]): Track {
+  return { id, name: name.trim(), volume: 0, muted: false, soloed: false, colour: leastUsedColour(tracks), clips: [] };
+}
+
+/** The Track Colour on the fewest of tracks, the earliest in the set if several tie. */
+function leastUsedColour(tracks: Track[]): number {
+  const uses = (colour: number) => tracks.filter((t) => t.colour === colour).length;
+  return [2, 3, 4, 5, 6].reduce((least, colour) => (uses(colour) < uses(least) ? colour : least), 1);
 }
 
 /**

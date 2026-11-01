@@ -646,6 +646,7 @@ describe('Saves, undo on Clips', () => {
     volume: 0,
     muted: false,
     soloed: false,
+    colour: 1,
     clips: starts.map((start, i) => ({
       id: i + 1,
       beatId: 1,

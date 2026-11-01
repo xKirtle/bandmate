@@ -2044,6 +2044,7 @@
                     class:fading={editing && isFadeEnd(clipDrag.mode)}
                     class:retaking={clip.id === recorder.clipId}
                     class:selected={isSelected}
+                    style:--clip-colour="var(--track-colour-{track.colour})"
                     style:left="{percent(at.start)}%"
                     style:width="{percent(at.length)}%"
                     {title}
@@ -2917,7 +2918,7 @@
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    border: 1px solid var(--accent);
+    border: 1px solid var(--clip-colour);
     border-radius: calc(0.375 * var(--timeline-rem));
     background: var(--surface-1);
     /* A long press opens the Clip's menu, not the browser's text selection or callout. */
@@ -2959,6 +2960,7 @@
     pointer-events: none;
   }
   .clip.taking {
+    --clip-colour: var(--accent);
     border-color: var(--danger);
     background: color-mix(in srgb, var(--danger) 15%, var(--surface-1));
     cursor: default;
@@ -3043,7 +3045,7 @@
     height: 100%;
   }
   rect {
-    fill: var(--accent);
+    fill: var(--clip-colour);
     opacity: 0.7;
   }
   /*

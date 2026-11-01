@@ -45,7 +45,7 @@ function clip(id: number, start: number, end: number, ofTakes = false): Clip {
 }
 
 function track(id: number, clips: Clip[]): Track {
-  return { id, name: `Track ${id}`, volume: 0, muted: false, soloed: false, clips };
+  return { id, name: `Track ${id}`, volume: 0, muted: false, soloed: false, colour: 1, clips };
 }
 
 // Two Tracks: a Beat in two Clips, at 0:10-0:20 and 0:40-0:50, and a vocal

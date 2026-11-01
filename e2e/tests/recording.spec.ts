@@ -441,6 +441,29 @@ test('a Take records on the Chosen Track at the playhead, or after its last Clip
   expectSung(second, end, 0.4);
 });
 
+test("the Clip being recorded is in the danger colour, not its Track's", async ({ page, bandmate }) => {
+  const song = await bandmate.song({ title: 'Anthem' });
+  await open(page, song.id);
+
+  await recordButton(page).click();
+  await skipCalibration(page);
+  const recording = timeline(page).locator('.clip.taking');
+  await expect(recording).toBeVisible();
+  const colours = await recording.evaluate((el) => {
+    const drawn = (token: string) => {
+      const probe = document.body.appendChild(document.createElement('i'));
+      probe.style.color = `var(${token})`;
+      const { color } = getComputedStyle(probe);
+      probe.remove();
+      return color;
+    };
+    return { border: getComputedStyle(el).borderTopColor, danger: drawn('--danger') };
+  });
+  await stopButton(page).click();
+
+  expect(colours.border).toBe(colours.danger);
+});
+
 test('a Retake records into its Clip, from its start, growing it', async ({ page, bandmate }) => {
   const song = await bandmate.song({ title: 'Anthem' });
   await open(page, song.id);

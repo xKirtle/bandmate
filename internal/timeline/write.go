@@ -14,6 +14,7 @@ type storedTrack struct {
 	volume   float64
 	muted    bool
 	soloed   bool
+	colour   int
 }
 
 // storedClip is a Clip's row as stored.
@@ -58,16 +59,18 @@ func writeTimeline(ctx context.Context, tx *sql.Tx, songID int64, tl Timeline) e
 	// tl holds it from the top, so the places a deleted Track left behind
 	// close up.
 	for i, t := range tl.Tracks {
-		want := storedTrack{name: t.Name, position: int64(i), volume: t.Volume, muted: t.Muted, soloed: t.Soloed}
+		want := storedTrack{name: t.Name, position: int64(i), volume: t.Volume, muted: t.Muted, soloed: t.Soloed,
+			colour: t.Colour}
 		was, there := tracks[t.ID]
 		delete(tracks, t.ID)
 		switch {
 		case !there:
-			_, err = tx.ExecContext(ctx, `INSERT INTO tracks (id, song_id, name, position, volume, muted, soloed)
-				VALUES (?, ?, ?, ?, ?, ?, ?)`, t.ID, songID, want.name, want.position, want.volume, want.muted, want.soloed)
+			_, err = tx.ExecContext(ctx, `INSERT INTO tracks (id, song_id, name, position, volume, muted, soloed, colour)
+				VALUES (?, ?, ?, ?, ?, ?, ?, ?)`, t.ID, songID, want.name, want.position, want.volume, want.muted, want.soloed,
+				want.colour)
 		case want != was:
-			_, err = tx.ExecContext(ctx, `UPDATE tracks SET name = ?, position = ?, volume = ?, muted = ?, soloed = ?
-				WHERE id = ?`, want.name, want.position, want.volume, want.muted, want.soloed, t.ID)
+			_, err = tx.ExecContext(ctx, `UPDATE tracks SET name = ?, position = ?, volume = ?, muted = ?, soloed = ?,
+				colour = ? WHERE id = ?`, want.name, want.position, want.volume, want.muted, want.soloed, want.colour, t.ID)
 		}
 		if err != nil {
 			return fmt.Errorf("writing track: %w", err)
@@ -169,11 +172,11 @@ func storedClipOf(trackID int64, c Clip) storedClip {
 func readStoredRows(ctx context.Context, tx *sql.Tx, songID int64) (map[int64]storedTrack,
 	map[int64]storedClip, map[int64]storedTake, error) {
 	tracks := map[int64]storedTrack{}
-	err := query(ctx, tx, `SELECT id, name, position, volume, muted, soloed FROM tracks WHERE song_id = ?`,
+	err := query(ctx, tx, `SELECT id, name, position, volume, muted, soloed, colour FROM tracks WHERE song_id = ?`,
 		[]any{songID}, func(rows *sql.Rows) error {
 			var id int64
 			var t storedTrack
-			err := rows.Scan(&id, &t.name, &t.position, &t.volume, &t.muted, &t.soloed)
+			err := rows.Scan(&id, &t.name, &t.position, &t.volume, &t.muted, &t.soloed, &t.colour)
 			tracks[id] = t
 			return err
 		})
