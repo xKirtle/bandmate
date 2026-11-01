@@ -38,7 +38,7 @@ Each feature gets a spec, as an issue, before it's built. Using a new feature fo
 - The Tracks a paste makes, and the one a Clip moves to when slowed by its Tempo, take the source Track's colour. The Track a Merge makes gets one like any new Track, and undoing a Track's deletion brings its colour back.
 - Existing Tracks, older Backups and the Demo Song get theirs in one upgrade step, in order from the top of each Song.
 - The colours stay muted so the Timeline doesn't take on the busy look of a DAW: only a Clip's border, its waveform, its Fade slopes and a changed Gain line, which always show on it, and a Track's volume slider take the colour. The slider is the only part of the Track header that does, so an empty Track shows its colour too. They're held to the 3:1 contrast floor against a Clip's background and a Track header's all the same.
-- The accent is left to what's active, so the Chosen Track's marking, Mute and Solo while on, the Selection, focus and a Clip's controls while they're hovered or dragged stay as they are, and the Clip being recorded stays in the danger colour. No Track Colour can be close to the accent.
+- The accent is left to what's active, so the Chosen Track's marking, Mute and Solo while on, the Selection, focus and a Clip's controls while they're hovered or dragged stay as they are, and the Clip being recorded stays in the danger colour, with its waveform in the accent, so the bars that mark clipped peaks show against it. No Track Colour can be close to the accent.
 
 ## A language data project
 
