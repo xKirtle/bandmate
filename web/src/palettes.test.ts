@@ -324,14 +324,11 @@ describe('Palettes', () => {
       });
 
       it(`${name} ${theme}: any Track Colour is at least 3:1 on its Track's header, tinted or not`, () => {
-        const chosen = trackHeaderTint('\\.head\\.chosen', '--head-colour');
-        const fileTarget = mix(
-          colours['--accent'],
-          trackHeaderTint('\\.head\\.file-target', '--accent'),
-          colours['--bg'],
-        );
+        const chosen = trackHeaderTint('\\.head\\.chosen', '--row-colour');
+        const fileTarget = trackHeaderTint('\\.head\\.file-target', '--row-colour');
         for (const shade of shades) {
-          for (const background of [colours['--bg'], mix(shade, chosen, colours['--bg']), fileTarget]) {
+          const tints = [chosen, fileTarget].map((tint) => mix(shade, tint, colours['--bg']));
+          for (const background of [colours['--bg'], ...tints]) {
             expect(contrast(shade, background), `${shade} on ${background}`).toBeGreaterThanOrEqual(
               MIN_TRACK_COLOUR_CONTRAST,
             );

@@ -1814,7 +1814,7 @@
           <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_noninteractive_element_interactions -->
           <div
             class="head"
-            style:--head-colour="var(--track-colour-{track.colour})"
+            style:--row-colour="var(--track-colour-{track.colour})"
             class:chosen={track.id === chosen}
             class:file-target={track.id === fileTarget}
             class:dragged={trackDrag.current?.dragged === i}
@@ -2011,6 +2011,7 @@
               <!-- svelte-ignore a11y_no_static_element_interactions -->
               <div
                 class="lane"
+                style:--row-colour="var(--track-colour-{track.colour})"
                 class:file-target={track.id === fileTarget}
                 class:dragged={trackDrag.current?.dragged === t}
                 class:drop-above={trackGap === t}
@@ -2580,15 +2581,16 @@
   }
   /* Marked along its left edge, in the room left for it, and tinted, both in its Track Colour. */
   .head.chosen {
-    --selected-edge: inset calc(0.1875 * var(--timeline-rem)) 0 0 var(--head-colour);
+    --selected-edge: inset calc(0.1875 * var(--timeline-rem)) 0 0 var(--row-colour);
     box-shadow: var(--selected-edge);
-    background: color-mix(in srgb, var(--head-colour) 8%, transparent);
+    background: color-mix(in srgb, var(--row-colour) 8%, transparent);
   }
-  /* The Track audio files dragged over the Timeline would be imported onto, across its header and lane. */
+  /* The Track audio files dragged over the Timeline would be imported onto, across its header and lane, in its Track Colour. */
   .head.file-target,
   .lane.file-target {
+    --selected-outline: inset 0 0 0 2px var(--row-colour);
     box-shadow: var(--selected-outline);
-    background: color-mix(in srgb, var(--accent) 16%, transparent);
+    background: color-mix(in srgb, var(--row-colour) 16%, transparent);
   }
   .head-row {
     display: flex;
@@ -2666,7 +2668,7 @@
     min-width: 0;
     min-height: 0;
     padding: 0;
-    accent-color: var(--head-colour);
+    accent-color: var(--row-colour);
     /* The browser draws the slider at its own size, so it's zoomed instead. */
     zoom: var(--timeline-scale);
   }
