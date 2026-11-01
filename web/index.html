@@ -8,16 +8,17 @@
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <script>
-      // Shows the Palette and Light or Dark kept on this device from the first
-      // paint, so the page never flashes the default. It reads them as
+      // Shows the Palette, Light or Dark and Track Colours kept on this device
+      // from the first paint, so the page never flashes the default. It reads them as
       // src/lib/appearance.ts does, which keeps them in step from then on.
       (function () {
-        var palette, theme;
+        var palette, theme, trackColours;
         try {
           palette = localStorage.getItem('bandmate.palette');
           theme = localStorage.getItem('bandmate.theme');
+          trackColours = localStorage.getItem('bandmate.trackColours');
         } catch (e) {
-          // No storage, e.g. blocked: Terracotta, following the system.
+          // No storage, e.g. blocked: Terracotta, following the system, with Track Colours.
         }
         var root = document.documentElement;
         if (palette === 'ink' || palette === 'olive') root.dataset.palette = palette;
@@ -25,6 +26,7 @@
           theme = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
         }
         root.dataset.theme = theme;
+        if (trackColours === 'off') root.dataset.trackColours = 'off';
       })();
     </script>
   </head>

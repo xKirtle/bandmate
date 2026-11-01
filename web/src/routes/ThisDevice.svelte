@@ -64,6 +64,21 @@
           </label>
         {/each}
       </fieldset>
+      <fieldset class="choice-group">
+        <label class="choice-row">
+          <input
+            type="checkbox"
+            role="switch"
+            checked={appearance.trackColours}
+            onchange={(e) => appearance.setTrackColours(e.currentTarget.checked)}
+            aria-describedby="track-colours-note"
+          />
+          <span>Track Colours</span>
+        </label>
+        <p id="track-colours-note" class="choice-under hint">
+          Each Track's Clips in a colour of their own. Off, they're all in the Palette's accent.
+        </p>
+      </fieldset>
     </section>
 
     {#if recordingOffered.current}

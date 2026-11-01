@@ -101,6 +101,56 @@ for (const [palette, theme] of [
   });
 }
 
+test("Track Colours turned off in Settings show the accent, and turned on again show each Track's own", async ({
+  page,
+  bandmate,
+}) => {
+  const hero = await heroSong(bandmate);
+  const trackColours = page.getByRole("switch", { name: "Track Colours" });
+  const take = clip(page, "Take 2");
+  /** How strongly a waveform's bars are drawn on a Clip. */
+  const waveformOf = (c: Locator) =>
+    c
+      .locator(".wave rect")
+      .first()
+      .evaluate((el) => getComputedStyle(el).opacity);
+
+  // Only this Device's look changes: the Song stays as it is throughout.
+  const before = await bandmate.timeline(hero.id);
+
+  await page.goto("/settings");
+  await expect(trackColours).toBeChecked();
+  await trackColours.uncheck();
+
+  await page.goto(`/songs/${hero.id}`);
+  const accent = await drawnColour(page, "--accent");
+  await expect(page.locator("html")).toHaveAttribute(
+    "data-track-colours",
+    "off",
+  );
+  await expect.poll(() => borderOf(take)).toBe(accent);
+  await expect.poll(() => borderOf(clip(page, "Lorem Click"))).toBe(accent);
+  await expect(volumeOf(page, "Lead vox")).toHaveCSS("accent-color", accent);
+  await expect.poll(() => waveformOf(take)).toBe("0.85");
+
+  await page.reload();
+  await expect.poll(() => borderOf(take)).toBe(accent);
+
+  await page.goto("/settings");
+  await expect(trackColours).not.toBeChecked();
+  await trackColours.check();
+
+  await page.goto(`/songs/${hero.id}`);
+  await expect(page.locator("html")).not.toHaveAttribute(
+    "data-track-colours",
+    "off",
+  );
+  await expectBorderIn(page, take, "--track-colour-2");
+  expect(await borderOf(take)).not.toBe(accent);
+  await expect.poll(() => waveformOf(take)).toBe("0.7");
+  expect(await bandmate.timeline(hero.id)).toEqual(before);
+});
+
 test("a selected Clip is ringed and filled in its Track Colour, not the accent", async ({
   page,
   bandmate,

@@ -165,7 +165,7 @@ A named lane on the Timeline (e.g. "Beat", "Lead vox", "Adlibs") holding Clips, 
 _Avoid_: Channel, layer
 
 **Track Colour**:
-One of a set of six muted colours that sets a Track's Clips and header apart from other Tracks': its volume slider, what marks it as the Chosen Track, and what marks a Clip as selected. Bandmate gives a Track one when it's made, the one least used on the Song's Tracks, and it keeps it wherever the Track moves and whatever happens to the other Tracks; the user doesn't pick it. A Track made to carry on another's Clips, by a paste or a Tempo change, takes that Track's, so past six Tracks, or after those, two Tracks can share one. It belongs to the Song, while the shade it shows in comes from this Device's Palette, light or dark, so a Track is the same Track Colour on every Device. It's never the accent, which marks what's switched on.
+One of a set of six muted colours that sets a Track's Clips and header apart from other Tracks': its volume slider, what marks it as the Chosen Track, and what marks a Clip as selected. Bandmate gives a Track one when it's made, the one least used on the Song's Tracks, and it keeps it wherever the Track moves and whatever happens to the other Tracks; the user doesn't pick it. A Track made to carry on another's Clips, by a paste or a Tempo change, takes that Track's, so past six Tracks, or after those, two Tracks can share one. It belongs to the Song, while the shade it shows in comes from this Device's Palette, light or dark, so a Track is the same Track Colour on every Device. It's never the accent, which marks what's switched on, though a Device can turn Track Colours off in Settings and show the accent in their place, while each Track keeps its own.
 _Avoid_: Track palette (a Palette is what's picked in Settings), accent
 
 **Chosen Track**:
@@ -290,7 +290,7 @@ The browser, on a computer or phone, that Bandmate is opened in. What's kept "on
 _Avoid_: Browser (in the UI), machine
 
 **Device Setting**:
-A choice the user makes on purpose about how Bandmate works on this Device, whatever the Song: the Palette, light or dark, the Input, each Input's Latency Offset, the rhyming dictionaries downloaded, the Instrument, left-handed Chord diagrams and the Shortcuts' keys. Every one is listed together in Settings' This device, even when it's also changed where it's used, except the Shortcuts' keys, which are listed in Settings' Shortcuts tab. What's simply remembered from last time, like a volume, a step or a Song's Transpose, isn't one.
+A choice the user makes on purpose about how Bandmate works on this Device, whatever the Song: the Palette, light or dark, whether Track Colours show, the Input, each Input's Latency Offset, the rhyming dictionaries downloaded, the Instrument, left-handed Chord diagrams and the Shortcuts' keys. Every one is listed together in Settings' This device, even when it's also changed where it's used, except the Shortcuts' keys, which are listed in Settings' Shortcuts tab. What's simply remembered from last time, like a volume, a step or a Song's Transpose, isn't one.
 _Avoid_: Preference, local setting
 
 **Palette**:

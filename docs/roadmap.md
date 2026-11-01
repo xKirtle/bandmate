@@ -33,6 +33,7 @@ Each feature gets a spec, as an issue, before it's built. Using a new feature fo
 
 - Each Track gets a Track Colour of its own automatically, so Clips on different Tracks can be told apart at a glance. Today every Clip is in the one accent colour.
 - The Track keeps its colour however Tracks are added, deleted or reordered, and the user doesn't pick it. A later picker from the same set stays possible, if using the feature shows a need.
+- A Setting turns Track Colours off on a Device, showing the Palette's accent in their place, for anyone who'd rather have the Timeline quieter. Each Track keeps its colour.
 - Each Palette has its own shades of the set, in light and dark, so the colours follow the Palette, and a Track stores which colour of the set it has, not a colour value.
 - There are six, enough for every Song so far without a repeat. A new Track gets the one least used on the Song's Tracks, ties going to the earliest in the set, so a Song's first Track is always the first colour. The first two are chosen with most care, as most Songs only ever show those.
 - The Tracks a paste makes, and the one a Clip moves to when slowed by its Tempo, take the source Track's colour. The Track a Merge makes gets one like any new Track, and undoing a Track's deletion brings its colour back.

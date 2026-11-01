@@ -3051,6 +3051,10 @@
     fill: var(--clip-colour);
     opacity: 0.7;
   }
+  /* Stronger with Track Colours off, as not every accent reaches 3:1 at the opacity above. */
+  :global(:where([data-track-colours='off'])) .clip:not(.taking) rect:not(.clipped) {
+    opacity: 0.85;
+  }
   /*
    * A Clip's gain line: a hairline --at of the way down the waveform, in a
    * thin target a few pixels either side of it, clear of the trim edges,
@@ -3081,6 +3085,9 @@
     background: var(--clip-colour);
     opacity: 0.8;
   }
+  :global(:where([data-track-colours='off'])) .gain-line.changed::before {
+    opacity: 0.85;
+  }
   .gain-line:hover::before,
   .clip.gaining .gain-line::before {
     height: 2px;
@@ -3100,6 +3107,9 @@
     stroke-width: 1.5px;
     vector-effect: non-scaling-stroke;
     opacity: 0.8;
+  }
+  :global(:where([data-track-colours='off'])) .fade-slopes line {
+    opacity: 0.85;
   }
   /*
    * A fade dot, at an end of the gain line: --fade of the way in from the
