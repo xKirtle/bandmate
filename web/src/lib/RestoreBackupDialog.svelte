@@ -9,6 +9,8 @@
     type BackupSong,
   } from './api';
   import {
+    backupDialogRoom,
+    backupDialogSize,
     backupName,
     beatCount,
     beatsBrought,
@@ -70,6 +72,13 @@
     ),
   );
   const pickedName = $derived('name' in toRestore ? toRestore.name : '');
+  // Picking, its size comes from the Backup's counts, known before its lists
+  // load, so it doesn't change as they do.
+  const size = $derived.by(() => {
+    if (phase === 'deciding') return backupDialogSize(backupDialogRoom(present.songs.length, present.beats.length));
+    if ((phase !== 'picking' && phase !== 'checking') || loadError) return backupDialogSize('little');
+    return backupDialogSize(backupDialogRoom(backup.songs, backup.beats));
+  });
 
   // svelte-ignore state_referenced_locally
   Promise.all([api.backupSongs(backup.id), api.backupBeats(backup.id)]).then(
@@ -150,6 +159,10 @@
 <Dialog
   bind:dialog
   title="Restore"
+  --dialog-width={size.width}
+  --dialog-height={size.height}
+  fill={size.fill}
+  sheet
   closeButton={phase === 'restoring' || phase === 'checking' ? 'hidden' : 'shown'}
   dismissible={() => phase !== 'restoring'}
   {oncancel}
@@ -164,42 +177,49 @@
     {:else if songs.length === 0 && beats.length === 0}
       <p>This Backup holds no Songs or Beats.</p>
     {:else}
-      <fieldset class="choice-group" disabled={phase === 'checking'}>
+      <fieldset class="choice-group pick-choices" disabled={phase === 'checking'}>
         <legend>What comes back</legend>
-        {#if songs.length > 0}
-          <label class="choice-row">
-            <input type="checkbox" bind:checked={songsTicked} aria-describedby="restore-songs-note" />
-            <span>Songs</span>
-          </label>
-          <div class="choice-under">
-            <p id="restore-songs-note" class="muted">Each Song comes back whole, with the Beats its Clips use.</p>
-            {#if songsTicked}
-              <PickList items={songs} bind:picked label="Songs to restore" folderOf={(s) => s.folder} />
-              {#if !beatsTicked && songsIn.length > 0}
-                <p class="muted">{broughtNote(songsIn.length, brought.size)}</p>
-              {/if}
-            {/if}
-          </div>
-        {/if}
-        {#if beats.length > 0}
-          <label class="choice-row">
-            <input type="checkbox" bind:checked={beatsTicked} aria-describedby="restore-beats-note" />
-            <span>Beat Library <span class="muted">· {beatCount(beats.length)}</span></span>
-          </label>
-          <div class="choice-under">
-            <p id="restore-beats-note" class="muted">Each Beat comes back with its credit.</p>
-            {#if beatsTicked}
-              <PickList
-                items={beats}
-                bind:picked={pickedBeats}
-                label="Beats to restore"
-                detail={(b) => b.producer}
-                locked={brought}
-                lockedNote="used by a picked Song"
-              />
-            {/if}
-          </div>
-        {/if}
+        <div class="pick-columns">
+          {#if songs.length > 0}
+            <div class="pick-column">
+              <label class="choice-row">
+                <input type="checkbox" bind:checked={songsTicked} aria-describedby="restore-songs-note" />
+                <span>Songs</span>
+              </label>
+              <div class="choice-under">
+                <p id="restore-songs-note" class="muted">Each Song comes back whole, with the Beats its Clips use.</p>
+                <div class="pick-column-list" class:off={!songsTicked} inert={!songsTicked}>
+                  <PickList fill items={songs} bind:picked label="Songs to restore" folderOf={(s) => s.folder} />
+                </div>
+                {#if songsTicked && !beatsTicked && songsIn.length > 0}
+                  <p class="muted">{broughtNote(songsIn.length, brought.size)}</p>
+                {/if}
+              </div>
+            </div>
+          {/if}
+          {#if beats.length > 0}
+            <div class="pick-column">
+              <label class="choice-row">
+                <input type="checkbox" bind:checked={beatsTicked} aria-describedby="restore-beats-note" />
+                <span>Beat Library <span class="muted">· {beatCount(beats.length)}</span></span>
+              </label>
+              <div class="choice-under">
+                <p id="restore-beats-note" class="muted">Each Beat comes back with its credit.</p>
+                <div class="pick-column-list" class:off={!beatsTicked} inert={!beatsTicked}>
+                  <PickList
+                    fill
+                    items={beats}
+                    bind:picked={pickedBeats}
+                    label="Beats to restore"
+                    detail={(b) => b.producer}
+                    locked={brought}
+                    lockedNote="used by a picked Song"
+                  />
+                </div>
+              </div>
+            </div>
+          {/if}
+        </div>
       </fieldset>
       {#if 'missing' in toRestore}
         <p id="restore-missing" class="muted">{toRestore.missing}</p>
@@ -329,25 +349,47 @@
     min-width: 0;
     overflow-wrap: anywhere;
   }
-  /* About six rows, then it scrolls. */
+  /* Songs beside Beats, each list scrolling on its own, or stacked, sharing
+     the height, where they're too narrow to sit side by side. */
   .present {
     display: flex;
+    flex: 1;
     flex-direction: column;
     gap: var(--space-2);
-    max-height: calc(7.5 * var(--control));
+    min-height: 0;
     overflow-y: auto;
     overscroll-behavior: contain;
+  }
+  .present section {
+    display: flex;
+    flex: 1 1 0;
+    flex-direction: column;
+    min-width: 0;
+    min-height: calc(5 * var(--control));
+  }
+  @container dialog-body (min-width: 52rem) {
+    .present {
+      flex-direction: row;
+      gap: var(--space-6);
+    }
+    .present section {
+      min-height: 0;
+    }
   }
   h3 {
     margin: 0 0 var(--space-1);
     font-size: var(--text-md);
   }
   .present ul {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
     margin: 0;
     padding: 0 var(--space-2);
     border: 1px solid var(--border);
     border-radius: var(--radius-md);
     list-style: none;
+    overscroll-behavior: contain;
   }
   .present li {
     display: flex;
@@ -365,6 +407,7 @@
     flex: 1 1 8rem;
   }
   .toggle {
+    position: relative;
     display: inline-flex;
     flex: none;
     border: 1px solid var(--border);

@@ -267,5 +267,27 @@ export function restorable(backup: Pick<Backup, 'songs' | 'beats'>): boolean {
   return backup.songs > 0 || backup.beats > 0;
 }
 
+/** What a Backup's dialog has to hold: two kinds to pick, one, or just a line or two. */
+export type BackupDialogRoom = 'both' | 'one' | 'little';
+
+/** The room a dialog needs for this many Songs and Beats to pick. */
+export function backupDialogRoom(songs: number, beats: number): BackupDialogRoom {
+  if (songs > 0 && beats > 0) return 'both';
+  return songs > 0 || beats > 0 ? 'one' : 'little';
+}
+
+/**
+ * A Backup's dialog's size, for Dialog. Picking, it holds its size within
+ * the window, so ticking never moves what's under the pointer.
+ */
+export function backupDialogSize(room: BackupDialogRoom): { width: string; height: string; fill: boolean } {
+  if (room === 'little') return { width: '28rem', height: 'fit-content', fill: false };
+  return {
+    width: room === 'both' ? 'min(64rem, calc(100vw - 4rem))' : '36rem',
+    height: 'min(48rem, calc(100dvh - 4rem))',
+    fill: true,
+  };
+}
+
 /** A Backup's size, as any size that may be small is written. */
 export const backupSize = formatSmallSize;

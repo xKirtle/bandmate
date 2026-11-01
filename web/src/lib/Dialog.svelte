@@ -131,6 +131,7 @@
   .body.fill {
     flex: 1;
     min-height: 0;
+    container: dialog-body / inline-size;
   }
   .stack {
     display: flex;
