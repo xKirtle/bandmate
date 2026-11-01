@@ -65,15 +65,24 @@ Syncing lyrics to the music, rhymes and keyboard shortcuts need a bigger screen.
 # Save as compose.yaml, then run: mkdir data && docker compose up -d
 services:
   bandmate:
-    image: ghcr.io/xkirtle/bandmate:latest
+    image: ${BANDMATE_IMAGE:-ghcr.io/xkirtle/bandmate:latest}
     container_name: bandmate
     restart: unless-stopped
-    # The user that owns ./data, so Bandmate can write to it.
     user: "${PUID:-1000}:${PGID:-1000}"
     ports:
-      - "8080:8080"
+      - "${BANDMATE_PORT:-8080}:8080"
+    environment:
+      BANDMATE_MAX_UPLOAD_MB: ${BANDMATE_MAX_UPLOAD_MB:-500}
+      BANDMATE_UPDATE_CHECK: ${BANDMATE_UPDATE_CHECK:-true}
+      BANDMATE_ADD_FROM_LINK: ${BANDMATE_ADD_FROM_LINK:-true}
     volumes:
       - ./data:/data
+    healthcheck:
+      test: ["CMD", "/bandmate", "healthcheck"]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
 ```
 
 ```sh [docker run]
@@ -92,6 +101,6 @@ curl -fsSL https://github.com/xKirtle/bandmate/releases/latest/download/bandmate
 
 :::
 
-Then open http://localhost:8080. The full Compose file, with a health check, and every setting are in the [self-hosting guide](/self-hosting). Bandmate has no login, so before using it anywhere beyond your own machine, read [Security](/self-hosting#security).
+Then open http://localhost:8080. Every setting is in the [self-hosting guide](/self-hosting#configuration). Bandmate has no login, so before using it anywhere beyond your own machine, read [Security](/self-hosting#security).
 
 Docker is the easiest way to run it, because the image includes yt-dlp, ffmpeg and QuickJS, which adding a Beat from a link needs. The binary does everything else on its own: to add Beats from links, install those three yourself, as [Without Docker](/self-hosting#without-docker) shows.

@@ -5,8 +5,8 @@
 //	BANDMATE_ADDR      listen address (default ":8080")
 //	BANDMATE_DATA_DIR  directory holding the database and audio files (default "./data")
 //	BANDMATE_MAX_UPLOAD_MB  largest audio file accepted, in megabytes (default 500)
-//	BANDMATE_UPDATE_CHECK   "off" stops the About page asking GitHub for releases, Bandmate's and yt-dlp's (default "on")
-//	BANDMATE_ADD_FROM_LINK  "off" stops Beats being added from a link, which fetches them (default "on")
+//	BANDMATE_UPDATE_CHECK   "false" stops the About page asking GitHub for releases, Bandmate's and yt-dlp's (default "true")
+//	BANDMATE_ADD_FROM_LINK  "false" stops Beats being added from a link, which fetches them (default "true")
 //
 // "bandmate healthcheck" asks a running server whether it is healthy and exits
 // non-zero if not, for container healthchecks in images without curl.
@@ -165,15 +165,16 @@ func maxUploadBytes() (int64, error) {
 }
 
 // readOff reads a switch, such as BANDMATE_UPDATE_CHECK, telling whether
-// it's off: it's on unless it's "off".
+// it's off: it's on unless it's "false". "on" and "off" still work, for
+// settings from before it took "true" and "false".
 func readOff(name string) (off bool, err error) {
 	switch strings.ToLower(os.Getenv(name)) {
-	case "", "on":
+	case "", "true", "on":
 		return false, nil
-	case "off":
+	case "false", "off":
 		return true, nil
 	}
-	return false, fmt.Errorf(`%s must be "on" or "off"`, name)
+	return false, fmt.Errorf(`%s must be "true" or "false"`, name)
 }
 
 func env(key, fallback string) string {

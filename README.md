@@ -37,15 +37,24 @@ With Docker Compose, save this as `compose.yaml`, then run `mkdir data && docker
 ```yaml
 services:
   bandmate:
-    image: ghcr.io/xkirtle/bandmate:latest
+    image: ${BANDMATE_IMAGE:-ghcr.io/xkirtle/bandmate:latest}
     container_name: bandmate
     restart: unless-stopped
-    # The user that owns ./data, so Bandmate can write to it.
     user: "${PUID:-1000}:${PGID:-1000}"
     ports:
-      - "8080:8080"
+      - "${BANDMATE_PORT:-8080}:8080"
+    environment:
+      BANDMATE_MAX_UPLOAD_MB: ${BANDMATE_MAX_UPLOAD_MB:-500}
+      BANDMATE_UPDATE_CHECK: ${BANDMATE_UPDATE_CHECK:-true}
+      BANDMATE_ADD_FROM_LINK: ${BANDMATE_ADD_FROM_LINK:-true}
     volumes:
       - ./data:/data
+    healthcheck:
+      test: ["CMD", "/bandmate", "healthcheck"]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
 ```
 
 Or with plain Docker:
@@ -57,7 +66,7 @@ docker run -d --name bandmate --restart unless-stopped \
   ghcr.io/xkirtle/bandmate:latest
 ```
 
-Then open http://localhost:8080. The repo's [`compose.yaml`](compose.yaml) is the full version, with a health check.
+Then open http://localhost:8080.
 
 To run it without Docker, from a ready-made binary or one you build yourself, see [Without Docker](https://xkirtle.github.io/bandmate/self-hosting#without-docker) in the self-hosting guide.
 

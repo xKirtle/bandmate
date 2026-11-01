@@ -12,10 +12,13 @@ services:
     image: ${BANDMATE_IMAGE:-ghcr.io/xkirtle/bandmate:latest}
     container_name: bandmate
     restart: unless-stopped
-    # Run as the owner of ./data so the bind-mounted folder stays writable.
     user: "${PUID:-1000}:${PGID:-1000}"
     ports:
       - "${BANDMATE_PORT:-8080}:8080"
+    environment:
+      BANDMATE_MAX_UPLOAD_MB: ${BANDMATE_MAX_UPLOAD_MB:-500}
+      BANDMATE_UPDATE_CHECK: ${BANDMATE_UPDATE_CHECK:-true}
+      BANDMATE_ADD_FROM_LINK: ${BANDMATE_ADD_FROM_LINK:-true}
     volumes:
       - ./data:/data
     healthcheck:
@@ -107,16 +110,16 @@ The Compose file checks Bandmate is healthy with `bandmate healthcheck`. For you
 
 ## Configuration
 
-Set these in a `.env` file next to `compose.yaml`. Without Docker, set them in Bandmate's environment instead, e.g. `BANDMATE_UPDATE_CHECK=off ./bandmate`. All are optional.
+Set these in a `.env` file next to `compose.yaml`. Without Docker, set them in Bandmate's environment instead, e.g. `BANDMATE_UPDATE_CHECK=false ./bandmate`. All are optional.
 
-| Variable                 | Default    | What it does                                                                  |
-| ------------------------ | ---------- | ----------------------------------------------------------------------------- |
-| `BANDMATE_PORT`          | `8080`     | The port Bandmate is on, on your machine                                      |
-| `BANDMATE_IMAGE`         | `…:latest` | Which version to run: see [Image tags](#image-tags)                           |
-| `PUID` / `PGID`          | `1000`     | The user the container runs as. It must own `./data`                          |
-| `BANDMATE_MAX_UPLOAD_MB` | `500`      | The largest audio file Bandmate takes, uploaded or downloaded, in megabytes   |
-| `BANDMATE_UPDATE_CHECK`  | `on`       | `off` stops Bandmate checking GitHub for new versions of itself and of yt-dlp |
-| `BANDMATE_ADD_FROM_LINK` | `on`       | `off` turns off [downloading Beats from links](/features#beats-from-a-link)     |
+| Variable                 | Default    | What it does                                                                    |
+| ------------------------ | ---------- | ------------------------------------------------------------------------------- |
+| `BANDMATE_PORT`          | `8080`     | The port Bandmate is on, on your machine                                        |
+| `BANDMATE_IMAGE`         | `…:latest` | Which version to run: see [Image tags](#image-tags)                             |
+| `PUID` / `PGID`          | `1000`     | The user the container runs as. It must own `./data`                            |
+| `BANDMATE_MAX_UPLOAD_MB` | `500`      | The largest audio file Bandmate takes, uploaded or downloaded, in megabytes     |
+| `BANDMATE_UPDATE_CHECK`  | `true`     | `false` stops Bandmate checking GitHub for new versions of itself and of yt-dlp |
+| `BANDMATE_ADD_FROM_LINK` | `true`     | `false` turns off [downloading Beats from links](/features#beats-from-a-link)     |
 
 `BANDMATE_PORT`, `BANDMATE_IMAGE`, `PUID` and `PGID` are the Compose file's. Running Bandmate without Docker, it also reads `BANDMATE_ADDR`, the address it listens on (`:8080`), and `BANDMATE_DATA_DIR`, where it keeps its data (`./data`; the image sets it to `/data`).
 
@@ -132,11 +135,11 @@ To report a vulnerability, see [SECURITY.md](https://github.com/xKirtle/bandmate
 
 Bandmate only goes online when you do something that needs it:
 
-| When you…                        | It connects to                                                | Turn it off with             |
-| -------------------------------- | ------------------------------------------------------------- | ---------------------------- |
-| Open Settings → About            | GitHub, for the latest Bandmate and yt-dlp, and release notes | `BANDMATE_UPDATE_CHECK=off`  |
-| Add a Beat from a link           | The site the link is on                                       | `BANDMATE_ADD_FROM_LINK=off` |
-| Press Update for yt-dlp in About | GitHub                                                        | `BANDMATE_ADD_FROM_LINK=off` |
+| When you…                        | It connects to                                                | Turn it off with               |
+| -------------------------------- | ------------------------------------------------------------- | ------------------------------ |
+| Open Settings → About            | GitHub, for the latest Bandmate and yt-dlp, and release notes | `BANDMATE_UPDATE_CHECK=false`  |
+| Add a Beat from a link           | The site the link is on                                       | `BANDMATE_ADD_FROM_LINK=false` |
+| Press Update for yt-dlp in About | GitHub                                                        | `BANDMATE_ADD_FROM_LINK=false` |
 
 ## Updating
 
