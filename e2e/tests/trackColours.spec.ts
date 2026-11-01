@@ -10,6 +10,7 @@ import {
   middleOf,
   namedClip,
   redoButton,
+  seek,
   serverClips,
   timeline,
   trackHead,
@@ -100,6 +101,25 @@ test('a selected Clip is ringed and filled in its Track Colour, not the accent',
   expect(ring).toContain(colour);
   expect(ring).not.toContain(accent);
   expect(await take.evaluate((el) => getComputedStyle(el).backgroundColor)).not.toBe(unselected);
+});
+
+test("a Clip's focus outline is in its Track's colour, as on the half a Split leaves focused", async ({
+  page,
+  bandmate,
+}) => {
+  const hero = await heroSong(bandmate);
+  await page.goto(`/songs/${hero.id}`);
+  const take = clip(page, 'Take 2');
+  await expect(take).toBeVisible();
+  await seek(page, 100);
+
+  await take.focus();
+  await page.keyboard.press('s');
+
+  const right = clip(page, 'Take 2').last();
+  await expect(right).toBeFocused();
+  await expect(right).toHaveCSS('outline-style', 'solid');
+  await expect(right).toHaveCSS('outline-color', await drawnColour(page, '--track-colour-2'));
 });
 
 test("a Clip moved to another Track takes that Track's colour", async ({ page, bandmate }) => {

@@ -2932,7 +2932,7 @@
   }
   .clip:focus-visible,
   .clip.editing {
-    outline: 2px solid var(--accent);
+    outline: 2px solid var(--clip-colour);
     outline-offset: 1px;
   }
   .clip.editing {

@@ -207,13 +207,13 @@ describe("a Clip's Track Colour", () => {
     expect(clipLineStrengths()).toEqual([80, 80]);
   });
 
-  it('leaves the accent to focus and recording on a Clip', () => {
+  it('leaves the accent on a Clip to the one being recorded', () => {
     const styles = timeline.slice(timeline.indexOf('<style')).replace(/\/\*[\s\S]*?\*\//g, '');
     const inAccent = [...styles.matchAll(/([^{}]+)\{[^{}]*var\(--accent\)[^{}]*\}/g)]
       .map(([, selectors]) => selectors.trim().replace(/\s+/g, ' '))
       .filter((selectors) => /clip|gain|fade|trim|rect/.test(selectors));
 
-    expect(inAccent).toEqual(['.clip:focus-visible, .clip.editing', '.clip.taking']);
+    expect(inAccent).toEqual(['.clip.taking']);
   });
 });
 
@@ -339,7 +339,7 @@ describe('Palettes', () => {
         }
       });
 
-      it(`${name} ${theme}: no Track Colour is close to the accent, so focus stands out on a Clip`, () => {
+      it(`${name} ${theme}: no Track Colour is close to the accent, so no Clip looks like the one being recorded`, () => {
         for (const shade of shades) {
           expect(hueGap(shade, colours['--accent']), shade).toBeGreaterThanOrEqual(MIN_TRACK_COLOUR_HUE_GAP);
           expect(difference(shade, colours['--accent']), shade).toBeGreaterThanOrEqual(MIN_TRACK_COLOUR_DIFFERENCE);
