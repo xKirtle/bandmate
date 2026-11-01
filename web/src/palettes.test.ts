@@ -181,13 +181,11 @@ function clipLineStrengths(): number[] {
   );
 }
 
-/** How much of the accent tints a Track's header while it's Chosen, or a file is dragged over it, as percentages. */
-function trackHeaderTints(): number[] {
-  return ['\\.head\\.chosen', '\\.head\\.file-target'].map((rule) =>
-    fromTimeline(
-      new RegExp(`\\n {2}${rule}[^{]*\\{[^}]*color-mix\\(in srgb, var\\(--accent\\) (\\d+)%, transparent\\)`),
-      `${rule} is a tint of the accent`,
-    ),
+/** How much of a colour tints a Track's header under a rule, as a percentage. */
+function trackHeaderTint(rule: string, colour: string): number {
+  return fromTimeline(
+    new RegExp(`\\n {2}${rule}[^{]*\\{[^}]*color-mix\\(in srgb, var\\(${colour}\\) (\\d+)%, transparent\\)`),
+    `${rule} is a tint of ${colour}`,
   );
 }
 
@@ -335,10 +333,15 @@ describe('Palettes', () => {
         }
       });
 
-      it(`${name} ${theme}: a volume slider in any Track Colour is at least 3:1 on a Track's header, tinted or not`, () => {
-        const tints = trackHeaderTints().map((tint) => mix(colours['--accent'], tint, colours['--bg']));
-        for (const background of [colours['--bg'], ...tints]) {
-          for (const shade of shades) {
+      it(`${name} ${theme}: any Track Colour is at least 3:1 on its Track's header, tinted or not`, () => {
+        const chosen = trackHeaderTint('\\.head\\.chosen', '--head-colour');
+        const fileTarget = mix(
+          colours['--accent'],
+          trackHeaderTint('\\.head\\.file-target', '--accent'),
+          colours['--bg'],
+        );
+        for (const shade of shades) {
+          for (const background of [colours['--bg'], mix(shade, chosen, colours['--bg']), fileTarget]) {
             expect(contrast(shade, background), `${shade} on ${background}`).toBeGreaterThanOrEqual(
               MIN_TRACK_COLOUR_CONTRAST,
             );

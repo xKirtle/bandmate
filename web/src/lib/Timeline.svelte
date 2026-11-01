@@ -1814,6 +1814,7 @@
           <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_noninteractive_element_interactions -->
           <div
             class="head"
+            style:--head-colour="var(--track-colour-{track.colour})"
             class:chosen={track.id === chosen}
             class:file-target={track.id === fileTarget}
             class:dragged={trackDrag.current?.dragged === i}
@@ -1918,7 +1919,6 @@
               >
               <input
                 class="volume"
-                style:accent-color="var(--track-colour-{track.colour})"
                 type="range"
                 min={minVolume}
                 max={maxVolume}
@@ -2366,8 +2366,6 @@
     --timeline-rem: calc(var(--timeline-scale) * 1rem);
     /* The page's control size, scaled, and never smaller than it. */
     --touch: max(var(--control), calc(var(--timeline-scale) * var(--control)));
-    /* The shared edge, scaled to the room left for it on a Track's header. */
-    --selected-edge: inset calc(0.1875 * var(--timeline-rem)) 0 0 var(--accent);
     /* Docked at the bottom of the window, directly above the tab bar if there is one. */
     position: sticky;
     bottom: var(--nav-bottom-space);
@@ -2580,10 +2578,11 @@
   .lane.drop-below::after {
     bottom: -2px;
   }
-  /* Marked along its left edge, in the room left for it. */
+  /* Marked along its left edge, in the room left for it, and tinted, both in its Track Colour. */
   .head.chosen {
+    --selected-edge: inset calc(0.1875 * var(--timeline-rem)) 0 0 var(--head-colour);
     box-shadow: var(--selected-edge);
-    background: color-mix(in srgb, var(--accent) 8%, transparent);
+    background: color-mix(in srgb, var(--head-colour) 8%, transparent);
   }
   /* The Track audio files dragged over the Timeline would be imported onto, across its header and lane. */
   .head.file-target,
@@ -2667,6 +2666,7 @@
     min-width: 0;
     min-height: 0;
     padding: 0;
+    accent-color: var(--head-colour);
     /* The browser draws the slider at its own size, so it's zoomed instead. */
     zoom: var(--timeline-scale);
   }

@@ -178,7 +178,7 @@ test("a Track's volume slider is in its colour, on an empty Track too", async ({
   await expect(volumeOf(page, 'Track 3')).toHaveCSS('accent-color', await drawnColour(page, '--track-colour-3'));
 });
 
-test("a Track's header shows its colour only on its volume slider, and the Chosen Track's is marked in the accent", async ({
+test("a Track's header shows its colour on its volume slider and, while Chosen, along its edge and as its tint", async ({
   page,
   bandmate,
 }) => {
@@ -189,9 +189,10 @@ test("a Track's header shows its colour only on its volume slider, and the Chose
   await expect(chosen).toHaveAttribute('aria-current', 'true');
   const shades = await Promise.all([1, 2, 3, 4, 5, 6].map((n) => drawnColour(page, `--track-colour-${n}`)));
 
-  expect(await paintOf(chosen)).toContain(await drawnColour(page, '--accent'));
+  expect(await paintOf(chosen)).toContain(await drawnColour(page, '--track-colour-2'));
+  expect(await paintOf(chosen)).not.toContain(await drawnColour(page, '--accent'));
   expect(await backgroundOf(chosen)).not.toBe(await backgroundOf(trackHead(page, 'Beat')));
-  for (const part of [chosen, ...(await chosen.getByRole('button').all())]) {
+  for (const part of [trackHead(page, 'Beat'), ...(await chosen.getByRole('button').all())]) {
     const paint = await paintOf(part);
     for (const shade of shades) expect(paint).not.toContain(shade);
   }
