@@ -132,7 +132,7 @@ Every song has a timeline: its beat, your takes and any other audio, laid out on
 6. **Mix down**: download the song, or its loop, as one audio file.
 7. **Input**: pick the input you record from, see [Record](#record).
 8. **Add a beat** from your library, or **a track**.
-9. **A track**, with its own volume, mute and solo. New takes go on the highlighted one: click a track's name to choose it.
+9. **A track**, with its own volume, mute and solo. A mark on the volume slider shows where the track's loudest clip starts to distort, and the slider changes colour past it. New takes go on the highlighted one: click a track's name to choose it.
 10. **A beat**: drag it to move it, or its ends to trim it. The file itself is never changed.
 11. **A take**, selected. Its **⋯** menu records it again or picks another take, see [Record](#record).
 

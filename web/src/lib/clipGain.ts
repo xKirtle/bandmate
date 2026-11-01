@@ -1,15 +1,16 @@
 // A Clip's Gain: how much louder or quieter it plays, in dB, before its
-// Track's volume applies. Its range is a Track's volume's, and like a
-// Track, all the way down it's quiet, never silent. It's set by dragging
+// Track's volume applies. Its range goes higher than a Track's volume's,
+// to lift a quiet recording on its own, and like a Track, all the way down
+// it's quiet, never silent. It's set by dragging
 // the gain line across the Clip, linear in dB: 0 dB in the middle, the top
 // of the range at the top and the bottom at the bottom. Plain arithmetic, so
 // the Timeline only has to draw and play it.
-import { formatVolume, maxVolume, minVolume } from './mixer';
+import { formatVolume } from './mixer';
 
 /** A Clip's lowest Gain, in dB. The server checks the same range (MinGain in the timeline package). */
-export const minGain = minVolume;
+export const minGain = -36;
 /** A Clip's highest Gain, in dB. */
-export const maxGain = maxVolume;
+export const maxGain = 36;
 
 // A Shift-drag goes this much as far, for fine changes.
 const fine = 0.1;

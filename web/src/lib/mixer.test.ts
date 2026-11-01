@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatVolume, trackGains } from './mixer';
+import { faderAt, formatVolume, trackGains } from './mixer';
 
 const track = (id: number, levels: { volume?: number; muted?: boolean; soloed?: boolean } = {}) => ({
   id,
@@ -7,6 +7,14 @@ const track = (id: number, levels: { volume?: number; muted?: boolean; soloed?: 
   muted: false,
   soloed: false,
   ...levels,
+});
+
+describe('faderAt', () => {
+  it('puts the bottom at 0, the top at 1 and 0 dB three fifths along', () => {
+    expect(faderAt(-36)).toBe(0);
+    expect(faderAt(24)).toBe(1);
+    expect(faderAt(0)).toBeCloseTo(0.6);
+  });
 });
 
 describe('trackGains', () => {
@@ -22,9 +30,9 @@ describe('trackGains', () => {
   });
 
   it('still plays a Track at the bottom and top of its fader', () => {
-    const gains = trackGains([track(1, { volume: -36 }), track(2, { volume: 36 })]);
+    const gains = trackGains([track(1, { volume: -36 }), track(2, { volume: 24 })]);
     expect(gains.get(1)).toBeCloseTo(0.01585, 5);
-    expect(gains.get(2)).toBeCloseTo(63.0957, 4);
+    expect(gains.get(2)).toBeCloseTo(15.8489, 4);
   });
 
   it('silences a muted Track', () => {
