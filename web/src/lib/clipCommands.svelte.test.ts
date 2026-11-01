@@ -264,6 +264,46 @@ describe('Clip commands, the Clipboard', () => {
     expect(clipIds(server)).toEqual([[1, 2], [3]]);
   });
 
+  it("gives a Track a paste adds its source Track's colour, even once that's deleted, and keeps it through undo and redo", async () => {
+    const vox = { ...track(2, [beatClip(3, 5, 15)]), name: 'Vox', colour: 5 };
+    const server = new FakeSongServer(emptySong(), [track(1, [beatClip(1, 0, 10)]), vox]);
+    const { commands, editing, selection, saves, state } = await commandsFor(server);
+    const colours = () => server.timeline.tracks.map((t) => t.colour);
+    selection.apply({ kind: 'toggle', clipId: 1 });
+    selection.apply({ kind: 'toggle', clipId: 3 });
+    await commands.run({ kind: 'copy', target: selected });
+    await editing.edit({ kind: 'deleteTrack', trackId: 2 });
+
+    state.playhead = 40;
+    await commands.run({ kind: 'paste', target: selected });
+    expect(server.timeline.tracks.map((t) => t.name)).toEqual(['Track 1', 'Vox']);
+    expect(colours()).toEqual([1, 5]);
+
+    await saves.undo();
+    expect(colours()).toEqual([1]);
+    await saves.redo();
+    expect(colours()).toEqual([1, 5]);
+
+    // Back to before the paste, then the deletion undone too.
+    await saves.undo();
+    await saves.undo();
+    expect(colours()).toEqual([1, 5]);
+    expect(clipIds(server)).toHaveLength(2);
+  });
+
+  it('brings a deleted Track back as it was, colour and all', async () => {
+    const vox = { ...track(2, [beatClip(3, 5, 15)]), name: 'Vox', volume: -3, muted: true, colour: 5 };
+    const server = new FakeSongServer(emptySong(), [vox, track(1)]);
+    const { editing, saves } = await commandsFor(server);
+    await editing.edit({ kind: 'deleteTrack', trackId: 2 });
+
+    await saves.undo();
+
+    const [back] = server.timeline.tracks;
+    expect(back).toMatchObject({ name: 'Vox', volume: -3, muted: true, soloed: false, colour: 5 });
+    expect(back.clips.map((c) => [c.start, c.length])).toEqual([[5, 10]]);
+  });
+
   it('has nothing to paste before anything is copied', async () => {
     const server = new FakeSongServer(emptySong(), twoTracks());
     const { commands } = await commandsFor(server);

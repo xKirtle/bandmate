@@ -562,12 +562,53 @@ func TestDeleting(t *testing.T) {
 
 func TestAddingTracks(t *testing.T) {
 	tl := timelineOf([]Clip{beatClip(1, 0, 10)})
-	after, added := tl.addingTracks([]string{"Harmony", "Bass"}, newIDs(tl))
+	after, added := tl.addingTracks([]TrackToAdd{{Name: "Harmony"}, {Name: "Bass"}}, newIDs(tl))
 	if want := []int64{2, 3}; !reflect.DeepEqual(added, want) {
 		t.Errorf("the Tracks added = %v, want %v", added, want)
 	}
 	if want := []string{"", "Harmony", "Bass"}; !reflect.DeepEqual(trackNames(after), want) {
 		t.Errorf("the Tracks = %v, want %v", trackNames(after), want)
+	}
+}
+
+// colours lists tl's Tracks' colours, top to bottom.
+func colours(tl Timeline) []int {
+	out := make([]int, len(tl.Tracks))
+	for i, t := range tl.Tracks {
+		out[i] = t.Colour
+	}
+	return out
+}
+
+func TestTracksAddedKeepTheColoursTheyCarryOn(t *testing.T) {
+	tl := timelineOf([]Clip{})
+	tl.Tracks[0].Colour = 1
+
+	// One with none to carry on counts those added before it.
+	after, _ := tl.addingTracks([]TrackToAdd{{Name: "A", Colour: 2}, {Name: "B", Colour: 1}, {Name: "C"}}, newIDs(tl))
+
+	if want := []int{1, 2, 1, 3}; !reflect.DeepEqual(colours(after), want) {
+		t.Errorf("the colours = %v, want %v", colours(after), want)
+	}
+}
+
+func TestSlowedClipsNewTracksTakeTheColourOfTheTrackTheyLeft(t *testing.T) {
+	// Slowed, the first and third don't fit together, so get a new Track each.
+	tl := timelineOf(
+		[]Clip{beatClip(1, 0, 10), beatClip(2, 10, 2), beatClip(3, 12, 10), beatClip(4, 22, 10)},
+		[]Clip{},
+	)
+	tl.Tracks[0].Colour, tl.Tracks[1].Colour = 4, 1
+
+	after, err := edited(tl, func(tl Timeline, ids *ids) (Timeline, error) {
+		return tl.settingTempos([]ClipTempo{{ClipID: 1, Tempo: 0.5}, {ClipID: 3, Tempo: 0.5}}, ids)
+	})
+	if err != nil {
+		t.Fatalf("settingTempos error = %v", err)
+	}
+
+	if want := []int{4, 4, 4, 1}; !reflect.DeepEqual(colours(after), want) {
+		t.Errorf("the colours = %v, want %v", colours(after), want)
 	}
 }
 
@@ -581,7 +622,7 @@ func TestPasting(t *testing.T) {
 	}
 	tests := []struct {
 		name       string
-		newTracks  []string
+		newTracks  []TrackToAdd
 		clips      []ClipCopy
 		wantTracks []string
 		want       []where
@@ -596,7 +637,7 @@ func TestPasting(t *testing.T) {
 		},
 		{
 			name:       "a Clip pasted onto a Track added for it",
-			newTracks:  []string{"Harmony"},
+			newTracks:  []TrackToAdd{{Name: "Harmony"}},
 			clips:      []ClipCopy{copied(OnTrack{NewTrack: placeOf(0)}, 0, 10)},
 			wantTracks: []string{"", "Harmony"},
 			want: []where{{clipID: 1, trackID: 1, length: 10},
@@ -604,7 +645,7 @@ func TestPasting(t *testing.T) {
 		},
 		{
 			name:      "two Clips pasted at once, one on a Track added for it",
-			newTracks: []string{"Harmony"},
+			newTracks: []TrackToAdd{{Name: "Harmony"}},
 			clips: []ClipCopy{copied(OnTrack{TrackID: 1}, 20, 10),
 				copied(OnTrack{NewTrack: placeOf(0)}, 20, 10)},
 			wantTracks: []string{"", "Harmony"},

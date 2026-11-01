@@ -38,15 +38,15 @@ func (tl Timeline) placingNew(trackID int64, c NewClip, src clipSource, clipID i
 	return tl.placing(trackID, asPlaced(c.placed(clipID, src))), nil
 }
 
-// addingTracks is tl with an empty Track of each of the names given, which
-// must be checked, at the bottom in order, at 0 dB and neither muted nor
-// soloed, and the ids they were added with: the Tracks a paste or a Place
-// adds for its Clips.
-func (tl Timeline) addingTracks(names []string, ids *ids) (Timeline, []int64) {
-	added := make([]int64, len(names))
-	for i, name := range names {
+// addingTracks is tl with an empty Track of each of those given, which must
+// be checked, at the bottom in order, at 0 dB and neither muted nor soloed,
+// and the ids they were added with: the Tracks a paste or a Place adds for
+// its Clips.
+func (tl Timeline) addingTracks(tracks []TrackToAdd, ids *ids) (Timeline, []int64) {
+	added := make([]int64, len(tracks))
+	for i, t := range tracks {
 		added[i] = ids.track()
-		tl = tl.insertingTrack(Track{ID: added[i], Name: name, Clips: []Clip{}}, len(tl.Tracks))
+		tl = tl.insertingTrack(Track{ID: added[i], Name: t.Name, Colour: t.Colour, Clips: []Clip{}}, len(tl.Tracks))
 	}
 	return tl, added
 }
@@ -54,10 +54,10 @@ func (tl Timeline) addingTracks(names []string, ids *ids) (Timeline, []int64) {
 // pasting is tl with a new Clip of each of those copied on its Track, as it
 // was copied, with an empty Track of each of newTracks added at the bottom
 // first for the Clips that run past the last Track: what PasteClips leaves.
-// The names must be checked. srcs are what those Clips play, one for each,
+// The Tracks must be checked. srcs are what those Clips play, one for each,
 // in the order clips gives them, a Clip of Takes' being the copies of its
 // Takes in the order it holds them.
-func (tl Timeline) pasting(newTracks []string, clips []ClipCopy, srcs []clipSource, ids *ids) (Timeline, error) {
+func (tl Timeline) pasting(newTracks []TrackToAdd, clips []ClipCopy, srcs []clipSource, ids *ids) (Timeline, error) {
 	tl, added := tl.addingTracks(newTracks, ids)
 	for i, c := range clips {
 		trackID, err := c.trackOf(added)
@@ -444,7 +444,7 @@ func (tl Timeline) addingTrack(t NewTrack, srcs []clipSource, ids *ids) (Timelin
 		return Timeline{}, err
 	}
 	added := Track{ID: ids.track(), Name: t.Name, Volume: t.Volume, Muted: t.Muted, Soloed: t.Soloed,
-		Clips: []Clip{}}
+		Colour: t.Colour, Clips: []Clip{}}
 	tl = tl.insertingTrack(added, place)
 	for i, c := range t.Clips {
 		if tl, err = tl.placingNew(added.ID, c, srcs[i], ids.clip()); err != nil {
@@ -456,10 +456,11 @@ func (tl Timeline) addingTrack(t NewTrack, srcs []clipSource, ids *ids) (Timelin
 
 // insertingTrack is tl with the new Track t among its Tracks at place, from
 // 0 (the top) to the number of Tracks (the bottom), pushing those from there
-// down. Every Track added to a Timeline comes in here, so here it gets its
-// colour. A Song's first Track, made with the Song, starts on the first.
+// down. Every Track added to a Timeline comes in here, so here one with no
+// colour to carry on gets its own. A Song's first Track, made with the Song,
+// starts on the first.
 func (tl Timeline) insertingTrack(t Track, place int) Timeline {
-	t.Colour = tl.leastUsedColour()
+	t.Colour = cmp.Or(t.Colour, tl.leastUsedColour())
 	tl.Tracks = slices.Insert(slices.Clone(tl.Tracks), place, t)
 	return tl
 }
@@ -501,9 +502,9 @@ func (tl Timeline) addingTracksAt(tracks []TrackAt, ids *ids) (Timeline, []int64
 	return tl, added, nil
 }
 
-// addingTrackBelow is tl with an empty Track right below one of its own,
-// named as a Merge names the Track it adds, "Track" and the number of
-// Tracks with it, and the id it was added with.
+// addingTrackBelow is tl with an empty Track right below one of its own, in
+// that Track's colour, named as a Merge names the Track it adds, "Track" and
+// the number of Tracks with it, and the id it was added with.
 func (tl Timeline) addingTrackBelow(trackID int64, ids *ids) (Timeline, int64, error) {
 	above, ok := tl.trackPlace(trackID)
 	if !ok {
@@ -511,7 +512,7 @@ func (tl Timeline) addingTrackBelow(trackID int64, ids *ids) (Timeline, int64, e
 	}
 	id := ids.track()
 	return tl.insertingTrack(Track{ID: id, Name: fmt.Sprintf("Track %d", len(tl.Tracks)+1),
-		Clips: []Clip{}}, above+1), id, nil
+		Colour: tl.Tracks[above].Colour, Clips: []Clip{}}, above+1), id, nil
 }
 
 // reordering is tl with its Tracks in the order given, top to bottom, which

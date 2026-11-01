@@ -2,6 +2,7 @@ package app_test
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"reflect"
 	"testing"
@@ -83,6 +84,30 @@ func TestATrackMadeByAMergeGetsTheLeastUsedColour(t *testing.T) {
 	got := timelineChange(t, ts.mergeClips(p.song.ID, mergedAudio(50, onNewTrack("Track 3", 1), p.first, p.second)))
 
 	expectColours(t, got, 1, 3, 2)
+}
+
+func TestUndoingAndRedoingAMergeLeavesItsTracksColour(t *testing.T) {
+	ts := newTestServer(t)
+	p := placeTwoClips(t, ts)
+	merged := timelineChange(t, ts.mergeClips(p.song.ID, mergedAudio(50, onNewTrack("Track 3", 1), p.first, p.second)))
+	added := merged.Tracks[1]
+
+	// Undone and redone as the web app does, by replacing Clips.
+	undone := timelineChange(t, ts.Do(http.MethodPost, timelinePath(p.song.ID)+"/clips/replace", map[string]any{
+		"clipIds": []int64{added.Clips[0].ID}, "trackIds": []int64{added.ID},
+		"clips": []map[string]any{
+			{"trackId": p.tl.Tracks[0].ID, "beatId": p.short.ID, "start": 0, "offset": 0, "length": 10},
+			{"trackId": p.tl.Tracks[0].ID, "beatId": p.long.ID, "start": 30, "offset": 0, "length": 20},
+		},
+	}))
+	expectColours(t, undone, 1, 2)
+
+	redone := timelineChange(t, ts.Do(http.MethodPost, timelinePath(p.song.ID)+"/clips/replace", map[string]any{
+		"clipIds":   []int64{undone.Tracks[0].Clips[0].ID, undone.Tracks[0].Clips[1].ID},
+		"newTracks": []map[string]any{{"name": "Track 3", "position": 1}},
+		"clips":     []map[string]any{{"newTrack": 0, "soundId": added.Clips[0].SoundID, "start": 0, "offset": 0, "length": 50}},
+	}))
+	expectColours(t, redone, 1, 3, 2)
 }
 
 func TestATrackKeepsItsColourWhenOthersAreAddedDeletedOrReordered(t *testing.T) {
@@ -188,4 +213,138 @@ func TestTheDemoSongsTracksHaveColours(t *testing.T) {
 		want = append(want, i%6+1)
 	}
 	expectColours(t, tl, want...)
+}
+
+// A Track that carries on another Track's Clips takes that Track's colour,
+// rather than one of its own.
+
+// clipsCloseTogether is placeTwoClips, the second Clip near enough the first
+// that slowing the first to half speed runs it into the second.
+func clipsCloseTogether(t *testing.T, ts *testServer) twoClips {
+	t.Helper()
+	p := placeTwoClips(t, ts)
+	p.tl = timelineChange(t, ts.moveClip(p.song.ID, p.second, p.tl.Tracks[0].ID, 15))
+	return p
+}
+
+func TestTheTrackASlowedClipMovesToTakesTheColourOfTheTrackItLeft(t *testing.T) {
+	ts := newTestServer(t)
+	p := clipsCloseTogether(t, ts)
+
+	slowed := timelineChange(t, ts.setClipTempo(p.song.ID, p.first, 0.5))
+
+	expectColours(t, slowed, 1, 1, 2)
+	expectColours(t, ts.getTimeline(p.song.ID), 1, 1, 2)
+}
+
+func TestATrackAPasteAddsTakesTheColourItCarriesOn(t *testing.T) {
+	ts := newTestServer(t)
+	p := placeTwoClips(t, ts)
+
+	got := timelineChange(t, ts.Do(http.MethodPost, timelinePath(p.song.ID)+"/clips/paste", map[string]any{
+		"newTracks": []map[string]any{{"name": "Beat", "colour": 5}, {"name": "Adlibs", "colour": 1}},
+		"clips":     []map[string]any{{"newTrack": 0, "beatId": p.short.ID, "start": 0, "offset": 0, "length": 10}},
+	}))
+
+	expectColours(t, got, 1, 2, 5, 1)
+	expectColours(t, ts.getTimeline(p.song.ID), 1, 2, 5, 1)
+}
+
+func TestATrackAPasteAddsGetsItsOwnColourIfItCarriesOnNone(t *testing.T) {
+	ts := newTestServer(t)
+	p := placeTwoClips(t, ts)
+
+	got := timelineChange(t, ts.pasteOntoNewTracks(p.song.ID, []string{"Beat"},
+		map[string]any{"newTrack": 0, "beatId": p.short.ID, "start": 0, "offset": 0, "length": 10}))
+
+	expectColours(t, got, 1, 2, 3)
+}
+
+func TestRedoingAPasteBringsItsTracksBackInTheirColours(t *testing.T) {
+	ts := newTestServer(t)
+	p := placeTwoClips(t, ts)
+
+	got := timelineChange(t, ts.Do(http.MethodPost, timelinePath(p.song.ID)+"/clips/place", map[string]any{
+		"newTracks": []map[string]any{{"name": "Beat", "colour": 4}},
+		"clips":     []map[string]any{{"newTrack": 0, "beatId": p.short.ID, "start": 0, "offset": 0, "length": 10}},
+	}))
+
+	expectColours(t, got, 1, 2, 4)
+}
+
+func TestUndoingATracksDeletionBringsItsColourBack(t *testing.T) {
+	ts := newTestServer(t)
+	s := ts.createSong("Night Drive")
+	timelineChange(t, ts.addTrack(s.ID, "Second"))
+	timelineChange(t, ts.addTrack(s.ID, "Third"))
+	tl := timelineChange(t, ts.addTrack(s.ID, "Fourth"))
+	timelineChange(t, ts.deleteTrack(s.ID, tl.Tracks[1].ID))
+	tl = timelineChange(t, ts.deleteTrack(s.ID, tl.Tracks[2].ID))
+	expectColours(t, tl, 1, 4)
+
+	// The newest deletion undone first. Colour 2 is the least used by now,
+	// so the Track only comes back in its own if it's given that.
+	got := timelineChange(t, ts.Do(http.MethodPost, timelinePath(s.ID)+"/tracks",
+		map[string]any{"name": "Third", "position": 1, "colour": 3}))
+	expectColours(t, got, 1, 3, 4)
+
+	got = timelineChange(t, ts.Do(http.MethodPost, timelinePath(s.ID)+"/tracks",
+		map[string]any{"name": "Second", "position": 1, "colour": 2}))
+	expectColours(t, got, 1, 2, 3, 4)
+}
+
+func TestATrackIsRefusedAColourOutsideTheSet(t *testing.T) {
+	ts := newTestServer(t)
+	p := placeTwoClips(t, ts)
+	clips := []map[string]any{{"newTrack": 0, "beatId": p.short.ID, "start": 0, "offset": 0, "length": 10}}
+
+	for _, colour := range []int{-1, 7} {
+		tracks := []map[string]any{{"name": "Beat", "colour": colour}}
+		for path, body := range map[string]map[string]any{
+			"/tracks":      {"name": "Beat", "colour": colour},
+			"/clips/paste": {"newTracks": tracks, "clips": clips},
+			"/clips/place": {"newTracks": tracks, "clips": clips},
+		} {
+			t.Run(fmt.Sprintf("%s %d", path, colour), func(t *testing.T) {
+				expectError(t, ts.Do(http.MethodPost, timelinePath(p.song.ID)+path, body),
+					http.StatusBadRequest, "a Track's colour goes from 1 to 6")
+				if read := ts.getTimeline(p.song.ID); !reflect.DeepEqual(read, p.tl) {
+					t.Errorf("timeline = %+v, want it unchanged: %+v", read, p.tl)
+				}
+			})
+		}
+	}
+}
+
+func TestATracksColourCantBeSetAnyOtherWay(t *testing.T) {
+	ts := newTestServer(t)
+	p := placeTwoClips(t, ts)
+	unknown := `unknown field "colour"`
+
+	expectError(t, ts.Do(http.MethodPatch, trackPath(p.song.ID, p.tl.Tracks[1].ID), map[string]any{"colour": 5}),
+		http.StatusBadRequest, unknown)
+	expectError(t, ts.Do(http.MethodPost, timelinePath(p.song.ID)+"/clips/replace", map[string]any{
+		"clipIds":   []int64{p.first},
+		"newTracks": []map[string]any{{"name": "Track 3", "position": 2, "colour": 5}},
+		"clips":     []map[string]any{{"newTrack": 0, "beatId": p.short.ID, "start": 0, "offset": 0, "length": 10}},
+	}), http.StatusBadRequest, unknown)
+	expectError(t, ts.mergeClips(p.song.ID, mergedAudio(50,
+		onto{"newTrack": map[string]any{"name": "Track 3", "position": 1, "colour": 5}}, p.first, p.second)),
+		http.StatusBadRequest, "details must be valid JSON with known fields")
+}
+
+func TestUndoingAndRedoingATempoChangeLeavesTheSameColours(t *testing.T) {
+	ts := newTestServer(t)
+	p := clipsCloseTogether(t, ts)
+	slowed := timelineChange(t, ts.setClipTempo(p.song.ID, p.first, 0.5))
+	added := slowed.Tracks[1]
+
+	// Undone as the web app does, by replacing the Clip, its new Track deleted.
+	undone := timelineChange(t, ts.Do(http.MethodPost, timelinePath(p.song.ID)+"/clips/replace", map[string]any{
+		"clipIds": []int64{added.Clips[0].ID}, "trackIds": []int64{added.ID},
+		"clips": []map[string]any{{"trackId": p.tl.Tracks[0].ID, "beatId": p.short.ID, "start": 0, "offset": 0, "length": 10}},
+	}))
+	expectColours(t, undone, 1, 2)
+
+	expectColours(t, timelineChange(t, ts.setClipTempo(p.song.ID, undone.Tracks[0].Clips[0].ID, 0.5)), 1, 1, 2)
 }

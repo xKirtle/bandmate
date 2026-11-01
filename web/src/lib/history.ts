@@ -59,7 +59,8 @@ import { rightHalves } from './split';
 // placing a Clip from their ids brings them back. A new Take, a copied
 // Clip and pasted Clips are redone as that too, so redoing never uploads a
 // Take again or copies it again. A paste that added Tracks is undone by
-// deleting them with its Clips, and redone by adding them again with them.
+// deleting them with its Clips, and redone by adding them again with them,
+// in the colours they had, as adding them from scratch would pick others.
 // Likewise, a Sound outlives its last Clip for as long as undo lasts, so an
 // imported Sound is undone by deleting its Clip and redone by placing a
 // Clip of it back, without uploading it again. A Retake is undone and redone by setting its Clip's Takes, and where they are, as
@@ -515,8 +516,8 @@ function inverse(edit: Edit, before: Timeline, after: Timeline): Step {
       return { edit: { kind: 'reorderTracks', order: before.tracks.map((t) => t.id) }, adds: none };
     case 'deleteTrack': {
       const position = before.tracks.findIndex((t) => t.id === edit.trackId);
-      const { id, name, volume, muted, soloed, clips } = before.tracks[position];
-      const track = { name, position, volume, muted, soloed, clips: clips.map(placementOf) };
+      const { id, name, volume, muted, soloed, colour, clips } = before.tracks[position];
+      const track = { name, position, volume, muted, soloed, colour, clips: clips.map(placementOf) };
       return { edit: { kind: 'addTrack', track }, adds: { tracks: [id], clips: clips.map((c) => c.id) } };
     }
     case 'moveClip': {
@@ -674,7 +675,10 @@ function placingAllAdded(before: Timeline, after: Timeline): Edit {
     return newTrack < 0 ? { trackId: track.id, clip: placementOf(clip) } : { newTrack, clip: placementOf(clip) };
   });
   if (tracks.length === 0) return { kind: 'placeClips', clips: placed };
-  const newTracks = tracks.map((id) => ({ name: after.tracks.find((t) => t.id === id)!.name }));
+  const newTracks = tracks.map((id) => {
+    const { name, colour } = after.tracks.find((t) => t.id === id)!;
+    return { name, colour };
+  });
   return { kind: 'placeClips', clips: placed, newTracks };
 }
 
