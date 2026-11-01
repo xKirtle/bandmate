@@ -12,7 +12,7 @@ services:
     image: ${BANDMATE_IMAGE:-ghcr.io/xkirtle/bandmate:latest}
     container_name: bandmate
     restart: unless-stopped
-    # Run as the owner of ./data so the bind-mounted folder stays writable.
+    # The user that owns ./data, so Bandmate can write to it.
     user: "${PUID:-1000}:${PGID:-1000}"
     ports:
       - "${BANDMATE_PORT:-8080}:8080"

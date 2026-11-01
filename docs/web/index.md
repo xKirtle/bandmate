@@ -81,6 +81,12 @@ services:
       BANDMATE_ADD_FROM_LINK: ${BANDMATE_ADD_FROM_LINK:-on}
     volumes:
       - ./data:/data
+    healthcheck:
+      test: ["CMD", "/bandmate", "healthcheck"]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
 ```
 
 ```sh [docker run]
@@ -99,6 +105,6 @@ curl -fsSL https://github.com/xKirtle/bandmate/releases/latest/download/bandmate
 
 :::
 
-Then open http://localhost:8080. The full Compose file, with a health check, and every setting are in the [self-hosting guide](/self-hosting). Bandmate has no login, so before using it anywhere beyond your own machine, read [Security](/self-hosting#security).
+Then open http://localhost:8080. Every setting is in the [self-hosting guide](/self-hosting#configuration). Bandmate has no login, so before using it anywhere beyond your own machine, read [Security](/self-hosting#security).
 
 Docker is the easiest way to run it, because the image includes yt-dlp, ffmpeg and QuickJS, which adding a Beat from a link needs. The binary does everything else on its own: to add Beats from links, install those three yourself, as [Without Docker](/self-hosting#without-docker) shows.

@@ -47,6 +47,12 @@ services:
       BANDMATE_ADD_FROM_LINK: ${BANDMATE_ADD_FROM_LINK:-on}
     volumes:
       - ./data:/data
+    healthcheck:
+      test: ["CMD", "/bandmate", "healthcheck"]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
 ```
 
 Or with plain Docker:
@@ -58,7 +64,7 @@ docker run -d --name bandmate --restart unless-stopped \
   ghcr.io/xkirtle/bandmate:latest
 ```
 
-Then open http://localhost:8080. The repo's [`compose.yaml`](compose.yaml) is the full version, with a health check.
+Then open http://localhost:8080.
 
 To run it without Docker, from a ready-made binary or one you build yourself, see [Without Docker](https://xkirtle.github.io/bandmate/self-hosting#without-docker) in the self-hosting guide.
 
