@@ -28,6 +28,7 @@ const track = (id: number, clips: Clip[] = [], more: Partial<Track> = {}): Track
   volume: -6,
   muted: false,
   soloed: false,
+  colour: 1,
   clips,
   ...more,
 });

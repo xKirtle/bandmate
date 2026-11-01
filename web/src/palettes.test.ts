@@ -174,6 +174,19 @@ function waveformStrength(): number {
   return fromTimeline(/\n {2}rect \{[^}]*opacity: ([\d.]+);/, 'a waveform is drawn at an opacity') * 100;
 }
 
+describe("a Clip's Track Colour", () => {
+  const timeline = readFileSync(new URL('./lib/Timeline.svelte', import.meta.url), 'utf8');
+
+  it("is its Track's", () => {
+    expect(timeline).toContain('style:--clip-colour="var(--track-colour-{track.colour})"');
+  });
+
+  it('draws its border and waveform', () => {
+    expect(timeline).toMatch(/\n {2}\.clip \{[^}]*border: 1px solid var\(--clip-colour\);/);
+    expect(timeline).toMatch(/\n {2}rect \{[^}]*fill: var\(--clip-colour\);/);
+  });
+});
+
 describe('contrast', () => {
   it('runs from 1 to 21', () => {
     expect(contrast('#000000', '#ffffff')).toBeCloseTo(21);

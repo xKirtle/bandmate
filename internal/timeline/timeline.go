@@ -56,6 +56,9 @@ type Track struct {
 	Muted  bool    `json:"muted"`
 	// Soloed Tracks are the only ones heard, when there are any.
 	Soloed bool `json:"soloed"`
+	// Colour is which of the Track Colours it has, from 1 to TrackColours.
+	// It's set when the Track is made, and never changes.
+	Colour int `json:"colour"`
 	// Clips are in the order they start, and never overlap.
 	Clips []Clip `json:"clips"`
 }
@@ -119,6 +122,10 @@ type Beat struct {
 	Size     int64   `json:"size"`
 	Duration float64 `json:"duration"`
 }
+
+// TrackColours is how many Track Colours there are. The tracks table's CHECK
+// and web/src/palettes.css's --track-colour-* tokens hold the same number.
+const TrackColours = 6
 
 // MinVolume and MaxVolume are a Track's lowest and highest volume, in dB.
 // Even at its lowest a Track is heard: muting it is what silences it. The
@@ -195,11 +202,11 @@ func read(ctx context.Context, tx *sql.Tx, songID int64) (Timeline, error) {
 	}
 
 	trackAt := map[int64]int{}
-	err = query(ctx, tx, `SELECT id, name, volume, muted, soloed FROM tracks
+	err = query(ctx, tx, `SELECT id, name, volume, muted, soloed, colour FROM tracks
 		WHERE song_id = ? ORDER BY position, id`, []any{songID},
 		func(rows *sql.Rows) error {
 			t := Track{Clips: []Clip{}}
-			if err := rows.Scan(&t.ID, &t.Name, &t.Volume, &t.Muted, &t.Soloed); err != nil {
+			if err := rows.Scan(&t.ID, &t.Name, &t.Volume, &t.Muted, &t.Soloed, &t.Colour); err != nil {
 				return err
 			}
 			trackAt[t.ID] = len(tl.Tracks)

@@ -33,6 +33,7 @@ const track = (id: number, clips: Clip[] = []): Track => ({
   volume: 0,
   muted: false,
   soloed: false,
+  colour: 1,
   clips,
 });
 

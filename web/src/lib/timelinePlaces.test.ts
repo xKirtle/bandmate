@@ -42,6 +42,7 @@ function track(id: number, clipIds: number[] = []): Track {
     volume: 0,
     muted: false,
     soloed: false,
+    colour: 1,
     clips: clipIds.map((clipId) => ({ id: clipId }) as Clip),
   };
 }

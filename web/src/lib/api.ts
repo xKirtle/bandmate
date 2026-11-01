@@ -436,6 +436,8 @@ export interface Track {
   muted: boolean;
   /** When any Track is soloed, only the soloed ones are heard. */
   soloed: boolean;
+  /** Which of the Track Colours it has, from 1 to 6: the shade is --track-colour-N in this Device's Palette. */
+  colour: number;
   /** In the order they start; they never overlap. */
   clips: Clip[];
 }

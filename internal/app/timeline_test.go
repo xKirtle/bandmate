@@ -33,7 +33,9 @@ type track struct {
 	Volume float64 `json:"volume"`
 	Muted  bool    `json:"muted"`
 	Soloed bool    `json:"soloed"`
-	Clips  []clip  `json:"clips"`
+	// Colour is which of the six Track Colours it has, from 1.
+	Colour int    `json:"colour"`
+	Clips  []clip `json:"clips"`
 }
 
 // clip is a stretch of a Beat, or of Takes, placed on a Track.
@@ -136,7 +138,7 @@ func TestANewSongStartsWithTrack1(t *testing.T) {
 	got := ts.getTimeline(s.ID)
 
 	want := timeline{SongID: s.ID, Version: s.Version, UpdatedAt: s.UpdatedAt,
-		Tracks: []track{{ID: firstTrackID(got), Name: "Track 1", Clips: []clip{}}}, Beats: []clipSource{}, Sounds: []sound{}}
+		Tracks: []track{{ID: firstTrackID(got), Name: "Track 1", Colour: 1, Clips: []clip{}}}, Beats: []clipSource{}, Sounds: []sound{}}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("timeline = %+v, want %+v", got, want)
 	}
@@ -480,7 +482,7 @@ func TestATrackCanBeAddedAtTheBottom(t *testing.T) {
 	if len(got.Tracks) != 2 {
 		t.Fatalf("tracks = %+v, want two", got.Tracks)
 	}
-	want := track{ID: got.Tracks[1].ID, Name: "Lead vox", Volume: 0, Clips: []clip{}}
+	want := track{ID: got.Tracks[1].ID, Name: "Lead vox", Volume: 0, Colour: 2, Clips: []clip{}}
 	if !reflect.DeepEqual(got.Tracks[1], want) {
 		t.Errorf("tracks = %+v, want an empty \"Lead vox\" Track at 0 dB, neither muted nor soloed, below Track 1", got.Tracks)
 	}
@@ -564,8 +566,8 @@ func TestATracksVolumeMuteAndSoloAreSavedWithTheSong(t *testing.T) {
 	timelineChange(t, ts.updateTrack(p.song.ID, beat.ID, map[string]any{"volume": -12.5, "muted": true}))
 	got := timelineChange(t, ts.updateTrack(p.song.ID, adlibs.ID, map[string]any{"soloed": true}))
 
-	wantBeat := track{ID: beat.ID, Name: "Track 1", Volume: -12.5, Muted: true, Clips: beat.Clips}
-	wantAdlibs := track{ID: adlibs.ID, Name: "Adlibs", Soloed: true, Clips: []clip{}}
+	wantBeat := track{ID: beat.ID, Name: "Track 1", Volume: -12.5, Muted: true, Colour: 1, Clips: beat.Clips}
+	wantAdlibs := track{ID: adlibs.ID, Name: "Adlibs", Soloed: true, Colour: 2, Clips: []clip{}}
 	if !reflect.DeepEqual(got.Tracks, []track{wantBeat, wantAdlibs}) {
 		t.Errorf("tracks = %+v, want %+v", got.Tracks, []track{wantBeat, wantAdlibs})
 	}

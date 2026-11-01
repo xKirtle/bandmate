@@ -79,6 +79,7 @@
               "tempo": 1
             }
           ],
+          "colour": 1,
           "id": 1,
           "muted": false,
           "name": "Track 1",
@@ -87,6 +88,7 @@
         },
         {
           "clips": [],
+          "colour": 2,
           "id": 2,
           "muted": false,
           "name": "Adlibs",
@@ -161,6 +163,7 @@
               "tempo": 1
             }
           ],
+          "colour": 1,
           "id": 1,
           "muted": false,
           "name": "Track 1",
@@ -169,6 +172,7 @@
         },
         {
           "clips": [],
+          "colour": 2,
           "id": 2,
           "muted": false,
           "name": "Adlibs",
@@ -258,6 +262,7 @@
               "tempo": 1
             }
           ],
+          "colour": 1,
           "id": 1,
           "muted": false,
           "name": "Track 1",
@@ -266,6 +271,7 @@
         },
         {
           "clips": [],
+          "colour": 2,
           "id": 2,
           "muted": false,
           "name": "Adlibs",
@@ -340,6 +346,7 @@
               "tempo": 1
             }
           ],
+          "colour": 1,
           "id": 1,
           "muted": false,
           "name": "Track 1",
@@ -348,6 +355,7 @@
         },
         {
           "clips": [],
+          "colour": 2,
           "id": 2,
           "muted": false,
           "name": "Adlibs",
@@ -433,6 +441,7 @@
               "tempo": 1
             }
           ],
+          "colour": 1,
           "id": 1,
           "muted": false,
           "name": "Track 1",
@@ -441,6 +450,7 @@
         },
         {
           "clips": [],
+          "colour": 2,
           "id": 2,
           "muted": false,
           "name": "Adlibs",
@@ -511,6 +521,7 @@
               "tempo": 1
             }
           ],
+          "colour": 1,
           "id": 1,
           "muted": false,
           "name": "Track 1",
@@ -519,6 +530,7 @@
         },
         {
           "clips": [],
+          "colour": 2,
           "id": 2,
           "muted": false,
           "name": "Adlibs",
@@ -606,6 +618,7 @@
               "tempo": 1
             }
           ],
+          "colour": 1,
           "id": 1,
           "muted": false,
           "name": "Track 1",
@@ -614,6 +627,7 @@
         },
         {
           "clips": [],
+          "colour": 2,
           "id": 2,
           "muted": false,
           "name": "Adlibs",
@@ -684,6 +698,7 @@
               "tempo": 1
             }
           ],
+          "colour": 1,
           "id": 1,
           "muted": false,
           "name": "Track 1",
@@ -692,6 +707,7 @@
         },
         {
           "clips": [],
+          "colour": 2,
           "id": 2,
           "muted": false,
           "name": "Adlibs",
@@ -700,6 +716,7 @@
         },
         {
           "clips": [],
+          "colour": 3,
           "id": 3,
           "muted": false,
           "name": "Keys",
@@ -794,6 +811,7 @@
               "tempo": 1
             }
           ],
+          "colour": 1,
           "id": 1,
           "muted": false,
           "name": "Track 1",
@@ -802,6 +820,7 @@
         },
         {
           "clips": [],
+          "colour": 2,
           "id": 2,
           "muted": false,
           "name": "Adlibs",
@@ -872,6 +891,7 @@
               "tempo": 1
             }
           ],
+          "colour": 1,
           "id": 1,
           "muted": false,
           "name": "Track 1",
@@ -880,6 +900,7 @@
         },
         {
           "clips": [],
+          "colour": 2,
           "id": 2,
           "muted": true,
           "name": "Vocals",
@@ -962,6 +983,7 @@
               "tempo": 1
             }
           ],
+          "colour": 1,
           "id": 1,
           "muted": false,
           "name": "Track 1",
@@ -970,6 +992,7 @@
         },
         {
           "clips": [],
+          "colour": 2,
           "id": 2,
           "muted": false,
           "name": "Adlibs",
@@ -988,6 +1011,7 @@
       "tracks": [
         {
           "clips": [],
+          "colour": 2,
           "id": 2,
           "muted": false,
           "name": "Adlibs",
@@ -1095,6 +1119,7 @@
               "tempo": 1
             }
           ],
+          "colour": 1,
           "id": 1,
           "muted": false,
           "name": "Track 1",
@@ -1103,6 +1128,7 @@
         },
         {
           "clips": [],
+          "colour": 2,
           "id": 2,
           "muted": false,
           "name": "Adlibs",
@@ -1173,6 +1199,7 @@
               "tempo": 1
             }
           ],
+          "colour": 1,
           "id": 1,
           "muted": false,
           "name": "Track 1",
@@ -1199,6 +1226,7 @@
               "tempo": 0.5
             }
           ],
+          "colour": 2,
           "id": 2,
           "muted": false,
           "name": "Adlibs",
@@ -1319,6 +1347,7 @@
               "tempo": 1
             }
           ],
+          "colour": 1,
           "id": 1,
           "muted": false,
           "name": "Track 1",
@@ -1327,6 +1356,7 @@
         },
         {
           "clips": [],
+          "colour": 2,
           "id": 2,
           "muted": false,
           "name": "Adlibs",
@@ -1414,6 +1444,7 @@
               "tempo": 1
             }
           ],
+          "colour": 1,
           "id": 1,
           "muted": false,
           "name": "Track 1",
@@ -1440,6 +1471,7 @@
               "tempo": 1
             }
           ],
+          "colour": 2,
           "id": 2,
           "muted": false,
           "name": "Adlibs",
@@ -1567,6 +1599,7 @@
               "tempo": 1
             }
           ],
+          "colour": 1,
           "id": 1,
           "muted": false,
           "name": "Track 1",
@@ -1575,6 +1608,7 @@
         },
         {
           "clips": [],
+          "colour": 2,
           "id": 2,
           "muted": false,
           "name": "Adlibs",
@@ -1645,6 +1679,7 @@
               "tempo": 1
             }
           ],
+          "colour": 1,
           "id": 1,
           "muted": false,
           "name": "Track 1",
@@ -1671,6 +1706,7 @@
               "tempo": 1
             }
           ],
+          "colour": 2,
           "id": 2,
           "muted": false,
           "name": "Adlibs",
@@ -1778,6 +1814,7 @@
               "tempo": 1
             }
           ],
+          "colour": 1,
           "id": 1,
           "muted": false,
           "name": "Track 1",
@@ -1786,6 +1823,7 @@
         },
         {
           "clips": [],
+          "colour": 2,
           "id": 2,
           "muted": false,
           "name": "Adlibs",
@@ -1856,6 +1894,7 @@
               "tempo": 1
             }
           ],
+          "colour": 1,
           "id": 1,
           "muted": false,
           "name": "Track 1",
@@ -1882,6 +1921,7 @@
               "tempo": 1
             }
           ],
+          "colour": 2,
           "id": 2,
           "muted": false,
           "name": "Adlibs",
@@ -2033,6 +2073,7 @@
               "tempo": 1
             }
           ],
+          "colour": 1,
           "id": 1,
           "muted": false,
           "name": "Track 1",
@@ -2041,6 +2082,7 @@
         },
         {
           "clips": [],
+          "colour": 2,
           "id": 2,
           "muted": false,
           "name": "Adlibs",
@@ -2111,6 +2153,7 @@
               "tempo": 1
             }
           ],
+          "colour": 1,
           "id": 1,
           "muted": false,
           "name": "Track 1",
@@ -2137,6 +2180,7 @@
               "tempo": 1
             }
           ],
+          "colour": 2,
           "id": 2,
           "muted": false,
           "name": "Adlibs",
@@ -2163,6 +2207,7 @@
               "tempo": 1
             }
           ],
+          "colour": 3,
           "id": 3,
           "muted": false,
           "name": "Adlibs 2",
@@ -2189,6 +2234,7 @@
               "tempo": 1
             }
           ],
+          "colour": 4,
           "id": 4,
           "muted": false,
           "name": "Adlibs 3",
@@ -2271,6 +2317,7 @@
               "tempo": 1
             }
           ],
+          "colour": 1,
           "id": 1,
           "muted": false,
           "name": "Track 1",
@@ -2279,6 +2326,7 @@
         },
         {
           "clips": [],
+          "colour": 2,
           "id": 2,
           "muted": false,
           "name": "Adlibs",
@@ -2366,6 +2414,7 @@
               "tempo": 1
             }
           ],
+          "colour": 1,
           "id": 1,
           "muted": false,
           "name": "Track 1",
@@ -2374,6 +2423,7 @@
         },
         {
           "clips": [],
+          "colour": 2,
           "id": 2,
           "muted": false,
           "name": "Adlibs",
@@ -2456,6 +2506,7 @@
               "tempo": 1
             }
           ],
+          "colour": 1,
           "id": 1,
           "muted": false,
           "name": "Track 1",
@@ -2464,6 +2515,7 @@
         },
         {
           "clips": [],
+          "colour": 2,
           "id": 2,
           "muted": false,
           "name": "Adlibs",
@@ -2551,6 +2603,7 @@
               "tempo": 1
             }
           ],
+          "colour": 1,
           "id": 1,
           "muted": false,
           "name": "Track 1",
@@ -2559,6 +2612,7 @@
         },
         {
           "clips": [],
+          "colour": 2,
           "id": 2,
           "muted": false,
           "name": "Adlibs",
@@ -2650,6 +2704,7 @@
               "tempo": 1
             }
           ],
+          "colour": 1,
           "id": 1,
           "muted": false,
           "name": "Track 1",
@@ -2658,6 +2713,7 @@
         },
         {
           "clips": [],
+          "colour": 2,
           "id": 2,
           "muted": false,
           "name": "Adlibs",
@@ -2745,6 +2801,7 @@
               "tempo": 1
             }
           ],
+          "colour": 1,
           "id": 1,
           "muted": false,
           "name": "Track 1",
@@ -2753,6 +2810,7 @@
         },
         {
           "clips": [],
+          "colour": 2,
           "id": 2,
           "muted": false,
           "name": "Adlibs",
@@ -2844,6 +2902,7 @@
               "tempo": 1
             }
           ],
+          "colour": 1,
           "id": 1,
           "muted": false,
           "name": "Track 1",
@@ -2852,6 +2911,7 @@
         },
         {
           "clips": [],
+          "colour": 2,
           "id": 2,
           "muted": false,
           "name": "Adlibs",
@@ -2939,6 +2999,7 @@
               "tempo": 1
             }
           ],
+          "colour": 1,
           "id": 1,
           "muted": false,
           "name": "Track 1",
@@ -2947,6 +3008,7 @@
         },
         {
           "clips": [],
+          "colour": 2,
           "id": 2,
           "muted": false,
           "name": "Adlibs",
@@ -3038,6 +3100,7 @@
               "tempo": 1
             }
           ],
+          "colour": 1,
           "id": 1,
           "muted": false,
           "name": "Track 1",
@@ -3046,6 +3109,7 @@
         },
         {
           "clips": [],
+          "colour": 2,
           "id": 2,
           "muted": false,
           "name": "Adlibs",
@@ -3133,6 +3197,7 @@
               "tempo": 1
             }
           ],
+          "colour": 1,
           "id": 1,
           "muted": false,
           "name": "Track 1",
@@ -3141,6 +3206,7 @@
         },
         {
           "clips": [],
+          "colour": 2,
           "id": 2,
           "muted": false,
           "name": "Adlibs",
@@ -3232,6 +3298,7 @@
               "tempo": 1
             }
           ],
+          "colour": 1,
           "id": 1,
           "muted": false,
           "name": "Track 1",
@@ -3240,6 +3307,7 @@
         },
         {
           "clips": [],
+          "colour": 2,
           "id": 2,
           "muted": false,
           "name": "Adlibs",
@@ -3327,6 +3395,7 @@
               "tempo": 1
             }
           ],
+          "colour": 1,
           "id": 1,
           "muted": false,
           "name": "Track 1",
@@ -3335,6 +3404,7 @@
         },
         {
           "clips": [],
+          "colour": 2,
           "id": 2,
           "muted": false,
           "name": "Adlibs",
@@ -3428,6 +3498,7 @@
               "tempo": 1
             }
           ],
+          "colour": 1,
           "id": 1,
           "muted": false,
           "name": "Track 1",
@@ -3454,6 +3525,7 @@
               "tempo": 1
             }
           ],
+          "colour": 2,
           "id": 2,
           "muted": false,
           "name": "Adlibs",
@@ -3541,6 +3613,7 @@
               "tempo": 1
             }
           ],
+          "colour": 1,
           "id": 1,
           "muted": false,
           "name": "Track 1",
@@ -3584,6 +3657,7 @@
               "tempo": 1
             }
           ],
+          "colour": 2,
           "id": 2,
           "muted": false,
           "name": "Adlibs",
@@ -3672,6 +3746,7 @@
               "tempo": 1
             }
           ],
+          "colour": 1,
           "id": 1,
           "muted": false,
           "name": "Track 1",
@@ -3680,6 +3755,7 @@
         },
         {
           "clips": [],
+          "colour": 2,
           "id": 2,
           "muted": false,
           "name": "Adlibs",
@@ -3733,6 +3809,7 @@
               "tempo": 1
             }
           ],
+          "colour": 1,
           "id": 1,
           "muted": false,
           "name": "Track 1",
@@ -3759,6 +3836,7 @@
               "tempo": 1
             }
           ],
+          "colour": 2,
           "id": 2,
           "muted": false,
           "name": "Adlibs",
@@ -3866,6 +3944,7 @@
               "tempo": 1
             }
           ],
+          "colour": 1,
           "id": 1,
           "muted": false,
           "name": "Track 1",
@@ -3874,6 +3953,7 @@
         },
         {
           "clips": [],
+          "colour": 2,
           "id": 2,
           "muted": false,
           "name": "Adlibs",
@@ -3927,6 +4007,7 @@
               "tempo": 1
             }
           ],
+          "colour": 1,
           "id": 1,
           "muted": false,
           "name": "Track 1",
@@ -3953,6 +4034,7 @@
               "tempo": 1
             }
           ],
+          "colour": 2,
           "id": 2,
           "muted": false,
           "name": "Adlibs",
@@ -4039,6 +4121,7 @@
               "tempo": 1
             }
           ],
+          "colour": 1,
           "id": 1,
           "muted": false,
           "name": "Track 1",
@@ -4047,6 +4130,7 @@
         },
         {
           "clips": [],
+          "colour": 2,
           "id": 2,
           "muted": false,
           "name": "Adlibs",
@@ -4117,6 +4201,7 @@
               "tempo": 1
             }
           ],
+          "colour": 1,
           "id": 1,
           "muted": false,
           "name": "Track 1",
@@ -4125,6 +4210,7 @@
         },
         {
           "clips": [],
+          "colour": 2,
           "id": 2,
           "muted": false,
           "name": "Adlibs",
@@ -4211,6 +4297,7 @@
               "tempo": 1
             }
           ],
+          "colour": 1,
           "id": 1,
           "muted": false,
           "name": "Track 1",
@@ -4219,6 +4306,7 @@
         },
         {
           "clips": [],
+          "colour": 2,
           "id": 2,
           "muted": false,
           "name": "Adlibs",
@@ -4289,6 +4377,7 @@
               "tempo": 1
             }
           ],
+          "colour": 1,
           "id": 1,
           "muted": false,
           "name": "Track 1",
@@ -4297,6 +4386,7 @@
         },
         {
           "clips": [],
+          "colour": 2,
           "id": 2,
           "muted": false,
           "name": "Adlibs",
@@ -4385,6 +4475,7 @@
               "tempo": 1
             }
           ],
+          "colour": 1,
           "id": 1,
           "muted": false,
           "name": "Track 1",
@@ -4393,6 +4484,7 @@
         },
         {
           "clips": [],
+          "colour": 2,
           "id": 2,
           "muted": false,
           "name": "Adlibs",
@@ -4463,6 +4555,7 @@
               "tempo": 1
             }
           ],
+          "colour": 1,
           "id": 1,
           "muted": false,
           "name": "Track 1",
@@ -4471,6 +4564,7 @@
         },
         {
           "clips": [],
+          "colour": 2,
           "id": 2,
           "muted": false,
           "name": "Adlibs",
@@ -4574,6 +4668,7 @@
               "tempo": 1
             }
           ],
+          "colour": 1,
           "id": 1,
           "muted": false,
           "name": "Track 1",
@@ -4582,6 +4677,7 @@
         },
         {
           "clips": [],
+          "colour": 2,
           "id": 2,
           "muted": false,
           "name": "Adlibs",
@@ -4652,6 +4748,7 @@
               "tempo": 1.25
             }
           ],
+          "colour": 1,
           "id": 1,
           "muted": false,
           "name": "Track 1",
@@ -4660,6 +4757,7 @@
         },
         {
           "clips": [],
+          "colour": 2,
           "id": 2,
           "muted": false,
           "name": "Adlibs",
@@ -4755,6 +4853,7 @@
               "tempo": 0.75
             }
           ],
+          "colour": 1,
           "id": 1,
           "muted": false,
           "name": "Track 1",
@@ -4763,6 +4862,7 @@
         },
         {
           "clips": [],
+          "colour": 2,
           "id": 2,
           "muted": false,
           "name": "Adlibs",
@@ -4833,6 +4933,7 @@
               "tempo": 1.5
             }
           ],
+          "colour": 1,
           "id": 1,
           "muted": false,
           "name": "Track 1",
@@ -4841,6 +4942,7 @@
         },
         {
           "clips": [],
+          "colour": 2,
           "id": 2,
           "muted": false,
           "name": "Adlibs",
@@ -4944,6 +5046,7 @@
               "tempo": 1
             }
           ],
+          "colour": 1,
           "id": 1,
           "muted": false,
           "name": "Track 1",
@@ -4952,6 +5055,7 @@
         },
         {
           "clips": [],
+          "colour": 2,
           "id": 2,
           "muted": false,
           "name": "Adlibs",
@@ -5022,6 +5126,7 @@
               "tempo": 1
             }
           ],
+          "colour": 1,
           "id": 1,
           "muted": false,
           "name": "Track 1",
@@ -5030,6 +5135,7 @@
         },
         {
           "clips": [],
+          "colour": 2,
           "id": 2,
           "muted": false,
           "name": "Adlibs",
@@ -5116,6 +5222,7 @@
               "tempo": 1
             }
           ],
+          "colour": 1,
           "id": 1,
           "muted": false,
           "name": "Track 1",
@@ -5124,6 +5231,7 @@
         },
         {
           "clips": [],
+          "colour": 2,
           "id": 2,
           "muted": false,
           "name": "Adlibs",
@@ -5194,6 +5302,7 @@
               "tempo": 1
             }
           ],
+          "colour": 1,
           "id": 1,
           "muted": false,
           "name": "Track 1",
@@ -5202,6 +5311,7 @@
         },
         {
           "clips": [],
+          "colour": 2,
           "id": 2,
           "muted": false,
           "name": "Adlibs",
@@ -5288,6 +5398,7 @@
               "tempo": 1
             }
           ],
+          "colour": 1,
           "id": 1,
           "muted": false,
           "name": "Track 1",
@@ -5296,6 +5407,7 @@
         },
         {
           "clips": [],
+          "colour": 2,
           "id": 2,
           "muted": false,
           "name": "Adlibs",
@@ -5366,6 +5478,7 @@
               "tempo": 1
             }
           ],
+          "colour": 1,
           "id": 1,
           "muted": false,
           "name": "Track 1",
@@ -5374,6 +5487,7 @@
         },
         {
           "clips": [],
+          "colour": 2,
           "id": 2,
           "muted": false,
           "name": "Adlibs",
@@ -5456,6 +5570,7 @@
               "tempo": 1
             }
           ],
+          "colour": 1,
           "id": 1,
           "muted": false,
           "name": "Track 1",
@@ -5464,6 +5579,7 @@
         },
         {
           "clips": [],
+          "colour": 2,
           "id": 2,
           "muted": false,
           "name": "Adlibs",
@@ -5509,6 +5625,7 @@
               "tempo": 1
             }
           ],
+          "colour": 1,
           "id": 1,
           "muted": false,
           "name": "Track 1",
@@ -5517,6 +5634,7 @@
         },
         {
           "clips": [],
+          "colour": 2,
           "id": 2,
           "muted": false,
           "name": "Adlibs",
@@ -5609,6 +5727,7 @@
               "tempo": 1
             }
           ],
+          "colour": 1,
           "id": 1,
           "muted": false,
           "name": "Track 1",
@@ -5617,6 +5736,7 @@
         },
         {
           "clips": [],
+          "colour": 2,
           "id": 2,
           "muted": false,
           "name": "Adlibs",
@@ -5635,6 +5755,7 @@
       "tracks": [
         {
           "clips": [],
+          "colour": 1,
           "id": 1,
           "muted": false,
           "name": "Track 1",
@@ -5643,6 +5764,7 @@
         },
         {
           "clips": [],
+          "colour": 2,
           "id": 2,
           "muted": false,
           "name": "Adlibs",
@@ -5721,6 +5843,7 @@
               "tempo": 1
             }
           ],
+          "colour": 1,
           "id": 1,
           "muted": false,
           "name": "Track 1",
@@ -5747,6 +5870,7 @@
               "tempo": 1
             }
           ],
+          "colour": 2,
           "id": 2,
           "muted": false,
           "name": "Adlibs",
@@ -5792,6 +5916,7 @@
               "tempo": 1
             }
           ],
+          "colour": 1,
           "id": 1,
           "muted": false,
           "name": "Track 1",
