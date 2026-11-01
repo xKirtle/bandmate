@@ -181,6 +181,30 @@ function clipLineStrengths(): number[] {
   );
 }
 
+/** How strongly a waveform is drawn with Track Colours off, as a percentage. A
+    clipped peak and the Clip being recorded are drawn the same either way. */
+function accentWaveformStrength(): number {
+  return (
+    fromTimeline(
+      /\n {2}:global\(:where\(\[data-track-colours='off'\]\)\) \.clip:not\(\.taking\) rect:not\(\.clipped\) \{[^}]*opacity: ([\d.]+);/,
+      'a waveform with Track Colours off is drawn at an opacity',
+    ) * 100
+  );
+}
+
+/** How strongly Fade slopes and a changed Gain line are drawn with Track Colours off, as percentages. */
+function accentClipLineStrengths(): number[] {
+  return ['\\.fade-slopes line', '\\.gain-line\\.changed::before'].map(
+    (rule) =>
+      fromTimeline(
+        new RegExp(
+          `\\n {2}:global\\(:where\\(\\[data-track-colours='off'\\]\\)\\) ${rule} \\{[^}]*opacity: ([\\d.]+);`,
+        ),
+        `${rule} with Track Colours off has an opacity`,
+      ) * 100,
+  );
+}
+
 /** How much of a colour tints a Track's header under a rule, as a percentage. */
 function trackHeaderTint(rule: string, colour: string): number {
   return fromTimeline(
@@ -188,6 +212,14 @@ function trackHeaderTint(rule: string, colour: string): number {
     `${rule} is a tint of ${colour}`,
   );
 }
+
+describe('Track Colours turned off', () => {
+  it('puts the accent in place of all six, whichever Palette and theme is on the root', () => {
+    const css = readFileSync(new URL('./palettes.css', import.meta.url), 'utf8');
+    const rule = css.match(/\[data-track-colours='off'\] body \{([^}]*)\}/)?.[1] ?? '';
+    for (const token of TRACK_COLOURS) expect(rule).toContain(`${token}: var(--accent);`);
+  });
+});
 
 describe("a Clip's Track Colour", () => {
   const timeline = readFileSync(new URL('./lib/Timeline.svelte', import.meta.url), 'utf8');
@@ -333,6 +365,33 @@ describe('Palettes', () => {
               MIN_TRACK_COLOUR_CONTRAST,
             );
           }
+        }
+      });
+
+      it(`${name} ${theme}: with Track Colours off, a waveform in the accent is at least 3:1 on a Clip, selected or not`, () => {
+        const { '--accent': accent, '--surface-1': clip } = colours;
+        for (const background of [clip, mix(accent, selectedClipTint(), clip)]) {
+          const drawn = mix(accent, accentWaveformStrength(), background);
+          expect(contrast(drawn, background), background).toBeGreaterThanOrEqual(MIN_TRACK_COLOUR_CONTRAST);
+        }
+      });
+
+      it(`${name} ${theme}: with Track Colours off, a Fade slope or changed Gain line in the accent is at least 3:1 on a Clip, selected or not`, () => {
+        const { '--accent': accent, '--surface-1': clip } = colours;
+        for (const background of [clip, mix(accent, selectedClipTint(), clip)]) {
+          for (const strength of accentClipLineStrengths()) {
+            const drawn = mix(accent, strength, background);
+            expect(contrast(drawn, background), background).toBeGreaterThanOrEqual(MIN_TRACK_COLOUR_CONTRAST);
+          }
+        }
+      });
+
+      it(`${name} ${theme}: with Track Colours off, the accent is at least 3:1 on a Track's header, tinted or not`, () => {
+        const { '--accent': accent, '--bg': header } = colours;
+        const chosen = trackHeaderTint('\\.head\\.chosen', '--row-colour');
+        const fileTarget = trackHeaderTint('\\.head\\.file-target', '--row-colour');
+        for (const background of [header, ...[chosen, fileTarget].map((tint) => mix(accent, tint, header))]) {
+          expect(contrast(accent, background), background).toBeGreaterThanOrEqual(MIN_TRACK_COLOUR_CONTRAST);
         }
       });
 

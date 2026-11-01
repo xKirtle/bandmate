@@ -7,7 +7,7 @@ A reference for setting Bandmate up the way you like, keeping copies of your wor
 **Settings**, at the foot of the side bar, has four tabs:
 
 - **This device**: what each device keeps for itself.
-  - **Appearance**: three colour palettes, Terracotta (the default), Ink and Olive, each in light and dark. Follow your system's light or dark, or pick one.
+  - **Appearance**: three colour palettes, Terracotta (the default), Ink and Olive, each in light and dark. Follow your system's light or dark, or pick one. Turn off **Track Colours** to show every Track in the palette's accent instead of a colour of its own; each Track keeps its colour for when you turn them back on.
   - **Recording**: every input on this device, each channel of an audio interface on its own, with its latency. Pick the one you record from, and check its level with **Test input**. Open one to [calibrate](/song#calibrate) it, or type its latency. Inputs that aren't plugged in keep their latency, under **Not connected**, where you can forget them.
   - **Rhyming dictionaries**: download one for each language you write in, so [Rhymes](/song#rhymes) can suggest words in it, or remove one you no longer need.
   - **Chords**: play chords on guitar or piano, on the [Chords](/features#chords) page and in Read mode alike, and flip the guitar's diagrams for left-handed playing.

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { paletteKey, themeKey, type Palette, type Theme } from './appearance';
+import { paletteKey, themeKey, trackColoursKey, type Palette, type Theme } from './appearance';
 import { DeviceAppearance } from './deviceAppearance.svelte';
 import { storage } from './storageFake';
 
@@ -24,8 +24,13 @@ function appearanceOn({ values = {}, systemDark = false }: AppearanceCase = {}) 
     return system;
   });
   const shown: Shown[] = [];
+  /** Whether Track Colours were shown, each time the appearance was. */
+  const trackColoursShown: boolean[] = [];
   const tabs = new EventTarget();
-  const appearance = new DeviceAppearance(storage(values), tabs, (palette, theme) => shown.push({ palette, theme }));
+  const appearance = new DeviceAppearance(storage(values), tabs, (palette, theme, trackColours) => {
+    shown.push({ palette, theme });
+    trackColoursShown.push(trackColours);
+  });
   /** Another tab kept a choice, or cleared storage with a null key, as the browser tells this one. */
   const otherTab = (key: string | null) => tabs.dispatchEvent(Object.assign(new Event('storage'), { key }));
   /** The system turned light or dark, as the browser tells the page. */
@@ -33,7 +38,7 @@ function appearanceOn({ values = {}, systemDark = false }: AppearanceCase = {}) 
     system.matches = dark;
     system.dispatchEvent(new Event('change'));
   };
-  return { appearance, shown, values, otherTab, systemTurned };
+  return { appearance, shown, trackColoursShown, values, otherTab, systemTurned };
 }
 
 afterEach(() => vi.unstubAllGlobals());
@@ -51,6 +56,60 @@ describe('The appearance on this device, as the app starts', () => {
     expect(appearance.palette).toBe('terracotta');
     expect(appearance.themeChoice).toBe('system');
     expect(shown).toEqual([{ palette: 'terracotta', theme: 'dark' }]);
+  });
+});
+
+describe('Track Colours on this device', () => {
+  it('are on until turned off here', () => {
+    const { appearance, trackColoursShown, values } = appearanceOn();
+    expect(appearance.trackColours).toBe(true);
+    expect(trackColoursShown).toEqual([true]);
+    expect(values).toEqual({});
+  });
+
+  it('are shown once as the app starts, off when kept off, with the Palette and light or dark', () => {
+    const { appearance, shown, trackColoursShown } = appearanceOn({
+      values: { [paletteKey]: 'ink', [trackColoursKey]: 'off' },
+    });
+    expect(appearance.trackColours).toBe(false);
+    expect(shown).toEqual([{ palette: 'ink', theme: 'light' }]);
+    expect(trackColoursShown).toEqual([false]);
+  });
+
+  it('are kept off once turned off, and forgotten once on again', () => {
+    const { appearance, trackColoursShown, values } = appearanceOn();
+    appearance.setTrackColours(false);
+    expect(appearance.trackColours).toBe(false);
+    expect(trackColoursShown.at(-1)).toBe(false);
+    expect(values).toEqual({ [trackColoursKey]: 'off' });
+
+    appearance.setTrackColours(true);
+    expect(appearance.trackColours).toBe(true);
+    expect(trackColoursShown.at(-1)).toBe(true);
+    expect(values).toEqual({});
+  });
+
+  it('are on when what is kept is no choice', () => {
+    expect(appearanceOn({ values: { [trackColoursKey]: 'sepia' } }).appearance.trackColours).toBe(true);
+  });
+
+  it('are on when storage is blocked', () => {
+    vi.stubGlobal('matchMedia', () => Object.assign(new EventTarget(), { matches: false }));
+    const appearance = new DeviceAppearance(storage({}, true), new EventTarget(), () => {});
+    expect(appearance.trackColours).toBe(true);
+  });
+
+  it('follow another tab turning them off, and storage being cleared', () => {
+    const { appearance, trackColoursShown, values, otherTab } = appearanceOn();
+    values[trackColoursKey] = 'off';
+    otherTab(trackColoursKey);
+    expect(appearance.trackColours).toBe(false);
+    expect(trackColoursShown.at(-1)).toBe(false);
+
+    delete values[trackColoursKey];
+    otherTab(null);
+    expect(appearance.trackColours).toBe(true);
+    expect(trackColoursShown.at(-1)).toBe(true);
   });
 });
 
