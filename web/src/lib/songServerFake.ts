@@ -272,7 +272,13 @@ export class FakeSongServer implements SongServer {
         return (tl) => place(tl, edit.trackId, edit.clip);
       case 'placeClips':
       case 'replaceClips': {
-        if (edit.kind === 'replaceClips' && (edit.newTracks || edit.trackIds)) throw notModelled(edit);
+        // A Merge's Track, added or deleted by replacing Clips, isn't modelled.
+        if (
+          edit.kind === 'replaceClips' &&
+          (edit.newTracks || edit.trackIds || edit.clips.some((c) => 'newTrack' in c))
+        ) {
+          throw notModelled(edit);
+        }
         if (edit.clips.some((c) => 'takeIds' in c.clip)) throw notModelled(edit);
         const replaced = edit.kind === 'replaceClips' ? edit.clipIds : [];
         const newTracks = edit.kind === 'placeClips' ? (edit.newTracks ?? []) : [];
