@@ -22,9 +22,9 @@ describe('trackGains', () => {
   });
 
   it('still plays a Track at the bottom and top of its fader', () => {
-    const gains = trackGains([track(1, { volume: -36 }), track(2, { volume: 36 })]);
+    const gains = trackGains([track(1, { volume: -36 }), track(2, { volume: 24 })]);
     expect(gains.get(1)).toBeCloseTo(0.01585, 5);
-    expect(gains.get(2)).toBeCloseTo(63.0957, 4);
+    expect(gains.get(2)).toBeCloseTo(15.8489, 4);
   });
 
   it('silences a muted Track', () => {

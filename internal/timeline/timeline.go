@@ -132,15 +132,16 @@ const TrackColours = 6
 // fader (web/src/lib/mixer.ts) and the tracks table's CHECK use the same range.
 const (
 	MinVolume = -36.0
-	MaxVolume = 36.0
+	MaxVolume = 24.0
 )
 
-// MinGain and MaxGain are a Clip's lowest and highest Gain, in dB, the same
-// as a Track's volume: even at its lowest a Clip is heard. The gain line
+// MinGain and MaxGain are a Clip's lowest and highest Gain, in dB: even at
+// its lowest a Clip is heard, and it goes higher than a Track's volume, to
+// lift a quiet recording on its own. The gain line
 // (web/src/lib/clipGain.ts) and the clips table's CHECK use the same range.
 const (
-	MinGain = MinVolume
-	MaxGain = MaxVolume
+	MinGain = -36.0
+	MaxGain = 36.0
 )
 
 // MinTempo and MaxTempo are a Clip's slowest and fastest Tempo, as ratios

@@ -582,11 +582,51 @@ func TestTracksBelowMinus36DecibelsComeUpToItAndSilentOnesAreMuted(t *testing.T)
 	if err := conn.QueryRow(`SELECT COUNT(*) FROM clips WHERE track_id = 1`).Scan(&clips); err != nil || clips != 1 {
 		t.Errorf("clips on the Silent Track = %d (%v), want its Clip kept", clips, err)
 	}
-	if _, err := conn.Exec(`UPDATE tracks SET volume = 36 WHERE id = 5`); err != nil {
-		t.Errorf("setting +36 dB: %v", err)
+}
+
+func TestTracksAbovePlus24DecibelsComeDownToIt(t *testing.T) {
+	conn := openBefore(t, "0050_track_volume_top")
+	exec(t, conn,
+		`INSERT INTO songs (id, title, created_at, updated_at) VALUES (1, 'Midnight Drive', '', '')`,
+		`INSERT INTO tracks (id, song_id, name, position, volume, muted, soloed) VALUES
+			(1, 1, 'Top', 0, 36, 1, 0),
+			(2, 1, 'Loud', 1, 24.5, 0, 1),
+			(3, 1, 'Highest kept', 2, 24, 0, 0),
+			(4, 1, 'Quiet', 3, -36, 0, 0)`,
+	)
+	if err := migrate(context.Background(), conn); err != nil {
+		t.Fatalf("migrating: %v", err)
 	}
-	for _, v := range []string{"-36.5", "36.5"} {
-		if _, err := conn.Exec(`UPDATE tracks SET volume = ` + v + ` WHERE id = 5`); err == nil {
+
+	rows, err := conn.Query(`SELECT name, volume, muted, soloed FROM tracks ORDER BY position`)
+	if err != nil {
+		t.Fatalf("reading the tracks: %v", err)
+	}
+	defer rows.Close()
+	type track struct {
+		name          string
+		volume        float64
+		muted, soloed bool
+	}
+	var tracks []track
+	for rows.Next() {
+		var got track
+		if err := rows.Scan(&got.name, &got.volume, &got.muted, &got.soloed); err != nil {
+			t.Fatalf("scanning a track: %v", err)
+		}
+		tracks = append(tracks, got)
+	}
+	want := []track{
+		{"Top", 24, true, false},
+		{"Loud", 24, false, true},
+		{"Highest kept", 24, false, false},
+		{"Quiet", -36, false, false},
+	}
+	if !reflect.DeepEqual(tracks, want) {
+		t.Errorf("tracks = %+v, want %+v", tracks, want)
+	}
+	for _, v := range []string{"-36.5", "24.5"} {
+		if _, err := conn.Exec(`UPDATE tracks SET volume = ` + v + ` WHERE id = 4`); err == nil {
 			t.Errorf("setting %s dB succeeded, want the constraint to refuse it", v)
 		}
 	}

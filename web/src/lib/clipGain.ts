@@ -1,15 +1,16 @@
 // A Clip's Gain: how much louder or quieter it plays, in dB, before its
-// Track's volume applies. Its range is a Track's volume's, and like a
-// Track, all the way down it's quiet, never silent. It's set by dragging
+// Track's volume applies. Its range goes higher than a Track's volume's,
+// to lift a quiet recording on its own, and like a Track, all the way down
+// it's quiet, never silent. It's set by dragging
 // the gain line across the Clip, linear in dB: 0 dB in the middle, the top
 // of the range at the top and the bottom at the bottom. Plain arithmetic, so
 // the Timeline only has to draw and play it.
-import { formatVolume, maxVolume, minVolume } from './mixer';
+import { formatVolume } from './mixer';
 
 /** A Clip's lowest Gain, in dB. The server checks the same range (MinGain in the timeline package). */
-export const minGain = minVolume;
+export const minGain = -36;
 /** A Clip's highest Gain, in dB. */
-export const maxGain = maxVolume;
+export const maxGain = 36;
 
 // A Shift-drag goes this much as far, for fine changes.
 const fine = 0.1;
@@ -44,6 +45,11 @@ export function draggedGain(from: number, dy: number, height: number, isFine: bo
 export function formatGain(gain: number): string {
   // Not "−0 dB" for a hair under 0.
   return formatVolume(Math.round(gain * 10) / 10 || 0);
+}
+
+/** Whether a waveform peak goes over full scale at a Clip's Gain and its Track's volume, so it clips as it plays. */
+export function overFullScale(peak: number, gain: number, volume: number): boolean {
+  return peak * gainFactor(gain + volume) > 1;
 }
 
 /** A waveform peak, from 0 to 1, as the Clip's Gain makes it sound, drawn no higher than full scale. */

@@ -44,8 +44,8 @@ const take: Take = {
 const takes = { beatId: null, takes: [take], activeTakeId: take.id };
 
 /** A Clip's bars, from `from` to `to` seconds into it, as count bars over drawn seconds. */
-function draw(c: Clip, at: Placed, [from, to, drawn]: number[], count: number, peaks: readonly number[]) {
-  return clipBars(c, at, { from, to, bars: count }, (count * barWidth) / drawn, peaks);
+function draw(c: Clip, at: Placed, [from, to, drawn]: number[], count: number, peaks: readonly number[], volume = 0) {
+  return clipBars(c, at, { from, to, bars: count }, (count * barWidth) / drawn, peaks, volume);
 }
 
 describe('clipBars', () => {
@@ -177,6 +177,37 @@ describe('clipBars', () => {
     const c = clip();
     const at = { start: 11, offset: 1, length: 2, tempo: 1 };
     expect(draw(c, at, [0, 2, 2], 2, beat).map((b) => b.height)).toEqual([20, 30]);
+  });
+
+  it('marks the bars its Track’s volume and its Gain take over full scale, whatever it plays', () => {
+    const c = clip({ length: 2 });
+    const clips = (over: Partial<Clip>, volume: number) =>
+      draw({ ...c, ...over }, { ...c, ...over }, [0, 2, 2], 2, [...beat.slice(0, 100), ...beat.slice(300)], volume).map(
+        (b) => b.clipped,
+      );
+    // Peaks of 0.1 and 0.4: 0.4 reaches full scale at about +8 dB.
+    expect(clips({}, 7.5)).toEqual([false, false]);
+    expect(clips({}, 8)).toEqual([false, true]);
+    expect(clips({}, 20.5)).toEqual([true, true]);
+    expect(clips({ gain: 8 }, 0)).toEqual([false, true]);
+    expect(clips({ gain: 16 }, -8)).toEqual([false, true]);
+    // A Sound's the same.
+    expect(clips({ beatId: null, soundId: 3 }, 8)).toEqual([false, true]);
+  });
+
+  it('leaves audio at exactly full scale unmarked at 0 dB', () => {
+    const c = clip({ length: 1 });
+    expect(draw(c, c, [0, 1, 1], 1, new Array<number>(100).fill(1))[0].clipped).toBe(false);
+    expect(draw(c, c, [0, 1, 1], 1, new Array<number>(100).fill(1), 0.5)[0].clipped).toBe(true);
+  });
+
+  it('marks no bar a Fade brings back under full scale', () => {
+    // At +12 dB, peaks of 0.4 are over it, until the Fade out brings them down.
+    const c = clip({ length: 4, offset: 0, fadeOut: 4 });
+    const flat = new Array<number>(400).fill(0.4);
+    const marked = draw(c, c, [0, 4, 4], 4, flat, 12).map((b) => b.clipped);
+    expect(marked[0]).toBe(true);
+    expect(marked[3]).toBe(false);
   });
 
   it('marks where a Take clipped, but not a Beat, often mastered loud', () => {

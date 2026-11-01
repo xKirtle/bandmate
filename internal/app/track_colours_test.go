@@ -155,7 +155,7 @@ func TestABackupKeepsEachTracksColour(t *testing.T) {
 func colourlessTracksBefore(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()
-	old, err := db.OpenBefore(context.Background(), dir, "0050_track_colours")
+	old, err := db.OpenBefore(context.Background(), dir, "0051_track_colours")
 	if err != nil {
 		t.Fatal(err)
 	}
