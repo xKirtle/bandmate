@@ -160,17 +160,14 @@ export async function dragMiddleOf(page: Page, target: Locator, by: Point) {
   await drag(page, await middleOf(target), by);
 }
 
-// A Clip's gain line, fade dots and trim edges aren't named for a screen
-// reader, so they're found by the hint each shows on hover.
+// A Clip's gain line and fade dots aren't named for a screen reader, so
+// they're found by the hint each shows on hover.
 
 /** A Clip's gain line. */
 export const gainLine = (target: Locator) => target.getByTitle(/^Gain .*: drag to change it/);
 
 /** A Clip's fade in or fade out dot. */
 export const fadeDot = (target: Locator, end: 'Fade in' | 'Fade out') => target.getByTitle(new RegExp(`^${end}\\b`));
-
-/** A Clip's start or end trim edge. */
-export const trimEdge = (target: Locator, edge: 'start' | 'end') => target.getByTitle(`Drag to trim the ${edge}`);
 
 /** A Line's Cue time in the Lyric Sheet's gutter, e.g. of "Line 1 of Verse 1", outside Sync mode. */
 export const cueOf = (page: Page, line: string) => page.getByRole('button', { name: `Cue for ${line}:`, exact: false });
