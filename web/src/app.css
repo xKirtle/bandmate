@@ -530,6 +530,75 @@ label.button:has(input:focus-visible) {
   margin: 0 0 var(--space-2) calc(var(--checkbox) + var(--space-2));
 }
 
+/* Songs and Beats to pick, in a dialog with fill: stacked, sharing its height,
+   the sheet scrolling only when there's no room for a few rows of each. */
+.pick-choices {
+  flex: 1;
+  min-height: 0;
+  min-inline-size: 0;
+}
+.pick-columns {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-height: 0;
+  overflow-y: auto;
+}
+.pick-column {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  min-width: 0;
+  min-height: calc(6 * var(--control));
+}
+.pick-column:has(.pick-column-list.off) {
+  flex: none;
+  min-height: 0;
+}
+.pick-column .choice-under {
+  flex: 1;
+  min-height: 0;
+  margin-bottom: 0;
+}
+.pick-column-list {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+/* Unticked, stacked, a list gives its height to the other. */
+.pick-column-list.off {
+  display: none;
+}
+/* Side by side, the rows line up across the columns, so the lists start level
+   however the notes above them wrap, and an unticked list stays in place,
+   fading as a disabled button does. */
+@container dialog-body (min-width: 52rem) {
+  .pick-columns {
+    display: grid;
+    grid-template-rows: auto auto minmax(0, 1fr) auto;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0 var(--space-6);
+  }
+  .pick-column,
+  .pick-column:has(.pick-column-list.off) {
+    display: grid;
+    grid-row: 1 / -1;
+    grid-template-rows: subgrid;
+    min-height: 0;
+  }
+  .pick-column .choice-under {
+    display: grid;
+    grid-row: 2 / -1;
+    grid-template-rows: subgrid;
+  }
+  .pick-column-list.off {
+    display: flex;
+    opacity: 0.6;
+  }
+}
+
 input,
 textarea,
 select {

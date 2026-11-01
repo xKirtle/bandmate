@@ -1,6 +1,15 @@
 <script lang="ts">
   import { api, type Backup, type Beat, type SongSummary } from './api';
-  import { backupName, backupSize, beatCount, beatsBrought, broughtNote, newBackup } from './backups';
+  import {
+    backupDialogRoom,
+    backupDialogSize,
+    backupName,
+    backupSize,
+    beatCount,
+    beatsBrought,
+    broughtNote,
+    newBackup,
+  } from './backups';
   import Dialog from './Dialog.svelte';
   import PickList from './PickList.svelte';
 
@@ -44,6 +53,12 @@
     newBackup({ songsTicked, picked, beatsTicked, pickedBeats }, { songIds, beats: beats ?? [] }),
   );
   const name = $derived('name' in toMake ? toMake.name : '');
+  // Sized for both kinds until they've loaded, and whichever there are after,
+  // so a disabled kind still shows why that side is empty.
+  const nothing = $derived(
+    songs !== null && beats !== null && backupDialogRoom(songs.length, beats.length) === 'little',
+  );
+  const size = $derived(backupDialogSize(phase === 'picking' && !loadError && !nothing ? 'both' : 'little'));
 
   Promise.all([api.listSongs(), api.listBeats(), api.listFolders()]).then(
     ([songList, beatList, folderList]) => {
@@ -82,6 +97,10 @@
 <Dialog
   bind:dialog
   title="New Backup"
+  --dialog-width={size.width}
+  --dialog-height={size.height}
+  fill={size.fill}
+  sheet
   closeButton={phase === 'making' ? 'hidden' : 'shown'}
   dismissible={() => phase !== 'making'}
   {oncancel}
@@ -95,55 +114,67 @@
     {:else if songs.length === 0 && beats.length === 0}
       <p>There are no Songs or Beats to back up yet.</p>
     {:else}
-      <fieldset class="choice-group">
+      <fieldset class="choice-group pick-choices">
         <legend>What goes in</legend>
-        <label class="choice-row">
-          <input
-            type="checkbox"
-            bind:checked={songsTicked}
-            disabled={songs.length === 0}
-            aria-describedby="backup-songs-note"
-          />
-          <span>Songs</span>
-        </label>
-        <div class="choice-under">
-          <p id="backup-songs-note" class="muted">
-            Each Song goes in whole, from its Lyric Sheet to its Timeline, Cover and Masters, with the Beats its Clips
-            use.
-          </p>
-          {#if songsTicked}
-            <PickList
-              items={songs}
-              bind:picked
-              label="Songs to back up"
-              folderOf={(s) => (s.folderId === null ? null : (folderNames.get(s.folderId) ?? null))}
-            />
-            {#if !beatsTicked && songsIn.length > 0}
-              <p class="muted">{broughtNote(songsIn.length, brought.size)}</p>
-            {/if}
-          {/if}
-        </div>
-        <label class="choice-row">
-          <input
-            type="checkbox"
-            bind:checked={beatsTicked}
-            disabled={beats.length === 0}
-            aria-describedby="backup-beat-library-note"
-          />
-          <span>Beat Library <span class="muted">· {beatCount(beats.length)}</span></span>
-        </label>
-        <div class="choice-under">
-          <p id="backup-beat-library-note" class="muted">Each Beat goes in with its credit.</p>
-          {#if beatsTicked}
-            <PickList
-              items={beats}
-              bind:picked={pickedBeats}
-              label="Beats to back up"
-              detail={(b) => b.producer}
-              locked={brought}
-              lockedNote="used by a picked Song"
-            />
-          {/if}
+        <div class="pick-columns">
+          <div class="pick-column">
+            <label class="choice-row">
+              <input
+                type="checkbox"
+                bind:checked={songsTicked}
+                disabled={songs.length === 0}
+                aria-describedby="backup-songs-note"
+              />
+              <span>Songs</span>
+            </label>
+            <div class="choice-under">
+              <p id="backup-songs-note" class="muted">
+                Each Song goes in whole, from its Lyric Sheet to its Timeline, Cover and Masters, with the Beats its
+                Clips use.
+              </p>
+              {#if songs.length > 0}
+                <div class="pick-column-list" class:off={!songsTicked} inert={!songsTicked}>
+                  <PickList
+                    fill
+                    items={songs}
+                    bind:picked
+                    label="Songs to back up"
+                    folderOf={(s) => (s.folderId === null ? null : (folderNames.get(s.folderId) ?? null))}
+                  />
+                </div>
+              {/if}
+              {#if songsTicked && !beatsTicked && songsIn.length > 0}
+                <p class="muted">{broughtNote(songsIn.length, brought.size)}</p>
+              {/if}
+            </div>
+          </div>
+          <div class="pick-column">
+            <label class="choice-row">
+              <input
+                type="checkbox"
+                bind:checked={beatsTicked}
+                disabled={beats.length === 0}
+                aria-describedby="backup-beat-library-note"
+              />
+              <span>Beat Library <span class="muted">· {beatCount(beats.length)}</span></span>
+            </label>
+            <div class="choice-under">
+              <p id="backup-beat-library-note" class="muted">Each Beat goes in with its credit.</p>
+              {#if beats.length > 0}
+                <div class="pick-column-list" class:off={!beatsTicked} inert={!beatsTicked}>
+                  <PickList
+                    fill
+                    items={beats}
+                    bind:picked={pickedBeats}
+                    label="Beats to back up"
+                    detail={(b) => b.producer}
+                    locked={brought}
+                    lockedNote="used by a picked Song"
+                  />
+                </div>
+              {/if}
+            </div>
+          </div>
         </div>
       </fieldset>
       {#if 'missing' in toMake}

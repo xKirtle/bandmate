@@ -3,7 +3,8 @@
   import { byFolder, groupTicked, tickGroup } from './pickList';
 
   // A list of things to pick, such as Songs, each with a checkbox, under
-  // "Choose all" and "Clear". About six fit, then it scrolls. It holds no
+  // "Choose all" and "Clear". About six fit, then it scrolls, or with fill it
+  // takes the height it's given. It holds no
   // picks of its own: they're the caller's, so they last as long as it keeps
   // them, even while the list isn't shown. A locked item shows ticked
   // whatever its own pick, which is kept under the lock for when it lifts.
@@ -18,6 +19,7 @@
     locked = new Set(),
     lockedNote = '',
     folderOf,
+    fill = false,
   }: {
     items: readonly T[];
     /** The ids picked. */
@@ -32,6 +34,8 @@
     lockedNote?: string;
     /** The name of the Folder an item sits in, or null for none, to group the items by Folder. */
     folderOf?: (item: T) => string | null;
+    /** Takes the height it's given, rather than stopping at about six. */
+    fill?: boolean;
   } = $props();
   const uid = $props.id();
 
@@ -72,7 +76,7 @@
   </li>
 {/snippet}
 
-<div class="pick-list">
+<div class="pick-list" class:fill>
   <div class="actions">
     <button
       type="button"
@@ -132,6 +136,14 @@
     border-radius: var(--radius-md);
     list-style: none;
     overscroll-behavior: contain;
+  }
+  .pick-list.fill {
+    flex: 1;
+  }
+  .pick-list.fill > ul {
+    flex: 1;
+    min-height: calc(3 * var(--control));
+    max-height: none;
   }
   /* A Folder's items sit under its name, lined up with it. */
   ul.in-folder {
