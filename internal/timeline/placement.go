@@ -456,7 +456,8 @@ func (tl Timeline) addingTrack(t NewTrack, srcs []clipSource, ids *ids) (Timelin
 
 // insertingTrack is tl with the new Track t among its Tracks at place, from
 // 0 (the top) to the number of Tracks (the bottom), pushing those from there
-// down. It's every new Track's way in, so it's what gives one its colour.
+// down. Every Track added to a Timeline comes in here, so here it gets its
+// colour. A Song's first Track, made with the Song, starts on the first.
 func (tl Timeline) insertingTrack(t Track, place int) Timeline {
 	t.Colour = tl.leastUsedColour()
 	tl.Tracks = slices.Insert(slices.Clone(tl.Tracks), place, t)

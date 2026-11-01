@@ -6,7 +6,7 @@ import type { Bandmate, Clip as SharedClip } from '../bandmate';
 import { toneWav } from '../beats';
 import { failRequests } from '../faults';
 import { expect, test } from '../fixtures';
-import { heroSong, recordButton, redoButton, seek, syncButton, undoButton } from '../songPage';
+import { drawnColour, heroSong, recordButton, redoButton, seek, syncButton, undoButton } from '../songPage';
 
 // Recording Takes on the Song page's Timeline, from Chromium's fake
 // microphone, which captures a half-second 440 Hz tone on a loop. The tests
@@ -447,21 +447,13 @@ test("the Clip being recorded is in the danger colour, not its Track's", async (
 
   await recordButton(page).click();
   await skipCalibration(page);
-  const recording = timeline(page).locator('.clip.taking');
+  const recording = timeline(page).getByLabel(/^Recording from /);
   await expect(recording).toBeVisible();
-  const colours = await recording.evaluate((el) => {
-    const drawn = (token: string) => {
-      const probe = document.body.appendChild(document.createElement('i'));
-      probe.style.color = `var(${token})`;
-      const { color } = getComputedStyle(probe);
-      probe.remove();
-      return color;
-    };
-    return { border: getComputedStyle(el).borderTopColor, danger: drawn('--danger') };
-  });
+  const border = await recording.evaluate((el) => getComputedStyle(el).borderTopColor);
+  const danger = await drawnColour(page, '--danger');
   await stopButton(page).click();
 
-  expect(colours.border).toBe(colours.danger);
+  expect(border).toBe(danger);
 });
 
 test('a Retake records into its Clip, from its start, growing it', async ({ page, bandmate }) => {
