@@ -164,6 +164,10 @@ _Avoid_: Session, project, mix
 A named lane on the Timeline (e.g. "Beat", "Lead vox", "Adlibs") holding Clips, with its own volume, mute and solo. Turning its volume all the way down makes it quiet, never silent: silencing a Track is what muting it is for. Turning it up can clip: the peaks of its Clips' waveforms that go over full scale turn red, though Tracks playing together can clip without any showing. A Timeline always has at least one Track: a Song starts with one, and the last Track can't be deleted.
 _Avoid_: Channel, layer
 
+**Track Colour**:
+One of a set of six muted colours that sets a Track's Clips apart from other Tracks'. Bandmate gives a Track one when it's made, the one least used on the Song's Tracks, and it keeps it wherever the Track moves and whatever happens to the other Tracks; the user doesn't pick it. A Track made to carry on another's Clips, by a paste or a Tempo change, takes that Track's, so past six Tracks, or after those, two Tracks can share one. It belongs to the Song, while the shade it shows in comes from this Device's Palette, light or dark, so a Track is the same Track Colour on every Device. It's never the accent, which marks what's active, like the Chosen Track or the Selection.
+_Avoid_: Track palette (a Palette is what's picked in Settings), accent
+
 **Chosen Track**:
 The Track a recording, a Beat or Sound being added, or a paste goes to. Exactly one Track is always chosen: clicking a Track's header, a Clip on it, or empty space along it chooses it.
 _Avoid_: Selected track (selecting is for Clips), armed track
