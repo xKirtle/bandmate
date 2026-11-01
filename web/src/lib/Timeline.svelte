@@ -2114,7 +2114,7 @@
                           aria-hidden="true"
                         >
                           <!-- Drawn as it sounds, at the Clip's Gain, shaped by its Fades. -->
-                          {#each clipBars(clip, at, wave, view.scale, peaks[sources.of(clip).key] ?? []) as { height, clipped }, i (i)}
+                          {#each clipBars(clip, at, wave, view.scale, peaks[sources.of(clip).key] ?? [], track.volume) as { height, clipped }, i (i)}
                             <rect class:clipped x={i + 0.15} y={(100 - height) / 2} width="0.7" {height} />
                           {/each}
                         </svg>
@@ -3169,7 +3169,7 @@
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
   }
-  /* A peak of a Take that clipped. */
+  /* A peak that clipped as it was recorded, or goes over full scale as it's played. */
   rect.clipped {
     fill: var(--danger);
     opacity: 1;

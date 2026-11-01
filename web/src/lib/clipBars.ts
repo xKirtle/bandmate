@@ -1,10 +1,10 @@
 // A Clip's waveform on the Timeline, drawn as it sounds: its source's peaks
 // over what it plays, trimmed, from where its audio file starts, at its
-// Tempo, shaped by its Fades and scaled by its Gain. Plain arithmetic, so
-// the Timeline only has to draw a bar for each.
+// Tempo, shaped by its Fades and scaled by its Gain, with the bars that clip
+// marked. Plain arithmetic, so the Timeline only has to draw a bar for each.
 import type { Clip } from './api';
 import { fitFades, shapedPeak } from './clipFade';
-import { heardPeak } from './clipGain';
+import { heardPeak, overFullScale } from './clipGain';
 import { fileStart } from './clipSource';
 import { sourceAt, sourceLength } from './clipTime';
 import { clipping } from './liveWave';
@@ -17,7 +17,12 @@ import { barWidth, bars } from './waveform';
 export interface ClipBar {
   /** How tall it's drawn, in percent of the Clip's waveform, never under minHeight. */
   height: number;
-  /** Whether its audio clipped: marked on a Take, not on a Beat or a Sound, often mastered loud. */
+  /**
+   * Whether it clips. Whatever the Clip plays, that's going over full scale at
+   * its Gain and its Track's volume, each Track taken alone. A Take can also
+   * have clipped as it was recorded, not marked on a Beat or a Sound, often
+   * mastered loud.
+   */
   clipped: boolean;
 }
 
@@ -27,9 +32,17 @@ const minHeight = 2;
 /**
  * A Clip's waveform, placed at `at`, over the stretch of it in a wave
  * window, at a scale in pixels a second, from the peaks of its source:
- * none while they load, or if they couldn't, which draws it flat.
+ * none while they load, or if they couldn't, which draws it flat. Its
+ * Track's volume, in dB, only decides which bars clip.
  */
-export function clipBars(clip: Clip, at: Placed, wave: WaveWindow, scale: number, peaks: readonly number[]): ClipBar[] {
+export function clipBars(
+  clip: Clip,
+  at: Placed,
+  wave: WaveWindow,
+  scale: number,
+  peaks: readonly number[],
+  volume: number,
+): ClipBar[] {
   const { from, to, bars: count } = wave;
   // How long a bar is, in seconds of the Timeline.
   const bar = barWidth / scale;
@@ -48,9 +61,10 @@ export function clipBars(clip: Clip, at: Placed, wave: WaveWindow, scale: number
   return shape.map((peak, i) => {
     // Halfway across the bar, in seconds into the Clip.
     const t = from + (i + 0.5) * bar;
+    const shaped = shapedPeak(peak, fades, at.length, t);
     return {
-      height: Math.max(minHeight, heardPeak(shapedPeak(peak, fades, at.length, t), clip.gain) * 100),
-      clipped: isTake && peak >= clipping,
+      height: Math.max(minHeight, heardPeak(shaped, clip.gain) * 100),
+      clipped: (isTake && peak >= clipping) || overFullScale(shaped, clip.gain, volume),
     };
   });
 }

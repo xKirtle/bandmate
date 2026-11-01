@@ -14,8 +14,11 @@ export interface Levels {
  * silences it. The server checks the same range (MinVolume in the timeline package).
  */
 export const minVolume = -36;
-/** A Track's highest volume, in dB. Nothing stops it distorting up there: that's left to the user. */
-export const maxVolume = 36;
+/**
+ * A Track's highest volume, in dB. Nothing stops it distorting up there, but
+ * its Clips' waveforms show where it does (see clipBars).
+ */
+export const maxVolume = 24;
 
 /**
  * Each Track's gain by id, as a factor of its audio. When some Tracks are

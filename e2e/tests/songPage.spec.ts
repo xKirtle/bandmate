@@ -1336,6 +1336,21 @@ test('a refused save stays in its toast until its dismiss is pressed', async ({ 
   await expect(saveError(page)).toHaveCount(0);
 });
 
+test('a Track’s waveforms show in red what its fader takes over full scale', async ({ page, bandmate }) => {
+  const song = await heroSong(bandmate);
+  await page.goto(`/songs/${song.id}`);
+  const fader = timeline(page).getByRole('slider', { name: 'Volume of Lead vox' });
+  const clipping = clip(page, 'Take 2').locator('rect.clipped');
+  await expect(fader).toHaveAttribute('max', '24');
+  await expect(clip(page, 'Take 2').locator('rect').first()).toBeVisible();
+  await expect(clipping).toHaveCount(0);
+
+  await fader.fill('24');
+  await expect(clipping).not.toHaveCount(0);
+  await fader.fill('0');
+  await expect(clipping).toHaveCount(0);
+});
+
 test('a Track’s fader let go where it started sends nothing, so an undo of its volume shows at once, and let go elsewhere sends its level', async ({
   page,
   bandmate,
