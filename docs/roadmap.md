@@ -29,18 +29,6 @@ Each feature gets a spec, as an issue, before it's built. Using a new feature fo
 - Slow the Timeline down, or speed it up, without changing its pitch, for learning a part, especially over a Loop.
 - Whether Masters and Beat previews get it too is for the spec.
 
-## Track colours
-
-- Each Track gets a Track Colour of its own automatically, so Clips on different Tracks can be told apart at a glance. Today every Clip is in the one accent colour.
-- The Track keeps its colour however Tracks are added, deleted or reordered, and the user doesn't pick it. A later picker from the same set stays possible, if using the feature shows a need.
-- A Setting turns Track Colours off on a Device, showing the Palette's accent in their place, for anyone who'd rather have the Timeline quieter. Each Track keeps its colour.
-- Each Palette has its own shades of the set, in light and dark, so the colours follow the Palette, and a Track stores which colour of the set it has, not a colour value.
-- There are six, enough for every Song so far without a repeat. A new Track gets the one least used on the Song's Tracks, ties going to the earliest in the set, so a Song's first Track is always the first colour. The first two are chosen with most care, as most Songs only ever show those.
-- The Tracks a paste makes, and the one a Clip moves to when slowed by its Tempo, take the source Track's colour. The Track a Merge makes gets one like any new Track, and undoing a Track's deletion brings its colour back.
-- Existing Tracks, older Backups and the Demo Song get theirs in one upgrade step, in order from the top of each Song.
-- The colours stay muted so the Timeline doesn't take on the busy look of a DAW: only a Clip's border, its waveform, its Fade slopes and a changed Gain line, which always show on it, and a Track's volume slider take the colour, as do the edge and tint that mark the Chosen Track, the outline and tint on a Track a file is dragged over, and a selected or focused Clip's marking, its fade dots, and its controls while they're hovered or dragged. Nothing else in the Track header does, and an empty Track shows its colour on its slider. They're held to the 3:1 contrast floor against a Clip's background and a Track header's all the same.
-- The accent is left to what's active, so Mute and Solo stay in it while on, and the Clip being recorded stays in the danger colour, with its waveform in the accent, so the bars that mark clipped peaks show against it. No Track Colour can be close to the accent.
-
 ## A language data project
 
 - A someday idea, only worth it if a community grows around Bandmate and asks for Languages one maintainer can't look after; until then, Languages are added in Bandmate, as CONTRIBUTING's "Adding a rhyming language" says.
