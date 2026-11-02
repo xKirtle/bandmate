@@ -1043,7 +1043,7 @@ async function api(method, path, body) {
   await listen.click();
   await page
     .getByRole("meter", { name: "Cents sharp or flat" })
-    .and(page.locator('[aria-valuetext$="sharp"]'))
+    .and(page.locator('[aria-valuetext*="sharp"]'))
     .waitFor();
   // Without the focus ring the click leaves on Stop, or a hover on it.
   await page.getByRole("button", { name: "Stop", exact: true }).blur();

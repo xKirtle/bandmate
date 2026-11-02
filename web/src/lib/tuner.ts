@@ -120,6 +120,16 @@ export function tunerDrift(reading: TunerReading | null): number {
 }
 
 /**
+ * Which way to tune a string to its note, the one held or else the nearest:
+ * up when it's heard flat, down when sharp, and none in tune or with nothing
+ * heard. It's the way to turn, not where the pitch sits.
+ */
+export function tunerWay(reading: TunerReading | null): 'up' | 'down' | null {
+  if (!reading || reading.inTune) return null;
+  return reading.cents < 0 ? 'up' : 'down';
+}
+
+/**
  * The octave a note is written in: its letter's, so C♭ sounding as B3 is C♭4,
  * and B♯ sounding as C4 is B♯3. Middle C (60) starts octave 4.
  */
