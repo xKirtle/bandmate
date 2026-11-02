@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { detectPitch, SteadyPitch } from './pitch';
+import { detectPitch, LastHeard, loudness, SteadyPitch } from './pitch';
 
 const rate = 48000;
 /** How many samples the Tuner listens to at a time: 4096, about 85 ms. */
@@ -144,5 +144,74 @@ describe('the pitch the Tuner shows', () => {
 
   it('moves to another note once that’s heard three times running', () => {
     expect(shown([110, 110, 110, 147, 147, 147, 147])).toEqual([null, null, 110, 110, 110, 147, 147]);
+  });
+});
+
+/**
+ * A plucked A2 dying away over about three seconds, read every 50 ms, then
+ * a second of silence: in tune while it rings, sagging flat as it fades, up
+ * to 10 cents flat by the time it's too quiet to hear, as a string's tail can.
+ */
+function fading(): Float32Array[] {
+  return Array.from({ length: 100 }, (_, i) => {
+    const time = i * 0.05;
+    if (time >= 4) return new Float32Array(size);
+    const strength = Math.exp(-time / 0.6);
+    const sag = strength >= 0.03 ? 0 : -15 * (1 - strength / 0.03);
+    return tone(110 * 2 ** (sag / 1200), plucked).map((s) => s * strength);
+  });
+}
+
+/** What the Tuner shows after each of a run of samples read 50 ms apart, and what it keeps once the note's faded. */
+function heard(frames: Float32Array[], keeper = new LastHeard()) {
+  const steady = new SteadyPitch();
+  return frames.map((samples, i) => {
+    const detected = detectPitch(samples, rate);
+    const shown = steady.hear(detected, i * 50);
+    return { shown, kept: keeper.hear(detected, shown, loudness(samples)) };
+  });
+}
+
+const silence = (n: number) => Array<Float32Array>(n).fill(new Float32Array(size));
+const ringing = (frequency: number, n: number) => Array<Float32Array>(n).fill(tone(frequency, plucked));
+
+describe('the reading the Tuner keeps once a note fades', () => {
+  it('is nothing before any note is heard, in silence or a hiss', () => {
+    expect(heard([...silence(5), noise(0.002), noise(0.5)]).map((r) => r.kept)).toEqual(Array(7).fill(null));
+  });
+
+  it('is nothing while a note shows: what’s heard shows instead', () => {
+    expect(heard(ringing(110, 6)).map((r) => r.kept)).toEqual(Array(6).fill(null));
+  });
+
+  it('is a note’s last reading where it stops short rather than fading', () => {
+    expect(Math.abs(cents(heard([...ringing(147, 10), ...silence(10)]).at(-1)!.kept!, 147))).toBeLessThan(1);
+  });
+
+  it('goes once the next note shows, which is kept in its turn once it fades', () => {
+    const readings = heard([...ringing(110, 10), ...silence(10), ...ringing(147, 10), ...silence(10)]);
+    expect(Math.abs(cents(readings[19].kept!, 110))).toBeLessThan(1);
+    const next = readings.findIndex((r, i) => i > 19 && r.shown !== null);
+    expect(readings[next].kept).toBeNull();
+    expect(Math.abs(cents(readings.at(-1)!.kept!, 147))).toBeLessThan(1);
+  });
+
+  it('is nothing once forgotten, till another note fades', () => {
+    const keeper = new LastHeard();
+    heard([...ringing(110, 10), ...silence(5)], keeper);
+    keeper.forget();
+    expect(heard(silence(5), keeper).map((r) => r.kept)).toEqual(Array(5).fill(null));
+    expect(Math.abs(cents(heard([...ringing(147, 10), ...silence(5)], keeper).at(-1)!.kept!, 147))).toBeLessThan(1);
+  });
+
+  it('is where a dying note was while well above its fade, not its flat tail', () => {
+    const readings = heard(fading());
+    const gone = readings.length - [...readings].reverse().findIndex((r) => r.shown !== null);
+    // The last it showed before it faded was flat, so that's not what's kept.
+    expect(cents(readings[gone - 1].shown!, 110)).toBeLessThan(-5);
+    const kept = readings.at(-1)!.kept!;
+    expect(Math.abs(cents(kept, 110))).toBeLessThan(1);
+    // Kept from when the note went, till the end of the silence.
+    expect(readings.slice(gone).every((r) => r.kept === kept)).toBe(true);
   });
 });
