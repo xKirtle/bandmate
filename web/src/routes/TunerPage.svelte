@@ -10,11 +10,11 @@
   // Input, showing between the pegs the note it hears, the string held or
   // else the one whose note is nearest, how many cents sharp or flat of it
   // the note is, which way to tune to it, with an arrow and words, and a wave
-  // that drifts as a strobe tuner's does, until Stop is
-  // pressed or the page is left. Its Input is picked under the headstock,
-  // from the Inputs connected, as the Timeline's mic button lists them: the
-  // Input recorded from until another is picked, and the Input recorded from
-  // again wherever the one picked isn't connected.
+  // that drifts as a strobe tuner's does, until Stop is pressed or the page is
+  // left. Its Input is picked under the headstock, from the Inputs connected,
+  // as the Timeline's mic button lists them: the Input recorded from until
+  // another is picked, and the Input recorded from again wherever the one
+  // picked isn't connected.
   import ArrowDown from '@lucide/svelte/icons/arrow-down';
   import ArrowUp from '@lucide/svelte/icons/arrow-up';
   import { untrack } from 'svelte';
@@ -145,6 +145,8 @@
   );
   // Which way to turn to the note, off it: up when flat, down when sharp.
   const way = $derived(tunerWay(reading));
+  // What the meter says to a screen reader: how far off, with the way to tune.
+  const meterText = $derived(way ? `${howFarOff}, tune ${way}` : howFarOff);
 
   // The wave, in its drawing's own units: a wavelength is this wide, two
   // show at once, and it swings this far either side of its middle.
@@ -251,7 +253,7 @@
             aria-valuemin={-reach}
             aria-valuemax={reach}
             aria-valuenow={Math.max(-reach, Math.min(reach, cents))}
-            aria-valuetext={way ? `${howFarOff}, tune ${way}` : howFarOff}
+            aria-valuetext={meterText}
           >
             <svg viewBox="0 0 {2 * wavelength} {waveHeight}" preserveAspectRatio="none" aria-hidden="true">
               <path d={wavePath} transform="translate({drifted * wavelength} 0)" vector-effect="non-scaling-stroke" />
