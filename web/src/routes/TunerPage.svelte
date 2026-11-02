@@ -38,6 +38,7 @@
   import Toasts from '../lib/Toasts.svelte';
   import {
     tunerPeg,
+    tunerReach,
     tunerReading,
     tunerSound,
     tunerStrings,
@@ -100,8 +101,6 @@
   const heardIn = 4096;
   /** How often it reads the pitch, in ms. */
   const every = 50;
-  /** How far sharp or flat the meter reaches, in cents: past it, it reads as the end. */
-  const reach = 50;
 
   // Listening: from Listen till Stop, or till the page is left, on the
   // Tuner's Input, or where it isn't connected, the Input recorded from.
@@ -150,10 +149,10 @@
       const running = audioContext().state === 'running' && !document.hidden;
       const samples = level.samples();
       const detected = running ? detectPitch(samples, level.sampleRate) : null;
-      const loud = loudness(samples);
+      const howLoud = loudness(samples);
       pitch = steady.hear(detected, performance.now());
-      if (pitch !== null) heardLoudness = loud;
-      kept = lastHeard.hear(detected, pitch, loud);
+      if (pitch !== null) heardLoudness = howLoud;
+      kept = lastHeard.hear(detected, pitch, howLoud);
     }, every);
     return () => {
       clearInterval(timer);
@@ -205,10 +204,13 @@
   const steps = 16;
   /** How far both waves scroll a second while a note's heard: a quarter of the target's wavelength. */
   const pace = wavelength / 4;
-  /** The target's dash and gap, in the units its path's length is measured in: each of its wavelengths holds this many of them, whole, so its dashes don't jump as it scrolls a wavelength on. */
+  // The target's dashes: a dash and a gap, in the units its path's length is
+  // measured in, and how many of them each of its wavelengths holds, whole,
+  // so its dashes don't jump as it scrolls a wavelength on. Thirteen keep
+  // them short, so the dashed line still reads as a wave.
   const dash = 4;
   const gap = 3;
-  const dashes = 13;
+  const dashesPerWave = 13;
   /**
    * A sine wave from a wavelength before the window to one past it, so it
    * fills the window however far it's scrolled within one.
@@ -318,9 +320,9 @@
             class="wave"
             role="meter"
             aria-label="Cents sharp or flat"
-            aria-valuemin={-reach}
-            aria-valuemax={reach}
-            aria-valuenow={Math.max(-reach, Math.min(reach, cents))}
+            aria-valuemin={-tunerReach}
+            aria-valuemax={tunerReach}
+            aria-valuenow={Math.max(-tunerReach, Math.min(tunerReach, cents))}
             aria-valuetext={meterText}
           >
             <!-- The string's note, dashed, and over it the note heard, scrolling
@@ -330,7 +332,7 @@
               <path
                 class="target-wave"
                 d={targetPath}
-                pathLength={targetWaves * dashes * (dash + gap)}
+                pathLength={targetWaves * dashesPerWave * (dash + gap)}
                 stroke-dasharray="{dash} {gap}"
                 transform="translate({scrolled % wavelength} 0)"
                 vector-effect="non-scaling-stroke"

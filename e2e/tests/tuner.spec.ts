@@ -498,6 +498,8 @@ test("tapping a string holds the Tuner to it, however far off it's heard, and tu
   await expect(tuner.auto).toHaveAccessibleDescription(
     "Held to the 6th string, E2",
   );
+  // Its wave is against E2's too: so sharp it's as short as it goes, half the target's.
+  await expect.poll(() => heardWavelength(page)).toBe(0.5);
   await expect(tuner.card).toContainText("Held to the 6th string, E2");
   await expect(tuner.card).not.toContainText("Picks the string nearest");
   await expect(tuner.card).toContainText("6th string, E2");

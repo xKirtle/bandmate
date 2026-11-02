@@ -103,8 +103,8 @@ export function tunerReading(
   return { heard, string, cents, inTune: Math.abs(cents) < inTuneWithin };
 }
 
-/** How far sharp or flat the heard wave's wavelength goes, in cents: past it, no further. */
-const widestOff = 50;
+/** How far sharp or flat the Tuner's meter, and its heard wave's wavelength, go, in cents: past it, they read as the end. */
+export const tunerReach = 50;
 
 /**
  * The Tuner's heard wave's wavelength, drawn over the target's, the target's
@@ -114,7 +114,7 @@ const widestOff = 50;
  */
 export function tunerWavelength(reading: TunerReading): number {
   if (reading.inTune) return 1;
-  return 1 - Math.max(-widestOff, Math.min(widestOff, reading.cents)) / 100;
+  return 1 - Math.max(-tunerReach, Math.min(tunerReach, reading.cents)) / 100;
 }
 
 /** How loud a string is, as `loudness` reads it, for its heard wave to be as tall as the target's. */
