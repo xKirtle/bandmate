@@ -69,11 +69,11 @@ describe('what the Tuner reads from a note heard', () => {
     expect(read('Standard', hz(55, -30))).toEqual({ heard: 'G3', string: '3rd', cents: -30, inTune: false });
   });
 
-  it('is in tune within 5 cents either way, as shown rounded', () => {
-    expect(read('Standard', hz(45, 4.4)).inTune).toBe(true);
-    expect(read('Standard', hz(45, -4.4)).inTune).toBe(true);
-    expect(read('Standard', hz(45, 4.6)).inTune).toBe(false);
-    expect(read('Standard', hz(45, -4.6)).inTune).toBe(false);
+  it('is in tune within 5 cents either way', () => {
+    expect(read('Standard', hz(45, 4.9)).inTune).toBe(true);
+    expect(read('Standard', hz(45, -4.9)).inTune).toBe(true);
+    expect(read('Standard', hz(45, 5.1)).inTune).toBe(false);
+    expect(read('Standard', hz(45, -5.1)).inTune).toBe(false);
   });
 
   it('names the note heard, which may not be the string’s', () => {

@@ -37,8 +37,8 @@ export function tunerStrings(tuning: string): TunerString[] | null {
   );
 }
 
-/** How far either way of a string's note it's in tune, in cents, as shown rounded: under 5. */
-const inTuneWithin = 5;
+/** How far either way of a string's note it's in tune, in cents: under 5. */
+export const inTuneWithin = 5;
 
 /** What the Tuner reads from a note it hears. */
 export interface TunerReading {
@@ -70,8 +70,9 @@ export function tunerReading(frequency: number, strings: readonly TunerString[])
   const cents = centsFrom(frequency, string.heard.midi);
   const midi = Math.round(69 + 12 * Math.log2(frequency / 440));
   const named = strings.find((s) => s.heard.midi === midi);
-  const heard = named ? named.name : commonNote(midi) + octave(commonNote(midi), midi);
-  return { heard, string, cents, inTune: Math.abs(Math.round(cents)) < inTuneWithin };
+  const common = commonNote(midi);
+  const heard = named ? named.name : common + octave(common, midi);
+  return { heard, string, cents, inTune: Math.abs(cents) < inTuneWithin };
 }
 
 /**

@@ -15,7 +15,7 @@
   import { input } from '../lib/sharedInput.svelte';
   import { deviceTuning } from '../lib/sharedTuning.svelte';
   import Toasts from '../lib/Toasts.svelte';
-  import { tunerReading, tunerSound, tunerStrings } from '../lib/tuner';
+  import { inTuneWithin, tunerReading, tunerSound, tunerStrings } from '../lib/tuner';
   import TuningField from '../lib/TuningField.svelte';
   import { audioContext } from '../lib/timelinePlayer';
   import { unheard, unheardToasts } from '../lib/unheard.svelte';
@@ -82,7 +82,10 @@
       gone = open.gone;
       const steady = new SteadyPitch();
       timer = setInterval(() => {
-        pitch = steady.hear(detectPitch(open.samples(), open.sampleRate), performance.now());
+        // While the audio's suspended, e.g. in a background tab, the samples
+        // stand still: nothing's heard, rather than the last note held.
+        const running = audioContext().state === 'running' && !document.hidden;
+        pitch = steady.hear(running ? detectPitch(open.samples(), open.sampleRate) : null, performance.now());
       }, every);
     } catch (e) {
       if (mine !== generation) return;
@@ -127,7 +130,7 @@
   /** Where the needle sits, from 0 at the flat end to 100 at the sharp end. */
   const needle = $derived(reading ? 50 + (Math.max(-reach, Math.min(reach, reading.cents)) / reach) * 50 : 50);
   const cents = $derived(reading ? Math.round(reading.cents) : 0);
-  const off = $derived(
+  const howFarOff = $derived(
     !reading
       ? 'Nothing heard'
       : reading.inTune
@@ -191,9 +194,10 @@
               aria-valuemin={-reach}
               aria-valuemax={reach}
               aria-valuenow={Math.max(-reach, Math.min(reach, cents))}
-              aria-valuetext={off}
+              aria-valuetext={howFarOff}
             >
-              <div class="zone"></div>
+              <!-- In tune: within 5 cents either way of the middle, of the 50 each end reaches. -->
+              <div class="zone" style:inset="0 {50 - (inTuneWithin / reach) * 50}%"></div>
               {#if reading}
                 <div class="needle" style:left="{needle}%"></div>
               {/if}
@@ -203,7 +207,7 @@
           {#if reading?.inTune}
             <p class="off"><span class="badge tuned">In tune</span></p>
           {:else}
-            <p class="off tabular">{reading ? off : ''}</p>
+            <p class="off tabular">{reading ? howFarOff : ''}</p>
           {/if}
         </div>
       {/if}
@@ -325,10 +329,8 @@
     border-radius: var(--radius-sm);
     background: var(--surface-2);
   }
-  /* In tune: within 5 cents either way of the middle, of the 50 each end reaches. */
   .zone {
     position: absolute;
-    inset: 0 45%;
     background: color-mix(in srgb, var(--finished-fg) 40%, transparent);
   }
   .needle {

@@ -79,7 +79,7 @@ The system font everywhere, with no typeface bundled. Content and tools differ b
 | `--text-md`    | 0.875rem                    | Tool text: buttons and fields in toolbars and dialogs, lists, menus                    |
 | `--text-lg`    | 1rem                        | Body text, and the headings of cards and panels                                        |
 | `--text-xl`    | 1.25rem                     | Dialog titles, icon buttons, larger headings                                           |
-| `--text-2xl`   | 1.5rem                      | Page titles, and a Song's title                                                        |
+| `--text-2xl`   | 1.5rem                      | Page titles, a Song's title, and the note the Tuner hears                              |
 | `--text-field` | `max(var(--text-lg), 16px)` | Text fields: under 16px, iOS zooms in on focus                                         |
 
 Content's line height is `--leading-content` (1.6), for Lines in Write mode and a Song's notes; tools keep the page's 1.5. The lyric sizes, and the Chord Chart's name size, are content's own, separate from the scale so Read mode can be tuned on its own:
