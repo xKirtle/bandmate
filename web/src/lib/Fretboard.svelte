@@ -1,10 +1,12 @@
 <script lang="ts">
-  // The fretboard Name it places a shape on: the strings upright, the low
-  // string on the left (on the right for a left-handed player), the nut at
-  // the top, as a chord diagram draws them. Tapping a fret places the
-  // string's one finger there, and tapping it again lifts it, leaving the
-  // string open. Above the nut, a string is marked open or muted. Arrow keys
-  // move between the frets, so the whole fretboard is one tab stop.
+  // The fretboard Name it places a shape on, drawn as a guitar's neck: the
+  // strings upright, the low string on the left (on the right for a
+  // left-handed player), the nut at the top, as a chord diagram draws them,
+  // on a fingerboard like the Tuner's headstock, its frets closing up the
+  // neck and its inlays on the board. Tapping a fret places the string's one
+  // finger there, and tapping it again lifts it, leaving the string open.
+  // Above the nut, a string is marked open or muted. Arrow keys move between
+  // the frets, so the whole fretboard is one tab stop.
   import { tick } from 'svelte';
   import { stringNumber, type Frets } from './chordFinder';
   import { leftHanded } from './sharedLeftHanded.svelte';
@@ -18,14 +20,22 @@
 
   /** The frets above the nut a finger can be placed on, as far as a Voicing reaches. */
   const fretCount = 12;
-  /** The frets a fretboard marks with an inlay, so a fret is easy to find. */
-  const inlays = new Set([3, 5, 7, 9, 12]);
+  /** The frets a fretboard marks with an inlay, so a fret is easy to find; the 12th's is a double. */
+  const inlays = [3, 5, 7, 9, 12];
 
   const strings = $derived(frets.length);
   /** The strings in the order they're drawn, left to right: mirrored for a left-handed player. */
   const order = $derived(Array.from({ length: strings }, (_, i) => (leftHanded.value ? strings - 1 - i : i)));
   /** Row 0 is above the nut; rows 1 to fretCount are the frets. */
   const rows = Array.from({ length: fretCount + 1 }, (_, fret) => fret);
+
+  /** Each row's height: above the nut 2rem, then the frets closing evenly from 2.5rem at the 1st to 2rem at the last. */
+  const rowHeights = rows
+    .map((fret) => (fret === 0 ? '2rem' : `${2.5 - (0.5 * (fret - 1)) / (fretCount - 1)}rem`))
+    .join(' ');
+
+  /** How thick a string is drawn: 2.5px for the low string, thinning evenly to 1px for the high one. */
+  const gauge = (string: number) => `${2.5 - (1.5 * string) / Math.max(1, strings - 1)}px`;
 
   /** A string as players name it: the low string of six is the 6th string. */
   const stringName = (string: number) => `${stringNumber(string, strings)} string`;
@@ -67,9 +77,27 @@
   }
 </script>
 
-<div bind:this={board} class="fretboard" role="group" aria-label="Fretboard" style:--strings={strings}>
+<div
+  bind:this={board}
+  class="fretboard"
+  role="group"
+  aria-label="Fretboard"
+  style:--strings={strings}
+  style:grid-template-rows={rowHeights}
+>
+  <!-- Under the strings, every cell placed so these don't push the strings
+       aside: the fingerboard, the nut, and the inlays. -->
+  <span class="board" aria-hidden="true"></span>
+  <span class="nut-bar" aria-hidden="true"></span>
+  {#each inlays as fret (fret)}
+    <span class="inlay" class:double={fret === fretCount} style:grid-row={fret + 1} aria-hidden="true">
+      <span></span>
+      {#if fret === fretCount}<span></span>{/if}
+    </span>
+  {/each}
+
   {#each rows as row (row)}
-    <span class="gutter" class:inlay={inlays.has(row)}>
+    <span class="gutter" class:inlaid={inlays.includes(row)} style:grid-row={row + 1}>
       {#if row > 0}{row}{/if}
     </span>
     {#each order as string, column (string)}
@@ -78,6 +106,8 @@
         <button
           type="button"
           class="nut"
+          style:grid-row={1}
+          style:grid-column={column + 2}
           tabindex={focused.column === column && focused.row === row ? 0 : -1}
           aria-label={nutLabel(string)}
           title={fret === null ? 'Ring this string open' : 'Mute this string'}
@@ -95,6 +125,10 @@
         <button
           type="button"
           class="fret"
+          class:last={row === fretCount}
+          style:grid-row={row + 1}
+          style:grid-column={column + 2}
+          style:--gauge={gauge(string)}
           tabindex={focused.column === column && focused.row === row ? 0 : -1}
           aria-label="{stringName(string)}, fret {row}"
           aria-pressed={fret === row}
@@ -113,17 +147,45 @@
   .fretboard {
     display: grid;
     grid-template-columns: 2.5rem repeat(var(--strings), minmax(0, 1fr));
-    grid-auto-rows: 2rem;
     width: 100%;
-    max-width: 22rem;
+    max-width: var(--fretboard-neck);
   }
-  @media (min-width: 40rem) {
-    .fretboard {
-      grid-auto-rows: 1.875rem;
-    }
+  /* Positioned, as the strings are, so they're drawn under them in order. */
+  .board,
+  .nut-bar,
+  .inlay {
+    position: relative;
+    grid-column: 2 / -1;
+  }
+  .board {
+    grid-row: 2 / -1;
+    background: var(--surface-2);
+  }
+  .nut-bar {
+    grid-row: 1;
+    align-self: end;
+    height: var(--space-1);
+    background: var(--text-muted);
+  }
+  .inlay {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  /* The 12th's two dots, a third of the way in from either side. */
+  .inlay.double {
+    justify-content: space-evenly;
+  }
+  .inlay > span {
+    width: 0.625rem;
+    height: 0.625rem;
+    border-radius: var(--radius-full);
+    background: var(--text-muted);
+    opacity: 0.3;
   }
   .gutter {
     display: flex;
+    grid-column: 1;
     align-items: center;
     justify-content: flex-end;
     padding-right: var(--space-2);
@@ -131,7 +193,7 @@
     font-size: var(--text-xs);
     font-variant-numeric: tabular-nums;
   }
-  .gutter.inlay {
+  .gutter.inlaid {
     color: var(--text);
     font-weight: 700;
   }
@@ -148,18 +210,22 @@
     font: inherit;
     cursor: pointer;
   }
-  /* The string, down the middle of each fret, and the fret wire under it. */
+  /* The string, down the middle of each fret at its gauge, and the fret wire under it. */
   .fret::before {
     content: '';
     position: absolute;
     top: 0;
     bottom: 0;
-    left: 50%;
-    width: 1px;
+    left: calc(50% - var(--gauge) / 2);
+    width: var(--gauge);
     background: var(--text-muted);
   }
   .fret {
     border-bottom: 1px solid var(--text-muted);
+  }
+  /* The neck goes on past the last fret, so no wire closes it. */
+  .fret.last {
+    border-bottom: 0;
   }
   .fret:hover::after {
     content: '';
@@ -170,9 +236,9 @@
     background: var(--text-muted);
     opacity: 0.35;
   }
-  /* The nut, under the open and muted marks. */
+  /* Above the nut bar, the open and muted marks. */
   .nut {
-    border-bottom: 4px solid var(--text);
+    padding-bottom: var(--space-1);
   }
   .open {
     width: 0.75rem;

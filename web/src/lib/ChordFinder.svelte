@@ -775,12 +775,12 @@
     align-items: center;
     gap: var(--space-3);
     width: 100%;
-    max-width: 22rem;
+    max-width: var(--fretboard-neck);
     align-self: center;
   }
   @container finder (min-width: 40rem) {
     .board {
-      flex: 0 0 22rem;
+      flex: 0 0 var(--fretboard-neck);
       align-self: flex-start;
     }
   }
@@ -793,7 +793,7 @@
       flex-basis: calc(var(--piano-white-keys) * var(--piano-key-widest));
     }
   }
-  /* Hear, Arpeggiate and Clear, side by side under the fretboard, at its right. */
+  /* Hear, Arpeggiate and Clear, side by side under the neck, at its right. */
   .board-actions {
     display: flex;
     align-items: center;

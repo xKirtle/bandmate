@@ -49,6 +49,8 @@
   --tuner-headstock: 28rem;
   --tuner-peg: 3.25rem;
   --tuner-wave: 3rem;
+  /* Name it's neck, as wide as it's drawn with its fret numbers. */
+  --fretboard-neck: 15rem;
 
   /* Type sizes, named by size. Tools stay at the small end; content takes
      the larger sizes. */
