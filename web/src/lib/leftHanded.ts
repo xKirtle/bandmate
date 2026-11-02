@@ -1,6 +1,7 @@
 // Whether Chord diagrams are mirrored for a left-handed player, the high
 // string on the left, and the Tuner's headstock, the low strings on the
-// right. A choice about how they're drawn, not about any Song: it's kept on this device, and is off until set here.
+// right. A choice about how they're drawn, not about any Song: it's kept on
+// this device, and is off until set here.
 import type { DeviceSettingStorage } from './deviceSetting.svelte';
 
 /** Where being left-handed is kept on this device. */

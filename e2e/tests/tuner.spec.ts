@@ -53,10 +53,10 @@ async function headstock(page: Page) {
   return { left: side(true), right: side(false) };
 }
 
-/** Standard tuning's headstock, as a right-handed guitar's: each outer string at the top. */
+/** Standard tuning's headstock, as a right-handed guitar's: each outer string nearest the nut, at the foot. */
 const rightHanded = {
-  left: ["E2", "A2", "D3"],
-  right: ["E4", "B3", "G3"],
+  left: ["D3", "A2", "E2"],
+  right: ["G3", "B3", "E4"],
 };
 
 for (const width of [1280, 320]) {

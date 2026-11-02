@@ -41,22 +41,22 @@ export function tunerStrings(tuning: string): TunerString[] | null {
 export interface TunerPeg {
   /** The side of the headstock, as it's looked at. */
   side: 'left' | 'right';
-  /** Its place down that side, 1 at the top, furthest from the nut. */
+  /** Its place down that side, 1 at the top, furthest from the nut, and 3 nearest it. */
   row: 1 | 2 | 3;
 }
 
 /**
  * Where the peg of a string is, by its place low to high (0 is the low
  * string), on a 3+3 headstock: the three low strings down the left, the three
- * high ones down the right, each outer string at the top, so no string
- * crosses another on its way from the nut. Mirrored for a left-handed player,
+ * high ones down the right, each outer string on the peg nearest the nut, at
+ * the foot, so no string crosses another on its way from the nut. Mirrored for a left-handed player,
  * the low strings on the right, as a left-handed guitar's are.
  */
 export function tunerPeg(string: number, leftHanded: boolean): TunerPeg {
   const low = string < 3;
   return {
     side: low !== leftHanded ? 'left' : 'right',
-    row: (low ? string + 1 : 6 - string) as TunerPeg['row'],
+    row: (low ? 3 - string : string - 2) as TunerPeg['row'],
   };
 }
 

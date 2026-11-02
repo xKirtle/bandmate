@@ -140,12 +140,17 @@
         : `${Math.abs(cents)} ${Math.abs(cents) === 1 ? 'cent' : 'cents'} ${cents > 0 ? 'sharp' : 'flat'}`,
   );
 
-  // The wave: a wavelength is this wide, and two show at once.
+  // The wave, in its drawing's own units: a wavelength is this wide, two
+  // show at once, and it swings this far either side of its middle.
   const wavelength = 50;
+  const waveHeight = 24;
+  const swing = 9;
+  /** How many straight steps draw each wavelength: enough to look smooth. */
+  const steps = 16;
   /** A sine wave from a wavelength before the window to two past it, so it fills the window however far it's drifted within one. */
-  const wavePath = Array.from({ length: 4 * 16 + 1 }, (_, i) => {
-    const x = -wavelength + (i * wavelength) / 16;
-    const y = 12 - 9 * Math.sin((2 * Math.PI * x) / wavelength);
+  const wavePath = Array.from({ length: 4 * steps + 1 }, (_, i) => {
+    const x = -wavelength + (i * wavelength) / steps;
+    const y = waveHeight / 2 - swing * Math.sin((2 * Math.PI * x) / wavelength);
     return `${i ? 'L' : 'M'}${x.toFixed(2)} ${y.toFixed(2)}`;
   }).join(' ');
   /** How far the wave has drifted, in wavelengths, 0 to 1: it carries on from there, so it never jumps. */
@@ -156,7 +161,7 @@
   const drift = $derived(tunerDrift(reading));
   $effect(() => {
     const speed = drift;
-    if (!speed) return;
+    if (!speed || reducedMotion()) return;
     let last = performance.now();
     let frame = requestAnimationFrame(function step(now) {
       if (!reducedMotion()) drifted = (((drifted + (speed * (now - last)) / 1000) % 1) + 1) % 1;
@@ -240,7 +245,7 @@
             aria-valuenow={Math.max(-reach, Math.min(reach, cents))}
             aria-valuetext={howFarOff}
           >
-            <svg viewBox="0 0 {2 * wavelength} 24" preserveAspectRatio="none" aria-hidden="true">
+            <svg viewBox="0 0 {2 * wavelength} {waveHeight}" preserveAspectRatio="none" aria-hidden="true">
               <path d={wavePath} transform="translate({drifted * wavelength} 0)" vector-effect="non-scaling-stroke" />
             </svg>
           </div>
@@ -260,6 +265,8 @@
         <p class="notice" role="status">{gone} isn't connected, so the default input is used.</p>
       {:else if !listening}
         <p class="muted">Listens on the Input you record from.</p>
+      {:else if !reading}
+        <p class="muted">Play a string near the microphone or input.</p>
       {/if}
     </section>
   {/if}

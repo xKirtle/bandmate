@@ -124,12 +124,12 @@ describe('where each string’s peg is on the headstock', () => {
     return { left: side('left'), right: side('right') };
   };
 
-  it('is three a side, the low strings on the left, each outer string at the top, as a 3+3 headstock’s', () => {
-    expect(sides(false)).toEqual({ left: ['E2', 'A2', 'D3'], right: ['E4', 'B3', 'G3'] });
+  it('is three a side, the low strings on the left, each outer string nearest the nut, at the foot, as a 3+3 headstock’s', () => {
+    expect(sides(false)).toEqual({ left: ['D3', 'A2', 'E2'], right: ['G3', 'B3', 'E4'] });
   });
 
   it('is mirrored for a left-handed player, the low strings on the right', () => {
-    expect(sides(true)).toEqual({ left: ['E4', 'B3', 'G3'], right: ['E2', 'A2', 'D3'] });
+    expect(sides(true)).toEqual({ left: ['G3', 'B3', 'E4'], right: ['D3', 'A2', 'E2'] });
   });
 });
 
