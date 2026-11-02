@@ -37,6 +37,29 @@ export function tunerStrings(tuning: string): TunerString[] | null {
   );
 }
 
+/** Where a string's peg is on the Tuner's headstock. */
+export interface TunerPeg {
+  /** The side of the headstock, as it's looked at. */
+  side: 'left' | 'right';
+  /** Its place down that side, 1 at the top, furthest from the nut, and 3 nearest it. */
+  row: 1 | 2 | 3;
+}
+
+/**
+ * Where the peg of a string is, by its place low to high (0 is the low
+ * string), on a 3+3 headstock: the three low strings down the left, the three
+ * high ones down the right, each outer string on the peg nearest the nut, at
+ * the foot, so no string crosses another on its way from the nut. Mirrored for a left-handed player,
+ * the low strings on the right, as a left-handed guitar's are.
+ */
+export function tunerPeg(string: number, leftHanded: boolean): TunerPeg {
+  const low = string < 3;
+  return {
+    side: low !== leftHanded ? 'left' : 'right',
+    row: (low ? 3 - string : string - 2) as TunerPeg['row'],
+  };
+}
+
 /** How far either way of a string's note it's in tune, in cents: under 5. */
 export const inTuneWithin = 5;
 
@@ -73,6 +96,22 @@ export function tunerReading(frequency: number, strings: readonly TunerString[])
   const common = commonNote(midi);
   const heard = named ? named.name : common + octave(common, midi);
   return { heard, string, cents, inTune: Math.abs(cents) < inTuneWithin };
+}
+
+/** How far off a string is, in cents, for its wave to drift a wavelength a second. */
+const centsPerWave = 25;
+/** How far off it drifts fastest at, in cents: past it, the wave drifts no faster. */
+const fastestFrom = 50;
+
+/**
+ * How fast the Tuner's wave drifts, as a strobe tuner's does, in wavelengths
+ * a second: flat drifts back (below 0), sharp forward, faster the further
+ * off, up to two a second from 50 cents, and it stands still in tune or with
+ * nothing heard.
+ */
+export function tunerDrift(reading: TunerReading | null): number {
+  if (!reading || reading.inTune) return 0;
+  return Math.max(-fastestFrom, Math.min(fastestFrom, reading.cents)) / centsPerWave;
 }
 
 /**

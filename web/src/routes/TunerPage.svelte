@@ -1,21 +1,25 @@
 <script lang="ts">
   // The Tuner's own page (see the glossary): the device's Tuning, picked as
-  // in the Chord Finder, the same one, and its six strings, low to high, each
-  // with its note. Tapping one plays its note from the guitar's recorded
-  // samples, ringing once, and tapping it again plays it again. It's a
-  // guitar's whatever the device's Instrument. Once Listen is pressed, it
-  // listens on the Input recorded from, showing the note it hears, the
+  // in the Chord Finder, the same one, and a guitar's 3+3 headstock, each
+  // string's note on the peg that tunes it, mirrored on a left-handed device.
+  // Tapping a peg plays its string's note from the guitar's recorded samples,
+  // ringing once, and tapping it again plays it again. It's a guitar's
+  // whatever the device's Instrument. Once Listen is pressed, it listens on
+  // the Input recorded from, showing between the pegs the note it hears, the
   // string whose note is nearest and how many cents sharp or flat of it the
-  // note is, until Stop is pressed or the page is left.
+  // note is, and a wave that drifts as a strobe tuner's does, until Stop is
+  // pressed or the page is left.
   import { onDestroy, untrack } from 'svelte';
   import { InputLevel, listenProblem } from '../lib/capture';
   import { hear, prepareToHear } from '../lib/hear';
   import { sameInput, type InputChoice } from '../lib/inputSettings';
+  import { reducedMotion } from '../lib/motion';
   import { detectPitch, SteadyPitch } from '../lib/pitch';
   import { input } from '../lib/sharedInput.svelte';
+  import { leftHanded } from '../lib/sharedLeftHanded.svelte';
   import { deviceTuning } from '../lib/sharedTuning.svelte';
   import Toasts from '../lib/Toasts.svelte';
-  import { inTuneWithin, tunerReading, tunerSound, tunerStrings } from '../lib/tuner';
+  import { tunerDrift, tunerPeg, tunerReading, tunerSound, tunerStrings } from '../lib/tuner';
   import TuningField from '../lib/TuningField.svelte';
   import { audioContext } from '../lib/timelinePlayer';
   import { unheard, unheardToasts } from '../lib/unheard.svelte';
@@ -50,7 +54,7 @@
   const heardIn = 4096;
   /** How often it reads the pitch, in ms. */
   const every = 50;
-  /** How far sharp or flat the needle reaches, in cents: past it, it stays at the end. */
+  /** How far sharp or flat the meter reaches, in cents: past it, it reads as the end. */
   const reach = 50;
 
   let level: InputLevel | null = null;
@@ -127,8 +131,6 @@
 
   onDestroy(stop);
 
-  /** Where the needle sits, from 0 at the flat end to 100 at the sharp end. */
-  const needle = $derived(reading ? 50 + (Math.max(-reach, Math.min(reach, reading.cents)) / reach) * 50 : 50);
   const cents = $derived(reading ? Math.round(reading.cents) : 0);
   const howFarOff = $derived(
     !reading
@@ -137,6 +139,37 @@
         ? 'In tune'
         : `${Math.abs(cents)} ${Math.abs(cents) === 1 ? 'cent' : 'cents'} ${cents > 0 ? 'sharp' : 'flat'}`,
   );
+
+  // The wave, in its drawing's own units: a wavelength is this wide, two
+  // show at once, and it swings this far either side of its middle.
+  const wavelength = 50;
+  const waveHeight = 24;
+  const swing = 9;
+  /** How many straight steps draw each wavelength: enough to look smooth. */
+  const steps = 16;
+  /** A sine wave from a wavelength before the window to two past it, so it fills the window however far it's drifted within one. */
+  const wavePath = Array.from({ length: 4 * steps + 1 }, (_, i) => {
+    const x = -wavelength + (i * wavelength) / steps;
+    const y = waveHeight / 2 - swing * Math.sin((2 * Math.PI * x) / wavelength);
+    return `${i ? 'L' : 'M'}${x.toFixed(2)} ${y.toFixed(2)}`;
+  }).join(' ');
+  /** How far the wave has drifted, in wavelengths, 0 to 1: it carries on from there, so it never jumps. */
+  let drifted = $state(0);
+  // Drifts while a string is heard off its note: flat one way, sharp the
+  // other, faster the further off. In tune, with nothing heard, or under
+  // reduced motion, it stands still where it is.
+  const drift = $derived(tunerDrift(reading));
+  $effect(() => {
+    const speed = drift;
+    if (!speed || reducedMotion()) return;
+    let last = performance.now();
+    let frame = requestAnimationFrame(function step(now) {
+      if (!reducedMotion()) drifted = (((drifted + (speed * (now - last)) / 1000) % 1) + 1) % 1;
+      last = now;
+      frame = requestAnimationFrame(step);
+    });
+    return () => cancelAnimationFrame(frame);
+  });
 </script>
 
 <header class="bar">
@@ -169,40 +202,52 @@
           <button type="button" class="button primary" onclick={listen}>Listen</button>
         {/if}
       </div>
-      {#if listening && !opening}
+      <!-- A 3+3 headstock: the pegs down either side, and between them what's heard. -->
+      <div class="headstock">
+        <ul aria-label="Strings">
+          {#each strings as s, i (s.number)}
+            {@const peg = tunerPeg(i, leftHanded.value)}
+            <li style:grid-column={peg.side === 'left' ? 1 : 3} style:grid-row={peg.row}>
+              <button
+                type="button"
+                class="button peg"
+                aria-label="Hear the {s.number} string, {s.name}"
+                title="Hear the {s.number} string"
+                onclick={() => hear([s.heard], tunerSound)}
+              >
+                <span class="note">{s.name}</span>
+                <span class="which">{s.number}</span>
+              </button>
+            </li>
+          {/each}
+        </ul>
         <div class="readout">
           <p class="heard">
             {#if reading}
               <span class="note">{reading.heard}</span>
-            {:else}
+            {:else if listening && !opening}
               <span class="nothing">Nothing heard</span>
             {/if}
           </p>
           <p class="nearest">
             {#if reading}
               {reading.string.number} string, {reading.string.name}
-            {:else}
-              Play a string near the microphone or input.
             {/if}
           </p>
-          <div class="scale">
-            <span aria-hidden="true">Flat</span>
-            <div
-              class="meter"
-              role="meter"
-              aria-label="Cents sharp or flat"
-              aria-valuemin={-reach}
-              aria-valuemax={reach}
-              aria-valuenow={Math.max(-reach, Math.min(reach, cents))}
-              aria-valuetext={howFarOff}
-            >
-              <!-- In tune: within 5 cents either way of the middle, of the 50 each end reaches. -->
-              <div class="zone" style:inset="0 {50 - (inTuneWithin / reach) * 50}%"></div>
-              {#if reading}
-                <div class="needle" style:left="{needle}%"></div>
-              {/if}
-            </div>
-            <span aria-hidden="true">Sharp</span>
+          <div
+            class="wave"
+            class:heard={reading}
+            class:in-tune={reading?.inTune}
+            role="meter"
+            aria-label="Cents sharp or flat"
+            aria-valuemin={-reach}
+            aria-valuemax={reach}
+            aria-valuenow={Math.max(-reach, Math.min(reach, cents))}
+            aria-valuetext={howFarOff}
+          >
+            <svg viewBox="0 0 {2 * wavelength} {waveHeight}" preserveAspectRatio="none" aria-hidden="true">
+              <path d={wavePath} transform="translate({drifted * wavelength} 0)" vector-effect="non-scaling-stroke" />
+            </svg>
           </div>
           {#if reading?.inTune}
             <p class="off"><span class="badge tuned">In tune</span></p>
@@ -210,7 +255,8 @@
             <p class="off tabular">{reading ? howFarOff : ''}</p>
           {/if}
         </div>
-      {/if}
+      </div>
+      <p class="muted">Tap a peg to hear its string's note.</p>
       {#if opening}
         <p class="muted" role="status">Opening the input…</p>
       {:else if problem}
@@ -219,26 +265,9 @@
         <p class="notice" role="status">{gone} isn't connected, so the default input is used.</p>
       {:else if !listening}
         <p class="muted">Listens on the Input you record from.</p>
+      {:else if !reading}
+        <p class="muted">Play a string near the microphone or input.</p>
       {/if}
-    </section>
-    <section class="card strings" aria-labelledby="tuner-strings-heading">
-      <h2 id="tuner-strings-heading">Tap a string to hear its note</h2>
-      <ul>
-        {#each strings as s (s.number)}
-          <li>
-            <button
-              type="button"
-              class="button"
-              aria-label="Hear the {s.number} string, {s.name}"
-              title="Hear the {s.number} string"
-              onclick={() => hear([s.heard], tunerSound)}
-            >
-              <span class="note">{s.name}</span>
-              <span class="which">{s.number}</span>
-            </button>
-          </li>
-        {/each}
-      </ul>
     </section>
   {/if}
 </main>
@@ -261,7 +290,6 @@
     display: flex;
     flex-direction: column;
     gap: var(--space-4);
-    margin: 0 0 var(--space-4);
   }
   .listen .error {
     margin: 0;
@@ -273,13 +301,10 @@
     gap: var(--space-3);
   }
   h2 {
-    margin: 0 0 var(--space-3);
+    margin: 0;
     color: var(--text-muted);
     font-size: var(--text-sm);
     font-weight: 600;
-  }
-  .head h2 {
-    margin: 0;
   }
   .listen p {
     margin: 0;
@@ -288,16 +313,69 @@
   .notice {
     color: var(--warning);
   }
-  /* The note heard, large, over its string and the needle, centred. */
+  /* The headstock, wider at the top and narrowing to the nut, a bar across
+     its foot. The pegs go down either side, in the columns either side of
+     the readout, which sits in the same row between them. */
+  .headstock {
+    display: grid;
+    grid-template-columns: var(--tuner-peg) minmax(0, 1fr) var(--tuner-peg);
+    column-gap: var(--space-2);
+    width: 100%;
+    max-width: var(--tuner-headstock);
+    margin: 0 auto;
+    padding: var(--space-4) var(--space-3);
+    border-bottom: var(--space-1) solid var(--text-muted);
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    background: var(--surface-2);
+    clip-path: polygon(0 0, 100% 0, calc(100% - var(--space-2)) 100%, var(--space-2) 100%);
+  }
+  ul {
+    display: grid;
+    grid-template-columns: subgrid;
+    grid-template-rows: repeat(3, auto);
+    grid-row: 1;
+    grid-column: 1 / -1;
+    align-content: space-between;
+    row-gap: var(--space-3);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  /* Each peg round, its string's note over the string's number. */
+  .peg {
+    flex-direction: column;
+    gap: 0;
+    width: var(--tuner-peg);
+    height: var(--tuner-peg);
+    padding: 0;
+    border-radius: var(--radius-full);
+  }
+  .peg .note {
+    color: var(--text);
+    font-size: var(--text-lg);
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+  .which {
+    color: var(--text-muted);
+    font-size: var(--text-xs);
+    font-weight: 400;
+  }
+  /* What's heard, centred between the pegs: the note, its string, the wave
+     and how far off it is, each holding its line while empty, so nothing
+     jumps as it's heard. */
   .readout {
     display: flex;
+    grid-row: 1;
+    grid-column: 2;
     flex-direction: column;
     align-items: center;
-    gap: var(--space-2);
+    justify-content: center;
+    gap: var(--space-1);
+    min-width: 0;
+    text-align: center;
   }
   .listen .heard {
-    display: flex;
-    align-items: center;
     min-height: 1lh;
     font-size: var(--text-2xl);
   }
@@ -305,74 +383,42 @@
     font-weight: 700;
     font-variant-numeric: tabular-nums;
   }
-  .nothing {
-    color: var(--text-muted);
-    font-size: var(--text-lg);
-  }
-  .nearest {
-    color: var(--text-muted);
-  }
-  /* Flat, the needle's scale, and Sharp, in a row as wide as the card allows. */
-  .scale {
-    display: grid;
-    grid-template-columns: auto minmax(0, 1fr) auto;
-    align-items: center;
-    gap: var(--space-2);
-    width: 100%;
-    max-width: 32rem;
-    color: var(--text-muted);
-    font-size: var(--text-xs);
-  }
-  .meter {
-    position: relative;
-    height: 1.5rem;
-    border-radius: var(--radius-sm);
-    background: var(--surface-2);
-  }
-  .zone {
-    position: absolute;
-    background: color-mix(in srgb, var(--finished-fg) 40%, transparent);
-  }
-  .needle {
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    width: 0.25rem;
-    border-radius: var(--radius-full);
-    background: var(--text);
-    translate: -50% 0;
-  }
-  .off {
+  .listen .nothing,
+  .listen .nearest,
+  .listen .off {
     min-height: 1lh;
+    color: var(--text-muted);
+    font-size: var(--text-sm);
+  }
+  /* The wave: at rest in the border's colour, muted while a note's heard,
+     and in the finished Status's colour in tune. */
+  .wave {
+    width: 100%;
+    height: var(--tuner-wave);
+    margin: var(--space-2) 0;
+    overflow: hidden;
+    color: var(--border);
+    transition: color var(--duration-base) var(--ease);
+  }
+  .wave.heard {
+    color: var(--text-muted);
+  }
+  .wave.in-tune {
+    color: var(--finished-fg);
+  }
+  svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+  path {
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
   }
   .tuned {
     background: var(--finished-bg);
     color: var(--finished-fg);
-  }
-  /* The six strings in a row, low to high, as a guitar is held: on a 320px
-     phone too. */
-  ul {
-    display: grid;
-    grid-template-columns: repeat(6, minmax(0, 1fr));
-    gap: var(--space-2);
-    margin: 0;
-    padding: 0;
-    list-style: none;
-  }
-  .strings .button {
-    flex-direction: column;
-    gap: var(--space-1);
-    width: 100%;
-    padding: var(--space-3) var(--space-1);
-  }
-  .strings .note {
-    color: var(--text);
-    font-size: var(--text-xl);
-    font-weight: 700;
-    font-variant-numeric: tabular-nums;
-  }
-  .which {
-    color: var(--text-muted);
-    font-size: var(--text-xs);
   }
 </style>

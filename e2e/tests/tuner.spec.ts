@@ -32,6 +32,33 @@ async function keepPlayed(page: Page) {
     ]);
 }
 
+/**
+ * The pegs' strings on each side of the headstock, top to bottom, by their
+ * notes: a peg left of the middle of the pegs is on the left.
+ */
+async function headstock(page: Page) {
+  const pegs = await Promise.all(
+    (await strings(page).all()).map(async (peg) => ({
+      note: (await peg.locator(".note").textContent())!,
+      box: (await peg.boundingBox())!,
+    })),
+  );
+  const middle =
+    pegs.reduce((sum, { box }) => sum + box.x + box.width / 2, 0) / 6;
+  const side = (left: boolean) =>
+    pegs
+      .filter(({ box }) => box.x + box.width / 2 < middle === left)
+      .sort((a, b) => a.box.y - b.box.y)
+      .map(({ note }) => note);
+  return { left: side(true), right: side(false) };
+}
+
+/** Standard tuning's headstock, as a right-handed guitar's: each outer string nearest the nut, at the foot. */
+const rightHanded = {
+  left: ["D3", "A2", "E2"],
+  right: ["G3", "B3", "E4"],
+};
+
 for (const width of [1280, 320]) {
   test(`at ${width}px, the navigation leads to the Tuner, between Chords and Settings, and it fits`, async ({
     page,
@@ -64,8 +91,11 @@ for (const width of [1280, 320]) {
     await expect(strings(page)).toHaveCount(6);
     for (const string of await strings(page).all()) {
       const box = (await string.boundingBox())!;
+      expect(box.x).toBeGreaterThanOrEqual(0);
       expect(box.x + box.width).toBeLessThanOrEqual(width);
     }
+    // A 3+3 headstock: the low strings down the left, the high ones down the right.
+    expect(await headstock(page)).toEqual(rightHanded);
     expect(
       await page.evaluate(() => document.documentElement.scrollWidth),
     ).toBeLessThanOrEqual(width);
@@ -410,6 +440,91 @@ test("leaving the Tuner stops it listening", async ({ page }) => {
   await expect.poll(mic.live).toBe(1);
   await nav(page).getByRole("link", { name: "Chords" }).click();
   await expect.poll(mic.live).toBe(0);
+});
+
+test("Left-handed, set in Settings, mirrors the headstock, the low strings on the right, and its hint says so", async ({
+  page,
+}) => {
+  await page.goto("/tuner");
+  expect(await headstock(page)).toEqual(rightHanded);
+
+  await page.goto("/settings");
+  const leftHanded = page.getByRole("switch", { name: "Left-handed" });
+  await expect(leftHanded).toHaveAccessibleDescription(
+    "Mirrors every Chord diagram, high string on the left, and the Tuner's headstock, low strings on the right.",
+  );
+  await leftHanded.check();
+  await page.goto("/tuner");
+  expect(await headstock(page)).toEqual({
+    left: rightHanded.right,
+    right: rightHanded.left,
+  });
+});
+
+/**
+ * How far the wave drifts in a third of a second, in wavelengths, forward
+ * (sharp) above 0 and back (flat) below: within half a wavelength either way.
+ */
+async function drifts(page: Page) {
+  const at = async () =>
+    Number(
+      /translate\(([-\d.e]+)/.exec(
+        (await listening(page)
+          .meter.locator("path")
+          .getAttribute("transform"))!,
+      )![1],
+    ) / 50;
+  const from = await at();
+  await page.waitForTimeout(330);
+  const moved = (((await at()) - from) % 1) + 1;
+  return (moved % 1) - (moved % 1 > 0.5 ? 1 : 0);
+}
+
+test("the wave drifts one way flat and the other sharp, and stands still in tune or with nothing heard", async ({
+  page,
+}) => {
+  const mic = await fakeMicrophone(page);
+  await page.goto("/tuner");
+  const tuner = listening(page);
+  // At rest before it listens.
+  expect(await drifts(page)).toBe(0);
+
+  await tuner.listen.click();
+  await mic.play(hz(45, 20));
+  await expect(tuner.meter).toHaveAttribute("aria-valuetext", /sharp$/);
+  expect(await drifts(page)).toBeGreaterThan(0.05);
+
+  await mic.play(hz(45, -20));
+  await expect(tuner.meter).toHaveAttribute("aria-valuetext", /flat$/);
+  expect(await drifts(page)).toBeLessThan(-0.05);
+
+  await mic.play(hz(45));
+  await expect(tuner.meter).toHaveAttribute("aria-valuetext", "In tune");
+  expect(await drifts(page)).toBe(0);
+
+  await mic.play(hz(45, -20));
+  await expect(tuner.meter).toHaveAttribute("aria-valuetext", /flat$/);
+  await mic.hush();
+  await expect(tuner.meter).toHaveAttribute("aria-valuetext", "Nothing heard");
+  expect(await drifts(page)).toBe(0);
+});
+
+test("with reduced motion asked for, the wave stands still, and how far off still reads", async ({
+  page,
+}) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  const mic = await fakeMicrophone(page);
+  await page.goto("/tuner");
+  const tuner = listening(page);
+  await tuner.listen.click();
+  await mic.play(hz(45, 20));
+  await expect(tuner.card).toContainText(/\d+ cents sharp/);
+  expect(await drifts(page)).toBe(0);
+  await mic.play(hz(45, -20));
+  await expect(tuner.card).toContainText(/\d+ cents flat/);
+  expect(await drifts(page)).toBe(0);
+  await mic.play(hz(45));
+  await expect(tuner.card.locator(".badge")).toHaveText("In tune");
 });
 
 for (const [why, browser, said] of [

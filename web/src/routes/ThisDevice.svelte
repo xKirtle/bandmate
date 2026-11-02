@@ -129,7 +129,9 @@
           />
           <span>Left-handed</span>
         </label>
-        <p id="left-handed-note" class="choice-under hint">Mirrors every Chord diagram, high string on the left.</p>
+        <p id="left-handed-note" class="choice-under hint">
+          Mirrors every Chord diagram, high string on the left, and the Tuner's headstock, low strings on the right.
+        </p>
       </fieldset>
     </section>
   </div>

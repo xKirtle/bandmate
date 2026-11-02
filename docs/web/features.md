@@ -25,7 +25,7 @@ The **Chords** page, in the side bar, helps with chords away from any song, on g
 
 - The rising bars arpeggiate the shape: they play it one note at a time, low to high, so you can hear each note.
 - On guitar, the copy button beside a shape copies it the way you [write it in a song](/song#how-you-play-a-chord), brackets and all, like `[Em:x-7-9-9-8-7]`: paste it straight into a line in Write mode. In Name it, each name your shape reads as has its own, so copy the one you want. The frets are for the tuning picked here, so paste it into a song in that tuning.
-- Left-handed? Turn it on in Settings, under **This device**, and every diagram flips, the fretboard too. The piano doesn't flip.
+- Left-handed? Turn it on in Settings, under **This device**, and every diagram flips, the fretboard too, and so does the [Tuner](#tuner)'s headstock. The piano doesn't flip.
 
 ### On piano
 
@@ -39,11 +39,11 @@ The **Chords** page, in the side bar, helps with chords away from any song, on g
 
 The **Tuner** page, in the side bar, tunes your guitar, by eye or by ear. Pick the tuning to tune to under **Tuning**, a named one or six notes of your own: it's the same one the Chords page uses, so after tuning to Open G, Chords shows Open G shapes, and the other way round. Your device remembers it.
 
-<img src="@screenshots/tuner.png" alt="The Tuner listening in standard tuning: it hears an A2 a few cents sharp of the 5th string, the needle just right of the middle">
+<img src="@screenshots/tuner.png" alt="The Tuner listening in standard tuning: a guitar's headstock with the low strings' pegs down the left and the high strings' down the right, and between them the A2 it hears, 8 cents sharp of the 5th string, over a wave">
 
-Press **Listen** and play a string. The Tuner shows the note it hears, the string whose note is nearest, and how many cents sharp or flat of it you are: tune until it says **In tune**, within 5 cents. It listens on the [input you record from](/song#record). If it can't listen, it says why: allow the microphone in the browser's site settings, connect an input, or open Bandmate on `localhost` or over HTTPS, as for [recording](/song#record).
+Press **Listen** and play a string. Between the pegs, the Tuner shows the note it hears, the string whose note is nearest, and how many cents sharp or flat of it you are. The wave there drifts as a strobe tuner's does: one way when you're flat, the other when you're sharp, faster the further off you are. Tune until it stands still and says **In tune**, within 5 cents. If your device asks for reduced motion, the wave stays still, and the cents and **In tune** tell you instead. It listens on the [input you record from](/song#record). If it can't listen, it says why: allow the microphone in the browser's site settings, connect an input, or open Bandmate on `localhost` or over HTTPS, as for [recording](/song#record).
 
-Tap a string to hear its note, on the recorded guitar, and tap it again to hear it again. Each note is at A = 440 Hz, in the octave that string is tuned to: in Drop D, the low string plays the D below the low E. It's always a guitar, even with the piano picked for Chords.
+Tap a peg to hear its string's note, on the recorded guitar, and tap it again to hear it again. Each note is at A = 440 Hz, in the octave that string is tuned to: in Drop D, the low string plays the D below the low E. It's always a guitar, even with the piano picked for Chords.
 
 ## Beats
 
