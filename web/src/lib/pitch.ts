@@ -127,15 +127,19 @@ export class LastHeard {
     if (shown !== null) {
       this.#kept = null;
       if (heard !== null) {
+        // A note run straight into another isn't the one that fades: its readings go.
+        const before = this.#note.at(-1);
+        if (before && Math.abs(1200 * Math.log2(shown / before.pitch)) >= together) this.#note = [];
         this.#note.push({ pitch: shown, level });
         if (this.#note.length > weighed) this.#note.shift();
       }
       return null;
     }
-    const last = this.#note.at(-1);
-    if (last) {
-      const above = this.#note.filter((r) => r.level >= wellAbove * last.level);
-      this.#kept = (above.at(-1) ?? last).pitch;
+    // The note's last reading, where it faded.
+    const faded = this.#note.at(-1);
+    if (faded) {
+      const above = this.#note.filter((r) => r.level >= wellAbove * faded.level);
+      this.#kept = (above.at(-1) ?? faded).pitch;
       this.#note = [];
     }
     return this.#kept;

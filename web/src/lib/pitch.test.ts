@@ -196,6 +196,12 @@ describe('the reading the Tuner keeps once a note fades', () => {
     expect(Math.abs(cents(readings.at(-1)!.kept!, 147))).toBeLessThan(1);
   });
 
+  it('is the note that faded, where a loud one ran straight into a quieter one', () => {
+    const loud = ringing(110, 10);
+    const quiet = Array<Float32Array>(10).fill(tone(147, plucked).map((s) => s * 0.05));
+    expect(Math.abs(cents(heard([...loud, ...quiet, ...silence(10)]).at(-1)!.kept!, 147))).toBeLessThan(1);
+  });
+
   it('is nothing once forgotten, till another note fades', () => {
     const keeper = new LastHeard();
     heard([...ringing(110, 10), ...silence(5)], keeper);

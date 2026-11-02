@@ -121,7 +121,9 @@
   const shown = $derived(pitch ?? kept);
   const reading = $derived(shown !== null && strings ? tunerReading(shown, strings, held) : null);
   // Whether what's shown is the note kept, Last heard, rather than one heard now.
-  const last = $derived(pitch === null && kept !== null);
+  const showingKept = $derived(pitch === null && kept !== null);
+  // The reading of a note heard now: null on the note kept, as on nothing heard.
+  const live = $derived(showingKept ? null : reading);
 
   // Read every so often while the Input is open, and nothing once it isn't.
   $effect(() => {
@@ -133,9 +135,9 @@
       // stand still: nothing's heard, rather than the last note held.
       const running = audioContext().state === 'running' && !document.hidden;
       const samples = level.samples();
-      const heard = running ? detectPitch(samples, level.sampleRate) : null;
-      pitch = steady.hear(heard, performance.now());
-      kept = lastHeard.hear(heard, pitch, loudness(samples));
+      const detected = running ? detectPitch(samples, level.sampleRate) : null;
+      pitch = steady.hear(detected, performance.now());
+      kept = lastHeard.hear(detected, pitch, loudness(samples));
     }, every);
     return () => {
       clearInterval(timer);
@@ -173,7 +175,7 @@
   const way = $derived(tunerWay(reading));
   // What the meter says to a screen reader: how far off, with the way to
   // tune, and for the note kept, that it's the one last heard.
-  const meterText = $derived(`${last ? 'Last heard: ' : ''}${way ? `${howFarOff}, tune ${way}` : howFarOff}`);
+  const meterText = $derived(`${showingKept ? 'Last heard: ' : ''}${way ? `${howFarOff}, tune ${way}` : howFarOff}`);
 
   // The wave, in its drawing's own units: a wavelength is this wide, two
   // show at once, and it swings this far either side of its middle.
@@ -193,7 +195,7 @@
   // Drifts while a string is heard off its note: flat one way, sharp the
   // other, faster the further off. In tune, with nothing heard, on the note
   // kept, or under reduced motion, it stands still where it is.
-  const drift = $derived(tunerDrift(last ? null : reading));
+  const drift = $derived(tunerDrift(live));
   $effect(() => {
     const speed = drift;
     if (!speed || reducedMotion()) return;
@@ -258,9 +260,9 @@
             </li>
           {/each}
         </ul>
-        <div class="readout" class:last>
+        <div class="readout" class:kept={showingKept}>
           <p class="last-heard">
-            {#if last}Last heard{/if}
+            {#if showingKept}Last heard{/if}
           </p>
           <p class="heard">
             {#if reading}
@@ -276,8 +278,8 @@
           </p>
           <div
             class="wave"
-            class:hearing={reading && !last}
-            class:in-tune={reading?.inTune && !last}
+            class:hearing={live}
+            class:in-tune={live?.inTune}
             role="meter"
             aria-label="Cents sharp or flat"
             aria-valuemin={-reach}
@@ -548,11 +550,11 @@
   }
   /* The note kept, Last heard: all of it muted, the In tune badge outlined
      as a Tag is, so it doesn't read as what's heard now. */
-  .last .heard .note,
-  .last .way {
+  .kept .heard .note,
+  .kept .way {
     color: var(--text-muted);
   }
-  .last .tuned {
+  .kept .tuned {
     border: 1px solid var(--border);
     background: none;
     color: var(--text-muted);
