@@ -43,9 +43,10 @@
   // A note that couldn't be heard here is this page's to say: leaving it goes.
   $effect(() => () => unheard.dismiss());
 
-  // The string the Tuner's held to, one of the Tuning's: null for none, the
-  // nearest string read instead.
-  let held = $state<TunerString | null>(null);
+  // The string the Tuner's held to, one of the Tuning's, kept raw so it's
+  // that very string, told apart from the others by identity: null for none,
+  // the nearest string read instead.
+  let held = $state.raw<TunerString | null>(null);
 
   function keep() {
     tuningError = '';
