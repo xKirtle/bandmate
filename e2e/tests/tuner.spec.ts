@@ -498,6 +498,8 @@ test("tapping a string holds the Tuner to it, however far off it's heard, and tu
   await expect(tuner.auto).toHaveAccessibleDescription(
     "Held to the 6th string, E2",
   );
+  // Its wave is against E2's too: so sharp it's as short as it goes, half the target's.
+  await expect.poll(() => heardWavelength(page)).toBe(0.5);
   await expect(tuner.card).toContainText("Held to the 6th string, E2");
   await expect(tuner.card).not.toContainText("Picks the string nearest");
   await expect(tuner.card).toContainText("6th string, E2");
@@ -650,7 +652,7 @@ test("the Tuner shows nothing heard in silence, and never catches a note in nois
   }
 });
 
-test("once a note fades, the Tuner keeps where it landed, muted and labelled Last heard, the wave at rest, till the next note, Stop, a string held, Auto, or another Tuning", async ({
+test("once a note fades, the Tuner keeps where it landed, muted and labelled Last heard, its wave frozen, till the next note, Stop, a string held, Auto, or another Tuning", async ({
   page,
 }) => {
   const mic = await fakeMicrophone(page);
@@ -660,7 +662,6 @@ test("once a note fades, the Tuner keeps where it landed, muted and labelled Las
   const label = tuner.card.locator(".last-heard");
   const colour = (where: ReturnType<Page["locator"]>) =>
     where.evaluate((e) => getComputedStyle(e).color);
-  const atRest = await colour(tuner.meter);
   const muted = await colour(readout.locator(".nearest"));
   const peg = (name: string) =>
     page.getByRole("button", { name: `Hear the ${name}` });
@@ -687,12 +688,12 @@ test("once a note fades, the Tuner keeps where it landed, muted and labelled Las
   await expect(tuner.card).toContainText("5th string, A2");
   await expect(tuner.way).toHaveText("Tune down");
   await expect(tuner.card).not.toContainText("Nothing heard");
-  // All of it muted, and the wave still, in its colour at rest.
+  // All of it muted, and its wave frozen, muted too, over the still target's.
   await expect(readout.locator(".heard .note")).toHaveText("A2");
   expect(await colour(readout.locator(".heard .note"))).toBe(muted);
   expect(await colour(tuner.way)).toBe(muted);
-  await expect.poll(() => colour(tuner.meter)).toBe(atRest);
-  expect(await drifts(page)).toBe(0);
+  await expect.poll(() => stroke(waves(page).heard)).toBe(muted);
+  expect(await scrolls(page)).toBe(0);
 
   // In tune, faded: kept with In tune, muted too.
   await pluck(hz(45), "In tune");
@@ -702,7 +703,7 @@ test("once a note fades, the Tuner keeps where it landed, muted and labelled Las
   );
   await expect(tuner.card.locator(".badge")).toHaveText("In tune");
   expect(await colour(tuner.card.locator(".badge"))).toBe(muted);
-  await expect.poll(() => colour(tuner.meter)).toBe(atRest);
+  await expect.poll(() => stroke(waves(page).heard)).toBe(muted);
 
   // The next note heard takes its place, no longer Last heard.
   await mic.play(hz(50, -20));
@@ -768,62 +769,109 @@ test("Left-handed, set in Settings, mirrors the headstock, the low strings on th
   });
 });
 
+/** The Tuner's two waves: the target's, the string's note, and the heard note's over it. */
+function waves(page: Page) {
+  const meter = listening(page).meter;
+  return {
+    target: meter.locator("path.target-wave"),
+    heard: meter.locator("path.heard-wave"),
+  };
+}
+
+/** A wave's colour. */
+const stroke = (wave: ReturnType<Page["locator"]>) =>
+  wave.evaluate((e) => getComputedStyle(e).stroke);
+
 /**
- * How far the wave drifts in a third of a second, in wavelengths, forward
- * (sharp) above 0 and back (flat) below: within half a wavelength either way.
+ * How far the waves scroll in a third of a second, in the target's
+ * wavelengths, within one: its path is shifted on by how far they've
+ * scrolled within its wavelength, 50 of the drawing's units.
  */
-async function drifts(page: Page) {
+async function scrolls(page: Page) {
   const at = async () =>
     Number(
       /translate\(([-\d.e]+)/.exec(
-        (await listening(page)
-          .meter.locator("path")
-          .getAttribute("transform"))!,
+        (await waves(page).target.getAttribute("transform"))!,
       )![1],
     ) / 50;
   const from = await at();
   await page.waitForTimeout(330);
-  const moved = (((await at()) - from) % 1) + 1;
-  return (moved % 1) - (moved % 1 > 0.5 ? 1 : 0);
+  return ((((await at()) - from) % 1) + 1) % 1;
 }
 
-test("the wave drifts one way flat and the other sharp, and stands still in tune, with nothing heard, or on the note last heard", async ({
+/**
+ * The heard wave's wavelength, the target's being 1: its path starts a
+ * wavelength before the window, as the target's, 50 units long, does.
+ */
+async function heardWavelength(page: Page) {
+  const d = (await waves(page).heard.getAttribute("d"))!;
+  return -Number(/^M([-\d.]+)/.exec(d)![1]) / 50;
+}
+
+test("the note heard is drawn over the string's, shorter sharp and longer flat, both scrolling together while it's heard, and still with nothing heard or on the note last heard", async ({
   page,
 }) => {
   const mic = await fakeMicrophone(page);
   await page.goto("/tuner");
   const tuner = listening(page);
-  // At rest before it listens.
-  expect(await drifts(page)).toBe(0);
+  const { target, heard } = waves(page);
+  // Before it listens, the target's alone, dashed, and still.
+  await expect(target).toHaveCount(1);
+  await expect(target).toHaveAttribute("stroke-dasharray", /\d/);
+  await expect(heard).toHaveCount(0);
+  expect(await scrolls(page)).toBe(0);
+  // Listen is in the accent while idle.
+  const accent = await tuner.listen.evaluate(
+    (e) => getComputedStyle(e).backgroundColor,
+  );
 
   await tuner.listen.click();
+  await expect(tuner.card).toContainText("Nothing heard");
+  await expect(heard).toHaveCount(0);
+  expect(await scrolls(page)).toBe(0);
+
+  // 20 cents sharp: a fifth shorter, in the accent.
   await mic.play(hz(45, 20));
   await expect(tuner.meter).toHaveAttribute(
     "aria-valuetext",
     /sharp, tune down$/,
   );
-  expect(await drifts(page)).toBeGreaterThan(0.05);
+  await expect.poll(() => heardWavelength(page)).toBeLessThan(0.85);
+  expect(await heardWavelength(page)).toBeGreaterThan(0.75);
+  await expect.poll(() => stroke(heard)).toBe(accent);
+  expect(await scrolls(page)).toBeGreaterThan(0.03);
 
+  // 20 cents flat: a fifth longer.
   await mic.play(hz(45, -20));
   await expect(tuner.meter).toHaveAttribute("aria-valuetext", /flat, tune up$/);
-  expect(await drifts(page)).toBeLessThan(-0.05);
+  await expect.poll(() => heardWavelength(page)).toBeGreaterThan(1.15);
+  expect(await heardWavelength(page)).toBeLessThan(1.25);
+  expect(await scrolls(page)).toBeGreaterThan(0.03);
 
+  // In tune, it lies on the target's, in the finished Status's colour, and they move as one.
   await mic.play(hz(45));
   await expect(tuner.meter).toHaveAttribute("aria-valuetext", "In tune");
-  expect(await drifts(page)).toBe(0);
+  await expect.poll(() => heardWavelength(page)).toBe(1);
+  const finished = await tuner.card
+    .locator(".badge")
+    .evaluate((e) => getComputedStyle(e).color);
+  await expect.poll(() => stroke(heard)).toBe(finished);
+  expect(await scrolls(page)).toBeGreaterThan(0.03);
 
+  // Faded, the note kept is still flat, its wave frozen over the still target's.
   await mic.play(hz(45, -20));
   await expect(tuner.meter).toHaveAttribute("aria-valuetext", /flat, tune up$/);
-  // Faded, the note kept is still flat, but the wave stands still: it's not heard now.
   await mic.hush();
   await expect(tuner.meter).toHaveAttribute(
     "aria-valuetext",
     /^Last heard: .*flat, tune up$/,
   );
-  expect(await drifts(page)).toBe(0);
+  await expect(heard).toHaveCount(1);
+  expect(await heardWavelength(page)).toBeGreaterThan(1.15);
+  expect(await scrolls(page)).toBe(0);
 });
 
-test("with reduced motion asked for, the wave stands still, and how far off still reads", async ({
+test("with reduced motion asked for, neither wave scrolls, and how far off still reads, in the words and the wavelength", async ({
   page,
 }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
@@ -833,10 +881,12 @@ test("with reduced motion asked for, the wave stands still, and how far off stil
   await tuner.listen.click();
   await mic.play(hz(45, 20));
   await expect(tuner.card).toContainText(/\d+ cents sharp\s+Tune down/);
-  expect(await drifts(page)).toBe(0);
+  await expect.poll(() => heardWavelength(page)).toBeLessThan(0.85);
+  expect(await scrolls(page)).toBe(0);
   await mic.play(hz(45, -20));
   await expect(tuner.card).toContainText(/\d+ cents flat\s+Tune up/);
-  expect(await drifts(page)).toBe(0);
+  await expect.poll(() => heardWavelength(page)).toBeGreaterThan(1.15);
+  expect(await scrolls(page)).toBe(0);
   await mic.play(hz(45));
   await expect(tuner.card.locator(".badge")).toHaveText("In tune");
 });

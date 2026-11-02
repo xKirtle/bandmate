@@ -11,11 +11,11 @@
   // Once Listen is pressed, it listens on its own Input, showing between the
   // pegs the note it hears, the string held or else the one whose note is
   // nearest, how many cents sharp or flat of it the note is, which way to
-  // tune to it, with an arrow and words, and a wave that drifts as a strobe
-  // tuner's does, until Stop is pressed or the page is left. Once a note
-  // fades, it keeps showing where it landed, muted and labelled Last heard,
-  // its string's peg muted under Auto, the wave at rest, until the next note
-  // is heard, or listening stops, a string is held, Auto is tapped, or
+  // tune to it, with an arrow and words, and the note heard drawn as a wave
+  // over the string's, until Stop is pressed or the page is left. Once a
+  // note fades, it keeps showing where it landed, muted and labelled Last
+  // heard, its string's peg muted under Auto, its wave frozen, until the next
+  // note is heard, or listening stops, a string is held, Auto is tapped, or
   // another Tuning is picked. Its Input is picked under the headstock, from
   // the Inputs connected, as the Timeline's mic button lists them: the Input
   // recorded from until another is picked, and the Input recorded from again
@@ -37,11 +37,13 @@
   import { deviceTuning } from '../lib/sharedTuning.svelte';
   import Toasts from '../lib/Toasts.svelte';
   import {
-    tunerDrift,
     tunerPeg,
+    tunerReach,
     tunerReading,
     tunerSound,
     tunerStrings,
+    tunerWaveHeight,
+    tunerWavelength,
     tunerWay,
     type TunerString,
   } from '../lib/tuner';
@@ -99,8 +101,6 @@
   const heardIn = 4096;
   /** How often it reads the pitch, in ms. */
   const every = 50;
-  /** How far sharp or flat the meter reaches, in cents: past it, it reads as the end. */
-  const reach = 50;
 
   // Listening: from Listen till Stop, or till the page is left, on the
   // Tuner's Input, or where it isn't connected, the Input recorded from.
@@ -114,6 +114,9 @@
 
   // The pitch heard, steadied, in Hz; null for nothing heard.
   let pitch = $state<number | null>(null);
+  // How loud the note heard is (see `loudness`), from its last reading while
+  // it's heard, so once it's faded its wave stays as it was.
+  let heardLoudness = $state(0);
   // Where the last note landed, in Hz, kept once it's faded, while nothing's
   // heard; null for none.
   const lastHeard = new LastHeard();
@@ -146,8 +149,10 @@
       const running = audioContext().state === 'running' && !document.hidden;
       const samples = level.samples();
       const detected = running ? detectPitch(samples, level.sampleRate) : null;
+      const howLoud = loudness(samples);
       pitch = steady.hear(detected, performance.now());
-      kept = lastHeard.hear(detected, pitch, loudness(samples));
+      if (pitch !== null) heardLoudness = howLoud;
+      kept = lastHeard.hear(detected, pitch, howLoud);
     }, every);
     return () => {
       clearInterval(timer);
@@ -187,31 +192,55 @@
   // tune, and for the note kept, that it's the one last heard.
   const meterText = $derived(`${showingKept ? 'Last heard: ' : ''}${way ? `${howFarOff}, tune ${way}` : howFarOff}`);
 
-  // The wave, in its drawing's own units: a wavelength is this wide, two
-  // show at once, and it swings this far either side of its middle.
-  const wavelength = 50;
+  // The waves, in their drawing's own units, this wide and tall: the target's,
+  // the string's note, two wavelengths showing, swinging this far either
+  // side of the middle, and over it the heard note's, its wavelength and
+  // height against the target's (see tunerWavelength and tunerWaveHeight).
+  const waveWidth = 100;
   const waveHeight = 24;
-  const swing = 9;
+  const wavelength = 50;
+  const swing = 8;
   /** How many straight steps draw each wavelength: enough to look smooth. */
   const steps = 16;
-  /** A sine wave from a wavelength before the window to two past it, so it fills the window however far it's drifted within one. */
-  const wavePath = Array.from({ length: 4 * steps + 1 }, (_, i) => {
-    const x = -wavelength + (i * wavelength) / steps;
-    const y = waveHeight / 2 - swing * Math.sin((2 * Math.PI * x) / wavelength);
-    return `${i ? 'L' : 'M'}${x.toFixed(2)} ${y.toFixed(2)}`;
-  }).join(' ');
-  /** How far the wave has drifted, in wavelengths, 0 to 1: it carries on from there, so it never jumps. */
-  let drifted = $state(0);
-  // Drifts while a string is heard off its note: flat one way, sharp the
-  // other, faster the further off. In tune, with nothing heard, on the note
-  // kept, or under reduced motion, it stands still where it is.
-  const drift = $derived(tunerDrift(live));
+  /** How far both waves scroll a second while a note's heard: a quarter of the target's wavelength. */
+  const pace = wavelength / 4;
+  // The target's dashes: a dash and a gap, in the units its path's length is
+  // measured in, and how many of them each of its wavelengths holds, whole,
+  // so its dashes don't jump as it scrolls a wavelength on. Thirteen keep
+  // them short, so the dashed line still reads as a wave.
+  const dash = 4;
+  const gap = 3;
+  const dashesPerWave = 13;
+  /**
+   * A sine wave from a wavelength before the window to one past it, so it
+   * fills the window however far it's scrolled within one.
+   */
+  function sine(length: number, height: number): string {
+    const count = Math.ceil(((waveWidth + 2 * length) / length) * steps);
+    return Array.from({ length: count + 1 }, (_, i) => {
+      const x = -length + (i * length) / steps;
+      const y = waveHeight / 2 - height * Math.sin((2 * Math.PI * x) / length);
+      return `${i ? 'L' : 'M'}${x.toFixed(2)} ${y.toFixed(2)}`;
+    }).join(' ');
+  }
+  const targetPath = sine(wavelength, swing);
+  /** How many wavelengths the target's path is long: a wavelength either side of the window. */
+  const targetWaves = waveWidth / wavelength + 2;
+  // The heard note's wave, the note heard now or the one kept: none with nothing heard.
+  const heardLength = $derived(reading ? wavelength * tunerWavelength(reading) : wavelength);
+  const heardPath = $derived(reading ? sine(heardLength, swing * tunerWaveHeight(heardLoudness)) : null);
+  /** How far both waves have scrolled, in the drawing's units: they carry on from there, so they never jump. */
+  let scrolled = $state(0);
+  // Both scroll together at one pace while a note's heard, off its note or
+  // in tune, so they're never still while there's a note. With nothing
+  // heard, on the note kept, or under reduced motion, they stand still
+  // where they are.
+  const scrolling = $derived(live !== null);
   $effect(() => {
-    const speed = drift;
-    if (!speed || reducedMotion()) return;
+    if (!scrolling || reducedMotion()) return;
     let last = performance.now();
     let frame = requestAnimationFrame(function step(now) {
-      if (!reducedMotion()) drifted = (((drifted + (speed * (now - last)) / 1000) % 1) + 1) % 1;
+      if (!reducedMotion()) scrolled += (pace * (now - last)) / 1000;
       last = now;
       frame = requestAnimationFrame(step);
     });
@@ -289,17 +318,35 @@
           </p>
           <div
             class="wave"
-            class:hearing={live}
-            class:in-tune={live?.inTune}
             role="meter"
             aria-label="Cents sharp or flat"
-            aria-valuemin={-reach}
-            aria-valuemax={reach}
-            aria-valuenow={Math.max(-reach, Math.min(reach, cents))}
+            aria-valuemin={-tunerReach}
+            aria-valuemax={tunerReach}
+            aria-valuenow={Math.max(-tunerReach, Math.min(tunerReach, cents))}
             aria-valuetext={meterText}
           >
-            <svg viewBox="0 0 {2 * wavelength} {waveHeight}" preserveAspectRatio="none" aria-hidden="true">
-              <path d={wavePath} transform="translate({drifted * wavelength} 0)" vector-effect="non-scaling-stroke" />
+            <!-- The string's note, dashed, and over it the note heard, scrolling
+                 together, each shifted on by how far they've scrolled within
+                 a wavelength of its own, which draws it the same. -->
+            <svg viewBox="0 0 {waveWidth} {waveHeight}" preserveAspectRatio="none" aria-hidden="true">
+              <path
+                class="target-wave"
+                d={targetPath}
+                pathLength={targetWaves * dashesPerWave * (dash + gap)}
+                stroke-dasharray="{dash} {gap}"
+                transform="translate({scrolled % wavelength} 0)"
+                vector-effect="non-scaling-stroke"
+              />
+              {#if heardPath}
+                <path
+                  class="heard-wave"
+                  class:in-tune={live?.inTune}
+                  class:kept={showingKept}
+                  d={heardPath}
+                  transform="translate({scrolled % heardLength} 0)"
+                  vector-effect="non-scaling-stroke"
+                />
+              {/if}
             </svg>
           </div>
           {#if reading?.inTune}
@@ -556,21 +603,14 @@
     color: var(--text);
     font-weight: 600;
   }
-  /* The wave: at rest in the border's colour, muted while a note's heard,
-     and in the finished Status's colour in tune. */
+  /* The waves: the string's note dashed in --text-muted, always there, and
+     over it, a little thicker, the note heard, in the accent, in the
+     finished Status's colour in tune, and muted once it's the note kept. */
   .wave {
     width: 100%;
     height: var(--tuner-wave);
     margin: var(--space-2) 0;
     overflow: hidden;
-    color: var(--border);
-    transition: color var(--duration-base) var(--ease);
-  }
-  .wave.hearing {
-    color: var(--text-muted);
-  }
-  .wave.in-tune {
-    color: var(--finished-fg);
   }
   svg {
     display: block;
@@ -579,9 +619,22 @@
   }
   path {
     fill: none;
-    stroke: currentColor;
-    stroke-width: 2;
+  }
+  .target-wave {
+    stroke: var(--text-muted);
+    stroke-width: 1.5;
+  }
+  .heard-wave {
+    stroke: var(--accent);
+    stroke-width: 2.5;
     stroke-linecap: round;
+    transition: stroke var(--duration-base) var(--ease);
+  }
+  .heard-wave.in-tune {
+    stroke: var(--finished-fg);
+  }
+  .heard-wave.kept {
+    stroke: var(--text-muted);
   }
   .tuned {
     background: var(--finished-bg);
