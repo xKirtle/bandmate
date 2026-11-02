@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { tunerReading, tunerStrings } from './tuner';
+import { tunerDrift, tunerPeg, tunerReading, tunerStrings } from './tuner';
 
 /** The strings as the Tuner names them, low to high: E2, A2. */
 const named = (tuning: string) => tunerStrings(tuning)?.map((s) => s.name);
@@ -108,5 +108,54 @@ describe('what the Tuner reads from a note heard', () => {
   it('is the lower string where a note is as near two', () => {
     // A2 and D3 are five semitones apart: halfway is 250 cents over A2.
     expect(read('Standard', hz(45, 250))).toMatchObject({ string: '5th', cents: 250 });
+  });
+});
+
+describe('where each string’s peg is on the headstock', () => {
+  /** Each side's pegs, top to bottom, by string name, in standard tuning. */
+  const sides = (leftHanded: boolean) => {
+    const strings = tunerStrings('Standard')!;
+    const side = (column: 'left' | 'right') =>
+      strings
+        .map((s, i) => ({ name: s.name, ...tunerPeg(i, leftHanded) }))
+        .filter((p) => p.side === column)
+        .sort((a, b) => a.row - b.row)
+        .map((p) => p.name);
+    return { left: side('left'), right: side('right') };
+  };
+
+  it('is three a side, the low strings on the left, each outer string at the top, as a 3+3 headstock’s', () => {
+    expect(sides(false)).toEqual({ left: ['E2', 'A2', 'D3'], right: ['E4', 'B3', 'G3'] });
+  });
+
+  it('is mirrored for a left-handed player, the low strings on the right', () => {
+    expect(sides(true)).toEqual({ left: ['E4', 'B3', 'G3'], right: ['E2', 'A2', 'D3'] });
+  });
+});
+
+describe('how fast the wave drifts', () => {
+  /** The drift, in wavelengths a second, for an A2 heard so many cents off in standard tuning. */
+  const drift = (cents: number) => tunerDrift(tunerReading(hz(45, cents), tunerStrings('Standard')!));
+
+  it('stands still with nothing heard', () => {
+    expect(tunerDrift(null)).toBe(0);
+  });
+
+  it('stands still in tune, within 5 cents either way', () => {
+    expect(drift(0)).toBe(0);
+    expect(drift(4)).toBe(0);
+    expect(drift(-4)).toBe(0);
+  });
+
+  it('drifts one way flat and the other sharp: a wavelength a second each 25 cents off', () => {
+    expect(drift(25)).toBeCloseTo(1, 6);
+    expect(drift(-25)).toBeCloseTo(-1, 6);
+    expect(drift(-12.5)).toBeCloseTo(-0.5, 6);
+  });
+
+  it('drifts faster the further off, up to two wavelengths a second from 50 cents', () => {
+    expect(drift(6)).toBeCloseTo(0.24, 6);
+    expect(drift(50)).toBeCloseTo(2, 6);
+    expect(drift(-120)).toBeCloseTo(-2, 6);
   });
 });
