@@ -5,18 +5,25 @@
   // Tapping a peg plays its string's note from the guitar's recorded samples,
   // ringing once, and tapping it again plays it again. It's a guitar's
   // whatever the device's Instrument. Once Listen is pressed, it listens on
-  // the Input recorded from, showing between the pegs the note it hears, the
-  // string whose note is nearest and how many cents sharp or flat of it the
-  // note is, and a wave that drifts as a strobe tuner's does, until Stop is
-  // pressed or the page is left.
-  import { onDestroy, untrack } from 'svelte';
-  import { InputLevel, listenProblem } from '../lib/capture';
+  // its own Input, showing between the pegs the note it hears, the string
+  // whose note is nearest and how many cents sharp or flat of it the note
+  // is, and a wave that drifts as a strobe tuner's does, until Stop is
+  // pressed or the page is left. Its Input is picked under the headstock,
+  // from the Inputs connected, as the Timeline's mic button lists them: the
+  // Input recorded from until another is picked, and the Input recorded from
+  // again wherever the one picked isn't connected.
+  import { untrack } from 'svelte';
+  import { listenProblem } from '../lib/capture';
   import { hear, prepareToHear } from '../lib/hear';
-  import { sameInput, type InputChoice } from '../lib/inputSettings';
+  import InputPicker from '../lib/InputPicker.svelte';
+  import { InputRows } from '../lib/inputRows.svelte';
+  import { inputName, sameInput } from '../lib/inputSettings';
   import { reducedMotion } from '../lib/motion';
+  import { OpenedInput } from '../lib/openedInput.svelte';
   import { detectPitch, SteadyPitch } from '../lib/pitch';
   import { input } from '../lib/sharedInput.svelte';
   import { leftHanded } from '../lib/sharedLeftHanded.svelte';
+  import { tunerInput } from '../lib/sharedTunerInput.svelte';
   import { deviceTuning } from '../lib/sharedTuning.svelte';
   import Toasts from '../lib/Toasts.svelte';
   import { tunerDrift, tunerPeg, tunerReading, tunerSound, tunerStrings } from '../lib/tuner';
@@ -39,16 +46,13 @@
     deviceTuning.set(tuning);
   }
 
-  // Listening: from Listen till Stop, or till the page is left.
-  let listening = $state(false);
-  let opening = $state(false);
-  // Why it can't listen, from the last Listen pressed.
-  let problem = $state<string | null>(null);
-  // The audio device recorded from when it isn't connected, so the default is listened on instead.
-  let gone = $state<string | null>(null);
-  // The pitch heard, steadied, in Hz; null for nothing heard.
-  let pitch = $state<number | null>(null);
-  const reading = $derived(pitch !== null && strings ? tunerReading(pitch, strings) : null);
+  // The Inputs to pick the Tuner's from, the Input recorded from used
+  // wherever the one picked isn't connected.
+  const inputs = new InputRows({
+    value: () => tunerInput.value,
+    set: (choice) => tunerInput.set(choice),
+    instead: () => input.value,
+  });
 
   /** How many samples it hears a note in: 4096, nearly four periods of the lowest string's at 48 kHz. */
   const heardIn = 4096;
@@ -57,79 +61,53 @@
   /** How far sharp or flat the meter reaches, in cents: past it, it reads as the end. */
   const reach = 50;
 
-  let level: InputLevel | null = null;
-  // The Input opened, to open another given in its place.
-  let opened: InputChoice | null = null;
-  let timer: ReturnType<typeof setInterval> | undefined;
-  // Each opening of the Input, so a slower one opened before is let go.
-  let generation = 0;
-
-  /** Opens the Input recorded from, in place of any open, and listens on it. */
-  async function listen() {
-    const mine = ++generation;
-    close();
-    listening = true;
-    opening = true;
-    problem = null;
-    // Resumed while the click on Listen still counts.
-    audioContext()
-      .resume()
-      .catch(() => {});
-    opened = $state.snapshot(input.value);
-    try {
-      const open = await InputLevel.open(audioContext(), opened, heardIn);
-      if (mine !== generation) {
-        open.close();
-        return;
-      }
-      level = open;
-      gone = open.gone;
-      const steady = new SteadyPitch();
-      timer = setInterval(() => {
-        // While the audio's suspended, e.g. in a background tab, the samples
-        // stand still: nothing's heard, rather than the last note held.
-        const running = audioContext().state === 'running' && !document.hidden;
-        pitch = steady.hear(running ? detectPitch(open.samples(), open.sampleRate) : null, performance.now());
-      }, every);
-    } catch (e) {
-      if (mine !== generation) return;
-      problem = listenProblem(e);
-      listening = false;
-      opened = null;
-    }
-    opening = false;
-  }
-
-  /** Lets go of the Input, if it's open. */
-  function close() {
-    clearInterval(timer);
-    level?.close();
-    level = null;
-    pitch = null;
-    gone = null;
-  }
-
-  /** Stops listening, keeping any problem with the last Listen shown. */
-  function stop() {
-    generation++;
-    close();
-    opened = null;
-    listening = false;
-    opening = false;
-  }
-
-  // Another Input recorded from, e.g. chosen in another tab: it's listened on in place of the one before.
-  $effect(() => {
-    const given = input.value;
-    if (opened && !sameInput(given, opened)) untrack(listen);
+  // Listening: from Listen till Stop, or till the page is left, on the
+  // Tuner's Input, or where it isn't connected, the Input recorded from.
+  const listened = new OpenedInput(() => ({ choice: tunerInput.value, instead: input.value }), {
+    size: heardIn,
+    say: listenProblem,
+    stopOnFailure: true,
   });
+  const listening = $derived(listened.on);
+  const opening = $derived(listened.opening);
+
+  // The pitch heard, steadied, in Hz; null for nothing heard.
+  let pitch = $state<number | null>(null);
+  const reading = $derived(pitch !== null && strings ? tunerReading(pitch, strings) : null);
+
+  // Read every so often while the Input is open, and nothing once it isn't.
+  $effect(() => {
+    const level = listened.level;
+    if (!level) return;
+    const steady = new SteadyPitch();
+    const timer = setInterval(() => {
+      // While the audio's suspended, e.g. in a background tab, the samples
+      // stand still: nothing's heard, rather than the last note held.
+      const running = audioContext().state === 'running' && !document.hidden;
+      pitch = steady.hear(running ? detectPitch(level.samples(), level.sampleRate) : null, performance.now());
+    }, every);
+    return () => {
+      clearInterval(timer);
+      pitch = null;
+    };
+  });
+
+  // The device picked when it isn't connected, so another is listened on:
+  // as opened while listening, and as far as can be told without opening it
+  // while not.
+  const gone = $derived(listening ? listened.gone : inputs.chosenGone);
+  // What's listened on in its place: the Input recorded from in place of
+  // the one picked, unless it isn't connected either; else the default input.
+  const usedInstead = $derived(
+    tunerInput.picked && sameInput(inputs.used, input.value) ? 'the Input you record from' : 'the default input',
+  );
+  // The Input named on the picker's button: the one listened on.
+  const named = $derived(inputName(inputs.used));
 
   // A Tuning that can't be read can't be tuned to: listening stops with it.
   $effect(() => {
-    if (!strings) untrack(stop);
+    if (!strings) untrack(() => listened.stop());
   });
-
-  onDestroy(stop);
 
   const cents = $derived(reading ? Math.round(reading.cents) : 0);
   const howFarOff = $derived(
@@ -197,9 +175,9 @@
         <h2 id="tuner-listen-heading">Play a string to see how far off it is</h2>
         <!-- In the accent while idle to be seen, plain while it listens. -->
         {#if listening}
-          <button type="button" class="button" onclick={stop}>Stop</button>
+          <button type="button" class="button" onclick={() => listened.stop()}>Stop</button>
         {:else}
-          <button type="button" class="button primary" onclick={listen}>Listen</button>
+          <button type="button" class="button primary" onclick={() => listened.start()}>Listen</button>
         {/if}
       </div>
       <!-- A 3+3 headstock: the pegs down either side, and between them what's heard. -->
@@ -257,14 +235,20 @@
         </div>
       </div>
       <p class="muted">Tap a peg to hear its string's note.</p>
+      <div class="input">
+        <span>Listens on</span>
+        <InputPicker {inputs} {named} label="Input to listen on" legend="Listen on" instead={usedInstead} note={null} />
+      </div>
       {#if opening}
         <p class="muted" role="status">Opening the input…</p>
-      {:else if problem}
-        <p class="error" role="alert">{problem}</p>
+      {:else if listened.problem}
+        <p class="error" role="alert">{listened.problem}</p>
       {:else if gone}
-        <p class="notice" role="status">{gone} isn't connected, so the default input is used.</p>
+        <p class="notice" role="status">{gone} isn't connected, so {usedInstead} is used.</p>
       {:else if !listening}
-        <p class="muted">Listens on the Input you record from.</p>
+        {#if !tunerInput.picked}
+          <p class="muted">The Input you record from, until you pick another here.</p>
+        {/if}
       {:else if !reading}
         <p class="muted">Play a string near the microphone or input.</p>
       {/if}
@@ -312,6 +296,18 @@
   }
   .notice {
     color: var(--warning);
+  }
+  /* The Input listened on, its name on the picker's button, cut short where it's long. */
+  .input {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    min-width: 0;
+  }
+  .input > span {
+    flex: none;
+    color: var(--text-muted);
+    font-size: var(--text-md);
   }
   /* The headstock, wider at the top and narrowing to the nut, a bar across
      its foot. The pegs go down either side, in the columns either side of

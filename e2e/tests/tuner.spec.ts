@@ -230,6 +230,13 @@ test("a string whose samples didn’t load says so in a toast, and the next tap 
   await expect(toast).toHaveCount(0);
 });
 
+/** An audio device the fake microphone lists as connected, with how many channels it has, 1 unless said. */
+interface FakeDevice {
+  deviceId: string;
+  label: string;
+  channels?: number;
+}
+
 /** A note's frequency at A = 440 Hz, from its MIDI note number, so many cents sharp of it. */
 const hz = (midi: number, cents = 0) =>
   440 * 2 ** ((midi - 69 + cents / 100) / 12);
@@ -238,12 +245,23 @@ const hz = (midi: number, cents = 0) =>
  * Gives the page a microphone that plays a plucked-string tone, its
  * harmonics louder than its fundamental, at a frequency set with `play`,
  * or noise or silence. Each input asked for is kept, by the device asked
- * for or 'default', and `live` says how many are still open. One device,
- * "scarlett", is listed as connected.
+ * for or 'default', and `live` says how many are still open. The devices
+ * given are listed as connected, by default one, "scarlett", and one asked
+ * for that isn't fails as a device gone does; `unplug` takes one away.
  */
-async function fakeMicrophone(page: Page) {
-  await page.addInitScript(() => {
+async function fakeMicrophone(
+  page: Page,
+  devices: FakeDevice[] = [
+    { deviceId: "scarlett", label: "Scarlett Solo USB" },
+  ],
+) {
+  await page.addInitScript((devices: FakeDevice[]) => {
     const w = window as unknown as Record<string, unknown>;
+    let connected = devices;
+    w.unplug = (deviceId: string) => {
+      connected = connected.filter((d) => d.deviceId !== deviceId);
+      navigator.mediaDevices.dispatchEvent(new Event("devicechange"));
+    };
     const asked: string[] = (w.asked = []);
     const streams: MediaStream[] = [];
     w.live = () =>
@@ -272,14 +290,13 @@ async function fakeMicrophone(page: Page) {
       apply();
     };
     navigator.mediaDevices.enumerateDevices = async () =>
-      [
-        {
-          kind: "audioinput",
-          deviceId: "scarlett",
-          groupId: "g",
-          label: "Scarlett Solo USB",
-        },
-      ] as MediaDeviceInfo[];
+      connected.map(({ deviceId, label, channels = 1 }) => ({
+        kind: "audioinput",
+        deviceId,
+        groupId: deviceId,
+        label,
+        getCapabilities: () => ({ channelCount: { min: 1, max: channels } }),
+      })) as unknown as MediaDeviceInfo[];
     navigator.mediaDevices.getUserMedia = async (constraints) => {
       const audio = constraints?.audio;
       const exact =
@@ -287,6 +304,11 @@ async function fakeMicrophone(page: Page) {
           ? (audio.deviceId as ConstrainDOMStringParameters)?.exact
           : undefined;
       asked.push(typeof exact === "string" ? exact : "default");
+      if (
+        typeof exact === "string" &&
+        !connected.some((d) => d.deviceId === exact)
+      )
+        throw new DOMException("Gone", "OverconstrainedError");
       context ??= new AudioContext();
       const out = context.createMediaStreamDestination();
       tone = context.createOscillator();
@@ -317,19 +339,23 @@ async function fakeMicrophone(page: Page) {
       streams.push(out.stream);
       return out.stream;
     };
-  });
-  const call = (name: string, ...args: number[]) =>
+  }, devices);
+  const call = (name: string, ...args: (number | string)[]) =>
     page.evaluate(
       ({ name, args }) =>
-        (window as unknown as Record<string, (...a: number[]) => void>)[name](
-          ...args,
-        ),
+        (
+          window as unknown as Record<
+            string,
+            (...a: (number | string)[]) => void
+          >
+        )[name](...args),
       { name, args },
     );
   return {
     play: (frequency: number) => call("play", frequency),
     hiss: () => call("hiss"),
     hush: () => call("hush"),
+    unplug: (deviceId: string) => call("unplug", deviceId),
     asked: () =>
       page.evaluate(() => (window as unknown as { asked: string[] }).asked),
     live: () =>
@@ -367,7 +393,7 @@ test("the Tuner listens on the Input recorded from, showing the note heard, the 
   await page.goto("/tuner");
   const tuner = listening(page);
   await expect(tuner.card).toContainText(
-    "Listens on the Input you record from.",
+    "The Input you record from, until you pick another here.",
   );
   expect(await mic.asked()).toEqual([]);
 
@@ -560,3 +586,219 @@ for (const [why, browser, said] of [
     await expect(tuner.listen).toBeVisible();
   });
 }
+
+/** An interface of two Inputs, a guitar on the second, and a USB microphone. */
+const scarlett = {
+  deviceId: "scarlett",
+  label: "Scarlett 2i2 USB",
+  channels: 2,
+};
+const usbMic = { deviceId: "usbmic", label: "Yeti" };
+const vocals = { deviceId: "scarlett", label: "Scarlett 2i2 USB", channel: 0 };
+const guitar = `Input 2 · ${scarlett.label}`;
+
+/** Makes an Input the one recorded from, as Settings would. */
+async function recordFrom(
+  page: Page,
+  choice: { deviceId: string; label: string; channel: number },
+) {
+  await page.addInitScript(
+    (choice) => localStorage.setItem("bandmate.input", JSON.stringify(choice)),
+    choice,
+  );
+}
+
+/** The Tuner's Input picker: its button, and the popover it opens. */
+function inputPicker(page: Page) {
+  const button = listening(page).card.getByRole("button", {
+    name: /^Input to listen on: /,
+  });
+  const dialog = page.getByRole("dialog", { name: "Input to listen on" });
+  return {
+    button,
+    dialog,
+    inputs: dialog.getByRole("list", { name: "Inputs" }),
+    radio: (name: string) => dialog.getByRole("radio", { name, exact: true }),
+  };
+}
+
+test("the Tuner listens on an Input picked on its page, with a level meter on it, kept across reloads, never changing the Input recorded from", async ({
+  page,
+}) => {
+  const mic = await fakeMicrophone(page, [scarlett, usbMic]);
+  await recordFrom(page, vocals);
+  await page.goto("/tuner");
+  const tuner = listening(page);
+  const picker = inputPicker(page);
+  // Until one is picked, it's the Input recorded from.
+  await expect(picker.button).toHaveAccessibleName(
+    `Input to listen on: Input 1 · ${scarlett.label}`,
+  );
+  await expect(tuner.card).toContainText(
+    "The Input you record from, until you pick another here.",
+  );
+
+  // The Inputs connected, as the Timeline's mic button lists them, the one used picked and metered.
+  await picker.button.click();
+  await expect(picker.inputs.getByRole("listitem").first()).toContainText(
+    "Default input",
+  );
+  await expect(picker.radio(`Input 1 · ${scarlett.label}`)).toBeChecked();
+  await expect(picker.radio(guitar)).toBeVisible();
+  await expect(picker.radio(`Input 1 · ${usbMic.label}`)).toBeVisible();
+  await expect(picker.dialog.getByRole("meter", { name: "Level" })).toHaveCount(
+    1,
+  );
+
+  await picker.radio(guitar).check();
+  await expect(
+    picker.inputs
+      .getByRole("listitem")
+      .filter({ has: page.getByRole("radio", { name: guitar, exact: true }) })
+      .getByRole("meter", { name: "Level" }),
+  ).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(picker.dialog).toBeHidden();
+  await expect(picker.button).toHaveAccessibleName(
+    `Input to listen on: ${guitar}`,
+  );
+  await expect(tuner.card).not.toContainText("until you pick another");
+
+  // It listens on the guitar's Input.
+  await expect.poll(mic.live).toBe(0);
+  const before = (await mic.asked()).length;
+  await tuner.listen.click();
+  await mic.play(hz(45));
+  await expect(tuner.card).toContainText("5th string, A2");
+  expect((await mic.asked()).slice(before)).toEqual(["scarlett"]);
+
+  // Kept on this device, and the Input recorded from is still the vocals', in Settings too.
+  await page.reload();
+  await expect(picker.button).toHaveAccessibleName(
+    `Input to listen on: ${guitar}`,
+  );
+  expect(
+    await page.evaluate(() =>
+      JSON.parse(localStorage.getItem("bandmate.input")!),
+    ),
+  ).toEqual(vocals);
+  await page.goto("/settings");
+  const settings = page.getByRole("region", { name: "Recording" });
+  await expect(
+    settings.getByRole("radio", {
+      name: `Input 1 · ${scarlett.label}`,
+      exact: true,
+    }),
+  ).toBeChecked();
+  await expect(page.getByText(/listen on/i)).toHaveCount(0);
+});
+
+test("until one is picked, the Tuner listens on the Input recorded from, following it as it changes", async ({
+  page,
+}) => {
+  const mic = await fakeMicrophone(page, [scarlett, usbMic]);
+  await recordFrom(page, vocals);
+  await page.goto("/tuner");
+  const tuner = listening(page);
+  await tuner.listen.click();
+  await mic.play(hz(45));
+  await expect(tuner.card).toContainText("5th string, A2");
+  expect(await mic.asked()).toEqual(["scarlett"]);
+
+  // Another Input recorded from, chosen in another tab: it's listened on instead.
+  await page.evaluate((usbMic) => {
+    localStorage.setItem(
+      "bandmate.input",
+      JSON.stringify({ ...usbMic, channel: 0 }),
+    );
+    window.dispatchEvent(
+      new StorageEvent("storage", { key: "bandmate.input" }),
+    );
+  }, usbMic);
+  await expect.poll(mic.asked).toEqual(["scarlett", "usbmic"]);
+  await expect.poll(mic.live).toBe(1);
+  await expect(inputPicker(page).button).toHaveAccessibleName(
+    `Input to listen on: Input 1 · ${usbMic.label}`,
+  );
+});
+
+test("an Input picked that isn't connected falls back to the Input recorded from, and says so, even unplugged while listening", async ({
+  page,
+}) => {
+  const mic = await fakeMicrophone(page, [scarlett, usbMic]);
+  await recordFrom(page, vocals);
+  await page.addInitScript(
+    (usbMic) =>
+      localStorage.setItem(
+        "bandmate.tuner.input",
+        JSON.stringify({ ...usbMic, channel: 0 }),
+      ),
+    usbMic,
+  );
+  await page.goto("/tuner");
+  const tuner = listening(page);
+  await tuner.listen.click();
+  await mic.play(hz(45));
+  await expect(tuner.card).toContainText("5th string, A2");
+  expect(await mic.asked()).toEqual(["usbmic"]);
+
+  // Unplugged while listening, it listens on the Input recorded from, and says so.
+  await mic.unplug(usbMic.deviceId);
+  await expect(tuner.card.getByRole("status")).toHaveText(
+    "Yeti isn't connected, so the Input you record from is used.",
+  );
+  expect(await mic.asked()).toEqual(["usbmic", "usbmic", "scarlett"]);
+  await expect.poll(mic.live).toBe(1);
+  await mic.play(hz(50));
+  await expect(tuner.card).toContainText("4th string, D3");
+
+  // So it says before listening too, the picker showing the Input recorded from used.
+  await tuner.stop.click();
+  await expect(tuner.card.getByRole("status")).toHaveText(
+    "Yeti isn't connected, so the Input you record from is used.",
+  );
+  await expect(inputPicker(page).button).toHaveAccessibleName(
+    `Input to listen on: Input 1 · ${scarlett.label}`,
+  );
+  await inputPicker(page).button.click();
+  await expect(
+    inputPicker(page).radio(`Input 1 · ${scarlett.label}`),
+  ).toBeChecked();
+  await expect(inputPicker(page).dialog).toContainText(
+    "Yeti isn't connected, so the Input you record from is used.",
+  );
+});
+
+test("listening on the Input recorded from in place of one picked, unplugging that too falls back to the default input, and says so", async ({
+  page,
+}) => {
+  const mic = await fakeMicrophone(page, [scarlett]);
+  await recordFrom(page, vocals);
+  await page.addInitScript(
+    (usbMic) =>
+      localStorage.setItem(
+        "bandmate.tuner.input",
+        JSON.stringify({ ...usbMic, channel: 0 }),
+      ),
+    usbMic,
+  );
+  await page.goto("/tuner");
+  const tuner = listening(page);
+  await tuner.listen.click();
+  await expect(tuner.card.getByRole("status")).toHaveText(
+    "Yeti isn't connected, so the Input you record from is used.",
+  );
+  expect(await mic.asked()).toEqual(["usbmic", "scarlett"]);
+
+  await mic.unplug(scarlett.deviceId);
+  await expect(tuner.card.getByRole("status")).toHaveText(
+    "Yeti isn't connected, so the default input is used.",
+  );
+  await expect
+    .poll(mic.asked)
+    .toEqual(["usbmic", "scarlett", "usbmic", "scarlett", "default"]);
+  await expect.poll(mic.live).toBe(1);
+  await expect(inputPicker(page).button).toHaveAccessibleName(
+    "Input to listen on: Default input",
+  );
+});

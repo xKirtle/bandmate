@@ -1,6 +1,6 @@
 <script lang="ts">
   import Mic from '@lucide/svelte/icons/mic';
-  import { onDestroy, tick } from 'svelte';
+  import { onDestroy, tick, untrack } from 'svelte';
   import InputName from './InputName.svelte';
   import { InputRows } from './inputRows.svelte';
   import LevelMeter from './LevelMeter.svelte';
@@ -12,12 +12,19 @@
   // picked meters its level, to check it's the right one. Setting Inputs up,
   // calibrating them, typing an offset or forgetting one, is left to
   // Settings. Folded into the transport row's ⋯, it has no button of its
-  // own, and opens by the ⋯ instead.
+  // own, and opens by the ⋯ instead. The Tuner picks the Input it listens on
+  // with it too, its button naming that Input.
 
   let {
     disabled = false,
     title,
     button: hasButton = true,
+    inputs: given,
+    label = 'Input to record from',
+    legend = 'Record from',
+    instead = 'the default input',
+    named,
+    note = "Calibrate an Input's latency in Settings → Recording.",
   }: {
     /** Keeps it from opening, and closes it, e.g. while recording. */
     disabled?: boolean;
@@ -25,10 +32,23 @@
     title?: string;
     /** Whether it shows its button, or only opens with `openBy`. */
     button?: boolean;
+    /** The Inputs to pick from, and which is picked: by default, the Input recorded from. */
+    inputs?: InputRows;
+    /** What it's for, as its button and panel are named. */
+    label?: string;
+    /** What picking an Input does, for screen readers. */
+    legend?: string;
+    /** What's used where the Input picked isn't connected. */
+    instead?: string;
+    /** The Input picked, named on its button beside the mic, rather than the mic alone. */
+    named?: string;
+    /** A line under the Inputs, or null for none. */
+    note?: string | null;
   } = $props();
 
   const id = $props.id();
-  const inputs = new InputRows();
+  // Its Inputs, made once, as they watch the devices while it is.
+  const inputs = untrack(() => given) ?? new InputRows();
 
   let open = $state(false);
   let root: HTMLElement;
@@ -112,21 +132,22 @@
   {#if hasButton}
     <button
       type="button"
-      class="icon"
+      class={named === undefined ? 'icon' : 'button named'}
       bind:this={button}
       {disabled}
-      aria-label="Input to record from"
+      aria-label={named === undefined ? label : `${label}: ${named}`}
       aria-haspopup="dialog"
       aria-expanded={open}
       {title}
-      onclick={() => (open ? hide() : show())}><Mic /></button
+      onclick={() => (open ? hide() : show())}
+      ><Mic />{#if named !== undefined}<span class="picked">{named}</span>{/if}</button
     >
   {/if}
   {#if open}
     <div
       class="popover panel"
       role="dialog"
-      aria-label="Input to record from"
+      aria-label={label}
       tabindex="-1"
       popover="manual"
       bind:this={panel}
@@ -134,10 +155,10 @@
       onkeydown={onPanelKey}
     >
       {#if inputs.chosenGone}
-        <p class="notice" role="status">{inputs.chosenGone} isn't connected, so the default input is used.</p>
+        <p class="notice" role="status">{inputs.chosenGone} isn't connected, so {instead} is used.</p>
       {/if}
       <fieldset class="choice-group">
-        <legend class="visually-hidden">Record from</legend>
+        <legend class="visually-hidden">{legend}</legend>
         <ul aria-label="Inputs">
           {#each inputs.connected as row (row.key)}
             <li>
@@ -154,7 +175,9 @@
           {/each}
         </ul>
       </fieldset>
-      <p class="muted">Calibrate an Input's latency in Settings → Recording.</p>
+      {#if note}
+        <p class="muted">{note}</p>
+      {/if}
     </div>
   {/if}
 </span>
@@ -163,6 +186,18 @@
   /* Flex, so it stands no taller than its button, as an inline box would. */
   .input-picker {
     display: inline-flex;
+    min-width: 0;
+  }
+  /* Naming the Input, cut short where it's too long to fit. */
+  .named {
+    min-width: 0;
+    max-width: 100%;
+    gap: var(--space-2);
+  }
+  .picked {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
   .panel {
     width: min(22rem, calc(100vw - 2rem));
