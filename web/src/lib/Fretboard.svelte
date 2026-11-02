@@ -6,7 +6,7 @@
   // string open. Above the nut, a string is marked open or muted. Arrow keys
   // move between the frets, so the whole fretboard is one tab stop.
   import { tick } from 'svelte';
-  import type { Frets } from './chordFinder';
+  import { stringNumber, type Frets } from './chordFinder';
   import { leftHanded } from './sharedLeftHanded.svelte';
 
   let {
@@ -27,11 +27,8 @@
   /** Row 0 is above the nut; rows 1 to fretCount are the frets. */
   const rows = Array.from({ length: fretCount + 1 }, (_, fret) => fret);
 
-  /** A string as players name it, the high one 1st: the low string of six is the 6th. */
-  function stringName(string: number): string {
-    const n = strings - string;
-    return n + (n === 1 ? 'st' : n === 2 ? 'nd' : n === 3 ? 'rd' : 'th') + ' string';
-  }
+  /** A string as players name it: the low string of six is the 6th string. */
+  const stringName = (string: number) => `${stringNumber(string, strings)} string`;
 
   function set(string: number, fret: number | null) {
     frets = frets.map((f, s) => (s === string ? fret : f));

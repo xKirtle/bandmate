@@ -35,6 +35,12 @@ The **Chords** page, in the side bar, helps with chords away from any song, on g
 - The speaker plays the keys together, on a recorded grand piano.
 - In Name it, tap a key to press it and again to let it go, or use the arrow keys and Space.
 
+## Tuner
+
+The **Tuner** page, in the side bar, tunes your guitar by ear. Pick the tuning to tune to under **Tuning**, a named one or six notes of your own: it's the same one the Chords page uses, so after tuning to Open G, Chords shows Open G shapes, and the other way round. Your device remembers it.
+
+Tap a string to hear its note, on the recorded guitar, and tap it again to hear it again. Each note is at A = 440 Hz, in the octave that string is tuned to: in Drop D, the low string plays the D below the low E. It's always a guitar, even with the piano picked for Chords.
+
 ## Beats
 
 The **Beats** page, in the side bar, is your Beat Library: the music you write to, kept in one place and used in any song.

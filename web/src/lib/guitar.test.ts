@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { diagramStartFret } from './guitar';
+import { diagramStartFret, stringNumber } from './guitar';
 
 describe("a chord diagram's first row", () => {
   it('starts a barre at its fret, so the barre is the first row', () => {
@@ -21,5 +21,15 @@ describe("a chord diagram's first row", () => {
 
   it('starts a Voicing with no barre up the neck at its lowest fret', () => {
     expect(diagramStartFret({ frets: [null, 7, 9, 9, 8, null] }, 5)).toBe(7);
+  });
+});
+
+describe('a string as players number it', () => {
+  it('counts from the high string, the 1st, so the low string of six is the 6th', () => {
+    expect([0, 1, 2, 3, 4, 5].map((s) => stringNumber(s, 6))).toEqual(['6th', '5th', '4th', '3rd', '2nd', '1st']);
+  });
+
+  it('counts the strings there are', () => {
+    expect(stringNumber(0, 4)).toBe('4th');
   });
 });
