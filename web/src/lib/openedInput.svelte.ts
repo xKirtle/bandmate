@@ -117,19 +117,28 @@ export class OpenedInput {
   }
 
   // An input plugged in or out: the one given opened again if it's the
-  // one that went or came back, or if opening it failed.
+  // one that went or came back, if what's open in its place went too, or
+  // the one to open instead came back, or if opening it failed.
   async #devicesChanged() {
     // Off, it's left so: it never starts on its own.
     if (!this.on) return;
-    const { choice } = this.#given();
+    const { choice, instead } = this.#given();
+    // What's open in place of the one given, by device, where it's gone.
+    const using = this.gone !== null ? this.level?.opened?.deviceId : undefined;
     let present = true;
+    let insteadWrong = false;
     try {
       const devices = await navigator.mediaDevices.enumerateDevices();
-      present = choice.deviceId === '' || devices.some((d) => d.deviceId === choice.deviceId);
+      const listed = (deviceId: string) => devices.some((d) => d.deviceId === deviceId);
+      present = choice.deviceId === '' || listed(choice.deviceId);
+      insteadWrong =
+        this.gone !== null &&
+        ((!!using && !listed(using)) ||
+          (!!instead?.deviceId && listed(instead.deviceId) && using !== instead.deviceId));
     } catch {
       // Can't tell, so it's left as it is, unless it failed.
     }
     // Asked again, as it may have been stopped while the devices were listed.
-    if (this.on && (this.problem !== null || (this.gone !== null) === present)) void this.start();
+    if (this.on && (this.problem !== null || (this.gone !== null) === present || insteadWrong)) void this.start();
   }
 }

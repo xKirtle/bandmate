@@ -768,3 +768,37 @@ test("an Input picked that isn't connected falls back to the Input recorded from
     "Yeti isn't connected, so the Input you record from is used.",
   );
 });
+
+test("listening on the Input recorded from in place of one picked, unplugging that too falls back to the default input, and says so", async ({
+  page,
+}) => {
+  const mic = await fakeMicrophone(page, [scarlett]);
+  await recordFrom(page, vocals);
+  await page.addInitScript(
+    (usbMic) =>
+      localStorage.setItem(
+        "bandmate.tuner.input",
+        JSON.stringify({ ...usbMic, channel: 0 }),
+      ),
+    usbMic,
+  );
+  await page.goto("/tuner");
+  const tuner = listening(page);
+  await tuner.listen.click();
+  await expect(tuner.card.getByRole("status")).toHaveText(
+    "Yeti isn't connected, so the Input you record from is used.",
+  );
+  expect(await mic.asked()).toEqual(["usbmic", "scarlett"]);
+
+  await mic.unplug(scarlett.deviceId);
+  await expect(tuner.card.getByRole("status")).toHaveText(
+    "Yeti isn't connected, so the default input is used.",
+  );
+  await expect
+    .poll(mic.asked)
+    .toEqual(["usbmic", "scarlett", "usbmic", "scarlett", "default"]);
+  await expect.poll(mic.live).toBe(1);
+  await expect(inputPicker(page).button).toHaveAccessibleName(
+    "Input to listen on: Default input",
+  );
+});

@@ -55,13 +55,16 @@ export class InputRows {
   #choice = $derived(this.#picked.value());
   // The Input used in its place where it isn't connected.
   #instead = $derived(this.#picked.instead?.() ?? defaultInput);
-  // The Input used: the one picked, or where it isn't connected, the one
-  // instead, or where that isn't either, the default.
-  #used = $derived(
+  /**
+   * The Input used, as far as can be told without opening it: the one
+   * picked, or where it isn't connected, the one instead, or where that
+   * isn't either, the default.
+   */
+  readonly used: InputChoice = $derived(
     this.#connected(this.#choice) ? this.#choice : this.#connected(this.#instead) ? this.#instead : defaultInput,
   );
   // The default input, as chosen where it is, e.g. a channel of it chosen before Inputs were listed.
-  #defaultChoice = $derived(this.#used.deviceId === '' ? this.#used : defaultInput);
+  #defaultChoice = $derived(this.used.deviceId === '' ? this.used : defaultInput);
   // The Input the default input looks to be, and its calibration.
   #defaultRecorded = new RecordedInput(() => this.#defaultChoice);
 
@@ -126,7 +129,7 @@ export class InputRows {
       calibration: this.#defaultRecorded.calibration,
       input: this.#defaultChoice,
       exact: false,
-      chosen: this.#used.deviceId === '',
+      chosen: this.used.deviceId === '',
     },
     ...this.#listed.connected.map((row) => ({
       key: keyOf(row.input),
@@ -136,7 +139,7 @@ export class InputRows {
       calibration: row.calibration,
       input: row.input,
       exact: true,
-      chosen: keyOf(row.input) === keyOf(this.#used),
+      chosen: keyOf(row.input) === keyOf(this.used),
     })),
   ]);
 

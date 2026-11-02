@@ -118,7 +118,9 @@ export async function openInput(choice: InputChoice, instead?: InputChoice): Pro
         autoGainControl: false,
       },
     });
-  let stream: MediaStream | undefined;
+  // Where the device chosen is gone, the one to open in its place, if not the default.
+  const other = instead && instead.deviceId !== choice.deviceId ? instead : null;
+  let stream: MediaStream | null = null;
   // Whether the device chosen couldn't be opened, so the default was.
   let fellBack = false;
   try {
@@ -127,7 +129,7 @@ export async function openInput(choice: InputChoice, instead?: InputChoice): Pro
     } catch (e) {
       // Gone, most likely: the one instead or the default is tried, and said so below.
       if (!choice.deviceId || (e as DOMException).name !== 'OverconstrainedError') throw e;
-      if (!instead || instead.deviceId === choice.deviceId) {
+      if (!other) {
         stream = await open('');
         fellBack = true;
       }
@@ -135,7 +137,8 @@ export async function openInput(choice: InputChoice, instead?: InputChoice): Pro
   } catch (e) {
     throw inputError(e as Error);
   }
-  if (!stream) return { ...(await openInput(instead!)), gone: deviceName(choice.label) };
+  // Opened apart from the try, so a CaptureError it fails with is shown as it is.
+  if (!stream) return { ...(await openInput(other!)), gone: deviceName(choice.label) };
   const settings = stream.getAudioTracks()[0]?.getSettings();
   const channels = settings?.channelCount || 1;
   // Only once allowed does the browser tell the inputs apart.

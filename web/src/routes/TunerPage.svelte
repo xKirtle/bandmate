@@ -17,7 +17,7 @@
   import { hear, prepareToHear } from '../lib/hear';
   import InputPicker from '../lib/InputPicker.svelte';
   import { InputRows } from '../lib/inputRows.svelte';
-  import { inputName } from '../lib/inputSettings';
+  import { inputName, sameInput } from '../lib/inputSettings';
   import { reducedMotion } from '../lib/motion';
   import { OpenedInput } from '../lib/openedInput.svelte';
   import { detectPitch, SteadyPitch } from '../lib/pitch';
@@ -97,11 +97,12 @@
   // while not.
   const gone = $derived(listening ? listened.gone : inputs.chosenGone);
   // What's listened on in its place: the Input recorded from in place of
-  // the one picked; the default input in place of the Input recorded from.
-  const usedInstead = $derived(tunerInput.picked ? 'the Input you record from' : 'the default input');
-  // The Input named on the picker's button: the one listened on, the Input
-  // recorded from in place of one picked that isn't connected.
-  const named = $derived(inputName(tunerInput.picked && inputs.chosenGone ? input.value : tunerInput.value));
+  // the one picked, unless it isn't connected either; else the default input.
+  const usedInstead = $derived(
+    tunerInput.picked && sameInput(inputs.used, input.value) ? 'the Input you record from' : 'the default input',
+  );
+  // The Input named on the picker's button: the one listened on.
+  const named = $derived(inputName(inputs.used));
 
   // A Tuning that can't be read can't be tuned to: listening stops with it.
   $effect(() => {
@@ -236,14 +237,7 @@
       <p class="muted">Tap a peg to hear its string's note.</p>
       <div class="input">
         <span>Listens on</span>
-        <InputPicker
-          {inputs}
-          {named}
-          label="Input to listen on"
-          legend="Listen on"
-          instead="the Input you record from"
-          note={null}
-        />
+        <InputPicker {inputs} {named} label="Input to listen on" legend="Listen on" instead={usedInstead} note={null} />
       </div>
       {#if opening}
         <p class="muted" role="status">Opening the input…</p>
