@@ -48,7 +48,7 @@ class Capture extends AudioWorkletProcessor {
 registerProcessor('bandmate-capture', Capture);
 `;
 
-import { inputRecorded, resolveInput, standIns, type InputChoice } from './inputSettings';
+import { deviceName, inputRecorded, resolveInput, standIns, type InputChoice } from './inputSettings';
 
 // Added to a context once.
 const loaded = new WeakMap<BaseAudioContext, Promise<void>>();
@@ -64,8 +64,19 @@ function loadWorklet(context: AudioContext): Promise<void> {
   return done;
 }
 
+/** Why an Input can't be opened, where the Tuner words it apart from recording: no secure connection, or no input. */
+type Unopenable = 'insecure' | 'noInput';
+
 /** Why recording couldn't start, in words to show. */
-export class CaptureError extends Error {}
+export class CaptureError extends Error {
+  constructor(
+    message: string,
+    /** Why, where the Tuner words it its own way. */
+    readonly why?: Unopenable,
+  ) {
+    super(message);
+  }
+}
 
 // How many channels to ask an input for: as many as it has, up to this.
 const wantedChannels = 8;
@@ -89,12 +100,14 @@ export interface OpenInput {
 }
 
 /**
- * Opens the input chosen, or the default one where it's gone, untouched by
- * the browser's echo cancellation, noise suppression and auto gain. Fails
+ * Opens the input chosen, or where it's gone, `instead`, e.g. the Input
+ * recorded from in place of the Tuner's own, and failing that the default
+ * one, untouched by the browser's echo cancellation, noise suppression and
+ * auto gain. Where the one chosen is gone, it's the one named gone. Fails
  * with a CaptureError to show.
  */
-export async function openInput(choice: InputChoice): Promise<OpenInput> {
-  if (!navigator.mediaDevices?.getUserMedia) throw new CaptureError(insecure);
+export async function openInput(choice: InputChoice, instead?: InputChoice): Promise<OpenInput> {
+  if (!navigator.mediaDevices?.getUserMedia) throw new CaptureError(insecure, 'insecure');
   const open = (deviceId: string) =>
     navigator.mediaDevices.getUserMedia({
       audio: {
@@ -105,21 +118,27 @@ export async function openInput(choice: InputChoice): Promise<OpenInput> {
         autoGainControl: false,
       },
     });
-  let stream: MediaStream;
+  // Where the device chosen is gone, the one to open in its place, if not the default.
+  const other = instead && instead.deviceId !== choice.deviceId ? instead : null;
+  let stream: MediaStream | null = null;
   // Whether the device chosen couldn't be opened, so the default was.
   let fellBack = false;
   try {
     try {
       stream = await open(choice.deviceId);
     } catch (e) {
-      // Gone, most likely: the default is tried, and said so below.
+      // Gone, most likely: the one instead or the default is tried, and said so below.
       if (!choice.deviceId || (e as DOMException).name !== 'OverconstrainedError') throw e;
-      stream = await open('');
-      fellBack = true;
+      if (!other) {
+        stream = await open('');
+        fellBack = true;
+      }
     }
   } catch (e) {
-    throw new CaptureError(inputError(e as Error));
+    throw inputError(e as Error);
   }
+  // Opened apart from the try, so a CaptureError it fails with is shown as it is.
+  if (!stream) return { ...(await openInput(other!)), gone: deviceName(choice.label) };
   const settings = stream.getAudioTracks()[0]?.getSettings();
   const channels = settings?.channelCount || 1;
   // Only once allowed does the browser tell the inputs apart.
@@ -225,19 +244,31 @@ export function openProblem(e: unknown): string {
   return e instanceof CaptureError ? e.message : `Couldn't open the input (${(e as Error).message}).`;
 }
 
-/** Why an input couldn't be opened, in words to show. */
-function inputError(e: Error): string {
+/**
+ * Why the Tuner can't listen on an Input, from what opening it threw, in
+ * words to show: as recording says, but for what it says of recording.
+ */
+export function listenProblem(e: unknown): string {
+  if (e instanceof CaptureError && e.why === 'insecure') return listeningInsecure;
+  if (e instanceof CaptureError && e.why === 'noInput') return nothingToListenOn;
+  return openProblem(e);
+}
+
+/** Why an input couldn't be opened, from what the browser threw. */
+function inputError(e: Error): CaptureError {
   const name = e.name;
-  if (name === 'NotAllowedError' || name === 'SecurityError') return blocked;
-  if (name === 'NotFoundError' || name === 'OverconstrainedError') return noInput;
+  if (name === 'NotAllowedError' || name === 'SecurityError') return new CaptureError(blocked);
+  if (name === 'NotFoundError' || name === 'OverconstrainedError') return new CaptureError(noInput, 'noInput');
   if (name === 'NotReadableError')
-    return "The audio input is busy or unavailable. Check it isn't in use by another app.";
-  return `Couldn't open the microphone (${e.message}).`;
+    return new CaptureError("The audio input is busy or unavailable. Check it isn't in use by another app.");
+  return new CaptureError(`Couldn't open the microphone (${e.message}).`);
 }
 
 const insecure = 'Recording needs a secure connection: open Bandmate over https or on localhost.';
 const blocked = "Bandmate isn't allowed to use the microphone. Allow it in the browser's site settings.";
 const noInput = "There's no microphone or audio input to record from. Connect one to record.";
+const listeningInsecure = 'Listening needs a secure connection: open Bandmate over https or on localhost.';
+const nothingToListenOn = "There's no microphone or audio input to listen on. Connect one to tune.";
 
 /**
  * Why Record can't work, as far as can be told without asking for the
@@ -285,7 +316,10 @@ function release(stream: MediaStream) {
   for (const track of stream.getTracks()) track.stop();
 }
 
-/** The chosen input's level, from when it's opened until it's closed, e.g. for a meter. */
+/**
+ * The chosen input's latest samples, from when it's opened until it's
+ * closed, e.g. for a level meter, or for the Tuner to hear a note in.
+ */
 export class InputLevel {
   #samples: Float32Array<ArrayBuffer>;
 
@@ -298,12 +332,26 @@ export class InputLevel {
     this.#samples = new Float32Array(analyser.fftSize);
   }
 
-  /** Opens the input chosen. Fails with a CaptureError to show. */
-  static async open(context: AudioContext, choice: InputChoice): Promise<InputLevel> {
-    const input = await openInput(choice);
+  /**
+   * Opens the input chosen, or where it's gone `instead`, as openInput
+   * does, keeping its latest `size` samples, a power of two: enough for a
+   * meter by default, more to hear a low note in. Fails with a
+   * CaptureError to show.
+   */
+  static async open(
+    context: AudioContext,
+    choice: InputChoice,
+    { size = 2048, instead }: { size?: number; instead?: InputChoice } = {},
+  ): Promise<InputLevel> {
+    const input = await openInput(choice, instead);
     const analyser = context.createAnalyser();
-    analyser.fftSize = 2048;
+    analyser.fftSize = size;
     return new InputLevel(context, input, connectChannel(context, input, analyser), analyser);
+  }
+
+  /** The rate its samples are at: the context's. */
+  get sampleRate(): number {
+    return this.context.sampleRate;
   }
 
   /** How many channels the input has, and which of them is metered. */

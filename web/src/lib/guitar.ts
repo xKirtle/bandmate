@@ -188,6 +188,12 @@ export const guitarSamples: SampleSet = {
   gain: 0.64,
 };
 
+/** A string as players number it, the high one 1st: the low string of six is the 6th. */
+export function stringNumber(string: number, strings: number): string {
+  const n = strings - string;
+  return n + (n === 1 ? 'st' : n === 2 ? 'nd' : n === 3 ? 'rd' : 'th');
+}
+
 /**
  * The guitar in a tuning, its strings' pitches low to high as MIDI note
  * numbers. It plays its recorded samples, which Hear strums, low string to

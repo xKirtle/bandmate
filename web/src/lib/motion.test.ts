@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { scrollBehavior } from './motion';
+import { reducedMotion, scrollBehavior } from './motion';
 
 /** Stubs the browser's answer to the reduced-motion preference. */
 function preferReducedMotion(reduce: boolean) {
@@ -24,5 +24,21 @@ describe('scrollBehavior', () => {
   it('scrolls smoothly where the preference can’t be read', () => {
     vi.stubGlobal('matchMedia', undefined);
     expect(scrollBehavior()).toBe('smooth');
+  });
+});
+
+describe('reducedMotion', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('is whether the user has asked for reduced motion', () => {
+    preferReducedMotion(true);
+    expect(reducedMotion()).toBe(true);
+    preferReducedMotion(false);
+    expect(reducedMotion()).toBe(false);
+  });
+
+  it('is false where the preference can’t be read', () => {
+    vi.stubGlobal('matchMedia', undefined);
+    expect(reducedMotion()).toBe(false);
   });
 });

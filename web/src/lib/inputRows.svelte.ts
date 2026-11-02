@@ -7,11 +7,11 @@ import { calibrations } from './sharedCalibration.svelte';
 import { input } from './sharedInput.svelte';
 
 // The Inputs on this device, as a list of them shows them: first the
-// default input, then each channel of each device connected, each to
-// record from; then every Input kept whose device isn't. Told again as
-// devices come and go, and once the browser allows the microphone. Made
-// while a component is set up, as it watches the devices while that's
-// mounted.
+// default input, then each channel of each device connected, each to pick;
+// then every Input kept whose device isn't. Told again as devices come and
+// go, and once the browser allows the microphone. Made while a component
+// is set up, as it watches the devices while that's mounted. By default
+// they're picked to record from; the Tuner picks its own from them.
 
 /** A connected row: the default input, or a device's channel. */
 export interface ConnectedRow {
@@ -28,7 +28,7 @@ export interface ConnectedRow {
   input: InputChoice;
   /** Whether it's calibrated as that Input exactly, rather than as the Input it turns out to be. */
   exact: boolean;
-  /** Whether it's the Input recorded from. */
+  /** Whether it's the Input used: the one picked, or the one used in its place where that isn't connected. */
   chosen: boolean;
 }
 
@@ -36,11 +36,35 @@ const defaultInput: InputChoice = { deviceId: '', label: '', channel: 0 };
 /** Tells an Input from the others listed: its device and channel. */
 export const keyOf = (input: InputChoice) => JSON.stringify([input.deviceId, input.channel]);
 
+/** Which Input the rows pick, and what's used in its place where it isn't connected. */
+export interface PickedInput {
+  /** The Input picked. */
+  value: () => InputChoice;
+  /** Picks one. */
+  set: (choice: InputChoice) => void;
+  /** The Input used where the one picked isn't connected: the default input unless it's another. */
+  instead?: () => InputChoice;
+}
+
+/** The Input recorded from, chosen on this device, in this tab or another. */
+const recordedFrom: PickedInput = { value: () => input.value, set: (choice) => input.set(choice) };
+
 export class InputRows {
-  // The Input chosen on this device, in this tab or another.
-  #choice = $derived(input.value);
+  #picked: PickedInput = recordedFrom;
+  // The Input picked.
+  #choice = $derived(this.#picked.value());
+  // The Input used in its place where it isn't connected.
+  #instead = $derived(this.#picked.instead?.() ?? defaultInput);
+  /**
+   * The Input used, as far as can be told without opening it: the one
+   * picked, or where it isn't connected, the one instead, or where that
+   * isn't either, the default.
+   */
+  readonly used: InputChoice = $derived(
+    this.#connected(this.#choice) ? this.#choice : this.#connected(this.#instead) ? this.#instead : defaultInput,
+  );
   // The default input, as chosen where it is, e.g. a channel of it chosen before Inputs were listed.
-  #defaultChoice = $derived(this.#choice.deviceId === '' ? this.#choice : defaultInput);
+  #defaultChoice = $derived(this.used.deviceId === '' ? this.used : defaultInput);
   // The Input the default input looks to be, and its calibration.
   #defaultRecorded = new RecordedInput(() => this.#defaultChoice);
 
@@ -59,7 +83,8 @@ export class InputRows {
     ),
   );
 
-  constructor() {
+  constructor(picked: PickedInput = recordedFrom) {
+    this.#picked = picked;
     $effect(() => {
       let live = true;
       const check = async () => {
@@ -84,14 +109,15 @@ export class InputRows {
    */
   readonly microphoneAllowed = $derived(this.#devices !== null || !this.#told);
 
-  /** The device chosen when it isn't connected, so the default input is recorded from; null otherwise. */
-  readonly chosenGone = $derived(
-    this.#choice.deviceId !== '' &&
-      this.#devices !== null &&
-      !this.#devices.some((d) => d.deviceId === this.#choice.deviceId)
-      ? deviceName(this.#choice.label)
-      : null,
-  );
+  /** The device picked when it isn't connected, so another is used in its place; null otherwise. */
+  readonly chosenGone = $derived(this.#connected(this.#choice) ? null : deviceName(this.#choice.label));
+
+  /** Whether an Input's device is connected, as far as can be told: the default input always is. */
+  #connected(choice: InputChoice): boolean {
+    return (
+      choice.deviceId === '' || this.#devices === null || this.#devices.some((d) => d.deviceId === choice.deviceId)
+    );
+  }
 
   /** The default input, then each channel of each device connected. */
   readonly connected: ConnectedRow[] = $derived([
@@ -103,7 +129,7 @@ export class InputRows {
       calibration: this.#defaultRecorded.calibration,
       input: this.#defaultChoice,
       exact: false,
-      chosen: this.#choice.deviceId === '' || this.chosenGone !== null,
+      chosen: this.used.deviceId === '',
     },
     ...this.#listed.connected.map((row) => ({
       key: keyOf(row.input),
@@ -113,7 +139,7 @@ export class InputRows {
       calibration: row.calibration,
       input: row.input,
       exact: true,
-      chosen: keyOf(row.input) === keyOf(this.#choice),
+      chosen: keyOf(row.input) === keyOf(this.used),
     })),
   ]);
 
@@ -122,9 +148,9 @@ export class InputRows {
     return this.#listed.notConnected;
   }
 
-  /** Makes a row's Input the one recorded from on this device. */
+  /** Picks a row's Input: by default, the one recorded from on this device. */
   choose(row: ConnectedRow) {
-    input.set(row.exact ? $state.snapshot(row.input) : defaultInput);
+    this.#picked.set(row.exact ? $state.snapshot(row.input) : defaultInput);
   }
 
   /** Learns how many channels a device has from an opening of it, e.g. a level meter's. */

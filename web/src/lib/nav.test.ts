@@ -27,6 +27,10 @@ describe('currentPage', () => {
     expect(currentPage('/chords')).toBe('chords');
   });
 
+  it('marks the Tuner on its page', () => {
+    expect(currentPage('/tuner')).toBe('tuner');
+  });
+
   it('marks Settings on every one of its tabs', () => {
     expect(currentPage('/settings')).toBe('settings');
     expect(currentPage('/settings/shortcuts')).toBe('settings');
@@ -45,6 +49,7 @@ describe('currentPage', () => {
     expect(currentPage('/beatsx')).toBeUndefined();
     expect(currentPage('/songsx')).toBeUndefined();
     expect(currentPage('/chordsx')).toBeUndefined();
+    expect(currentPage('/tunerx')).toBeUndefined();
     expect(currentPage('/backupsx')).toBeUndefined();
     expect(currentPage('/settingsx')).toBeUndefined();
     expect(currentPage('/settings/nowhere')).toBeUndefined();
@@ -62,8 +67,9 @@ describe('listAt', () => {
     expect(listAt('/nowhere')).toBeUndefined();
   });
 
-  it('is none on the Chord Finder or Settings, which keep no search', () => {
+  it('is none on the Chord Finder, the Tuner or Settings, which keep no search', () => {
     expect(listAt('/chords')).toBeUndefined();
+    expect(listAt('/tuner')).toBeUndefined();
     expect(listAt('/settings')).toBeUndefined();
     expect(listAt('/settings/backups')).toBeUndefined();
     expect(listAt('/settings/about')).toBeUndefined();
@@ -71,11 +77,12 @@ describe('listAt', () => {
 });
 
 describe('pages', () => {
-  it('leads to the Songs, the Beats and the Chord Finder, in that order', () => {
+  it('leads to the Songs, the Beats, the Chord Finder and the Tuner, in that order', () => {
     expect(pages.map((p) => [p.label, p.href])).toEqual([
       ['Songs', '/'],
       ['Beats', '/beats'],
       ['Chords', '/chords'],
+      ['Tuner', '/tuner'],
     ]);
   });
 });

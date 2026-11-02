@@ -4,8 +4,8 @@
  * for reduced motion (docs/design.md).
  */
 
-/** Whether the user has asked for reduced motion. */
-function reducedMotion(): boolean {
+/** Whether the user has asked for reduced motion: motion in script that isn't tracking real time stops. */
+export function reducedMotion(): boolean {
   return typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
 }
 

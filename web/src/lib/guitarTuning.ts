@@ -141,6 +141,12 @@ export function guitarTuningNotes(text: string): string | null {
   );
 }
 
+/** A tuning's strings, low to high: each one's note as written, with # or b, and its pitch as a MIDI note number. Null if it can't be read. */
+export function guitarTuningStrings(text: string): { note: string; pitch: number }[] | null {
+  const tuning = readTuning(text);
+  return tuning && tuning.notes.map((n, string) => ({ note: n.name, pitch: tuning.pitches[string] }));
+}
+
 /** A tuning's text as the Details write it: its name if it has one, else its six notes spaced. Null if it can't be read. */
 export function guitarTuningText(text: string): string | null {
   return guitarTuningName(text) ?? guitarTuningNotes(text);

@@ -7,6 +7,7 @@
   import DemoSong from './routes/DemoSong.svelte';
   import BeatLibrary from './routes/BeatLibrary.svelte';
   import ChordFinderPage from './routes/ChordFinderPage.svelte';
+  import TunerPage from './routes/TunerPage.svelte';
   import Backups from './routes/Backups.svelte';
   import ThisDevice from './routes/ThisDevice.svelte';
   import Shortcuts from './routes/Shortcuts.svelte';
@@ -46,6 +47,8 @@
       <BeatLibrary />
     {:else if router.path === '/chords'}
       <ChordFinderPage />
+    {:else if router.path === '/tuner'}
+      <TunerPage />
     {:else if settingsTab === 'device'}
       <ThisDevice />
     {:else if hidden}

@@ -33,7 +33,7 @@ import { keys } from './transpose';
 export { qualities, roots, type Quality, type Suggestion } from './chordTheory';
 /** The one list of Keys (transpose.ts), the list a Song's and a Beat's Key field offers, and what Suggest's Tonics are projected from. */
 export { keys };
-export type { Frets, GuitarVoicing } from './guitar';
+export { stringNumber, type Frets, type GuitarVoicing } from './guitar';
 export type { HeardNote, InstrumentSound } from './instrument';
 export { highestKey, lowestKey, pianoKeyName, whiteKeys, type PianoKeys, type PianoVoicing } from './piano';
 

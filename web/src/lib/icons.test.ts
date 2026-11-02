@@ -35,7 +35,8 @@ describe('icons', () => {
 
   it('draws no icon by hand: the only inline SVGs are drawings', () => {
     // A Chord diagram; the waveforms of a Master, a Beat and a Clip; a
-    // Clip's Fades; Bandmate's mark; calibration's metronome. An
+    // Clip's Fades; Bandmate's mark; calibration's metronome; the Tuner's
+    // wave. An
     // icon comes from Lucide instead
     // (docs/design.md, Icons).
     const drawings = [
@@ -44,6 +45,7 @@ describe('icons', () => {
       'lib/ChordDiagram.svelte',
       'lib/Metronome.svelte',
       'lib/Timeline.svelte',
+      'routes/TunerPage.svelte',
     ];
     const drawn = files.filter(({ code }) => /<svg[\s>]/.test(code)).map(({ path }) => path);
     expect(drawn.sort()).toEqual(drawings);
