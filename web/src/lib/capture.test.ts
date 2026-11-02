@@ -111,3 +111,48 @@ describe('why the Tuner can’t listen', () => {
     );
   });
 });
+
+describe('opening an Input with another to use where it isn’t connected', () => {
+  // A browser with one device connected, "scarlett", of two channels: any
+  // other asked for exactly isn't there.
+  const asked: string[] = [];
+  beforeEach(() => {
+    asked.length = 0;
+    vi.stubGlobal('navigator', {
+      mediaDevices: {
+        getUserMedia: async ({ audio }: { audio: { deviceId?: { exact: string } } }) => {
+          const id = audio.deviceId?.exact ?? '';
+          asked.push(id || 'default');
+          if (id !== '' && id !== 'scarlett') throw new DOMException('Gone', 'OverconstrainedError');
+          const settings = { channelCount: 2, deviceId: 'scarlett', groupId: 'g' };
+          return { getAudioTracks: () => [{ getSettings: () => settings }], getTracks: () => [] };
+        },
+        enumerateDevices: async () => [
+          { kind: 'audioinput', deviceId: 'scarlett', groupId: 'g', label: 'Scarlett 2i2 USB' },
+        ],
+      },
+    });
+  });
+  afterEach(() => vi.unstubAllGlobals());
+
+  const guitar = { deviceId: 'guitar', label: 'Guitar Link (1234:abcd)', channel: 0 };
+  const scarlett2 = { deviceId: 'scarlett', label: 'Scarlett 2i2 USB', channel: 1 };
+
+  it('opens the Input asked for while it’s connected', async () => {
+    const opened = await openInput(scarlett2, guitar);
+    expect(asked).toEqual(['scarlett']);
+    expect(opened).toMatchObject({ channel: 1, gone: null, input: scarlett2 });
+  });
+
+  it('opens the other where it isn’t, naming the one gone', async () => {
+    const opened = await openInput(guitar, scarlett2);
+    expect(asked).toEqual(['guitar', 'scarlett']);
+    expect(opened).toMatchObject({ channel: 1, gone: 'Guitar Link', input: scarlett2 });
+  });
+
+  it('opens the default where the other isn’t connected either, still naming the one asked for', async () => {
+    const opened = await openInput(guitar, { ...guitar, deviceId: 'other', label: 'Other' });
+    expect(asked).toEqual(['guitar', 'other', 'default']);
+    expect(opened).toMatchObject({ channel: 0, gone: 'Guitar Link' });
+  });
+});

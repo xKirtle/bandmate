@@ -48,7 +48,7 @@ class Capture extends AudioWorkletProcessor {
 registerProcessor('bandmate-capture', Capture);
 `;
 
-import { inputRecorded, resolveInput, standIns, type InputChoice } from './inputSettings';
+import { deviceName, inputRecorded, resolveInput, standIns, type InputChoice } from './inputSettings';
 
 // Added to a context once.
 const loaded = new WeakMap<BaseAudioContext, Promise<void>>();
@@ -100,11 +100,13 @@ export interface OpenInput {
 }
 
 /**
- * Opens the input chosen, or the default one where it's gone, untouched by
- * the browser's echo cancellation, noise suppression and auto gain. Fails
+ * Opens the input chosen, or where it's gone, `instead`, e.g. the Input
+ * recorded from in place of the Tuner's own, and failing that the default
+ * one, untouched by the browser's echo cancellation, noise suppression and
+ * auto gain. Where the one chosen is gone, it's the one named gone. Fails
  * with a CaptureError to show.
  */
-export async function openInput(choice: InputChoice): Promise<OpenInput> {
+export async function openInput(choice: InputChoice, instead?: InputChoice): Promise<OpenInput> {
   if (!navigator.mediaDevices?.getUserMedia) throw new CaptureError(insecure, 'insecure');
   const open = (deviceId: string) =>
     navigator.mediaDevices.getUserMedia({
@@ -116,21 +118,24 @@ export async function openInput(choice: InputChoice): Promise<OpenInput> {
         autoGainControl: false,
       },
     });
-  let stream: MediaStream;
+  let stream: MediaStream | undefined;
   // Whether the device chosen couldn't be opened, so the default was.
   let fellBack = false;
   try {
     try {
       stream = await open(choice.deviceId);
     } catch (e) {
-      // Gone, most likely: the default is tried, and said so below.
+      // Gone, most likely: the one instead or the default is tried, and said so below.
       if (!choice.deviceId || (e as DOMException).name !== 'OverconstrainedError') throw e;
-      stream = await open('');
-      fellBack = true;
+      if (!instead || instead.deviceId === choice.deviceId) {
+        stream = await open('');
+        fellBack = true;
+      }
     }
   } catch (e) {
     throw inputError(e as Error);
   }
+  if (!stream) return { ...(await openInput(instead!)), gone: deviceName(choice.label) };
   const settings = stream.getAudioTracks()[0]?.getSettings();
   const channels = settings?.channelCount || 1;
   // Only once allowed does the browser tell the inputs apart.
@@ -325,12 +330,17 @@ export class InputLevel {
   }
 
   /**
-   * Opens the input chosen, keeping its latest `size` samples, a power of
-   * two: enough for a meter by default, more to hear a low note in. Fails
-   * with a CaptureError to show.
+   * Opens the input chosen, or where it's gone `instead`, as openInput
+   * does, keeping its latest `size` samples, a power of two: enough for a
+   * meter by default, more to hear a low note in. Fails with a
+   * CaptureError to show.
    */
-  static async open(context: AudioContext, choice: InputChoice, size = 2048): Promise<InputLevel> {
-    const input = await openInput(choice);
+  static async open(
+    context: AudioContext,
+    choice: InputChoice,
+    { size = 2048, instead }: { size?: number; instead?: InputChoice } = {},
+  ): Promise<InputLevel> {
+    const input = await openInput(choice, instead);
     const analyser = context.createAnalyser();
     analyser.fftSize = size;
     return new InputLevel(context, input, connectChannel(context, input, analyser), analyser);
