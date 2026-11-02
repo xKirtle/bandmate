@@ -4,20 +4,22 @@
   // string's note on the peg that tunes it, mirrored on a left-handed device.
   // Tapping a peg plays its string's note from the guitar's recorded samples,
   // ringing once, and tapping it again plays it again. Tapping it also holds
-  // the Tuner to that string, marked as held, until it's released, another
-  // string is tapped, or another Tuning is picked. It's a guitar's whatever
-  // the device's Instrument. Once Listen is pressed, it listens on its own
-  // Input, showing between the pegs the note it hears, the string held or
-  // else the one whose note is nearest, how many cents sharp or flat of it
-  // the note is, which way to tune to it, with an arrow and words, and a wave
-  // that drifts as a strobe tuner's does, until Stop is pressed or the page is
-  // left. Once a note fades, it keeps showing where it landed, muted and
-  // labelled Last heard, the wave at rest, until the next note is heard, or
-  // listening stops, a string is held or released, or another Tuning is
-  // picked. Its Input is picked under the headstock, from the Inputs connected,
-  // as the Timeline's mic button lists them: the Input recorded from until
-  // another is picked, and the Input recorded from again wherever the one
-  // picked isn't connected.
+  // the Tuner to that string and turns Auto off, until Auto is tapped, another
+  // string is tapped, or another Tuning is picked. With Auto on, it picks the
+  // string nearest the note heard. Either way, the peg of the string it's
+  // tuning shows pressed. It's a guitar's whatever the device's Instrument.
+  // Once Listen is pressed, it listens on its own Input, showing between the
+  // pegs the note it hears, the string held or else the one whose note is
+  // nearest, how many cents sharp or flat of it the note is, which way to
+  // tune to it, with an arrow and words, and a wave that drifts as a strobe
+  // tuner's does, until Stop is pressed or the page is left. Once a note
+  // fades, it keeps showing where it landed, muted and labelled Last heard,
+  // its string's peg muted under Auto, the wave at rest, until the next note
+  // is heard, or listening stops, a string is held, Auto is tapped, or
+  // another Tuning is picked. Its Input is picked under the headstock, from
+  // the Inputs connected, as the Timeline's mic button lists them: the Input
+  // recorded from until another is picked, and the Input recorded from again
+  // wherever the one picked isn't connected.
   import ArrowDown from '@lucide/svelte/icons/arrow-down';
   import ArrowUp from '@lucide/svelte/icons/arrow-up';
   import { untrack } from 'svelte';
@@ -59,7 +61,7 @@
 
   // The string the Tuner's held to, one of the Tuning's, kept raw so it's
   // that very string, told apart from the others by identity: null for none,
-  // the nearest string read instead.
+  // Auto on, the nearest string read instead.
   let held = $state.raw<TunerString | null>(null);
 
   function keep() {
@@ -70,7 +72,10 @@
     deviceTuning.set(tuning);
   }
 
-  /** Holds the Tuner to a string, or releases it with null: the note kept was read against another, so it goes. */
+  /**
+   * Holds the Tuner to a string, turning Auto off, or lets go with null,
+   * Auto on: the note kept was read against another, so it goes.
+   */
   function hold(string: TunerString | null) {
     held = string;
     forgetLastHeard();
@@ -124,6 +129,11 @@
   const showingKept = $derived(pitch === null && kept !== null);
   // The reading of a note heard now: null on the note kept, as on nothing heard.
   const live = $derived(showingKept ? null : reading);
+  // The string it's tuning, its peg shown pressed: the one held, else under
+  // Auto the one the note shown is read against, none with nothing heard.
+  const tuned = $derived(held ?? reading?.string ?? null);
+  // Under Auto, the string of the note kept, its peg muted as the rest of Last heard is.
+  const pegFaded = $derived(!held && showingKept);
 
   // Read every so often while the Input is open, and nothing once it isn't.
   $effect(() => {
@@ -248,9 +258,10 @@
               <button
                 type="button"
                 class="button peg"
-                class:held={held === s}
+                class:pressed={tuned === s}
+                class:faded={tuned === s && pegFaded}
                 aria-label="Hear the {s.number} string, {s.name}"
-                aria-current={held === s ? 'true' : undefined}
+                aria-current={tuned === s ? 'true' : undefined}
                 title="Hear the {s.number} string, and hold the Tuner to it"
                 onclick={() => playAndHold(s)}
               >
@@ -310,14 +321,21 @@
           {/if}
         </div>
       </div>
-      {#if held}
-        <p class="holding">
-          <span>Held to the {held.number} string, {held.name}</span>
-          <button type="button" class="button quiet" onclick={() => hold(null)}>Release</button>
-        </p>
-      {:else}
-        <p class="muted">Tap a peg to hear its string's note and hold the Tuner to that string.</p>
-      {/if}
+      <!-- Auto, on while no string is held: tapping it lets go of the one held. -->
+      <p class="holding">
+        <button
+          type="button"
+          class="chip"
+          aria-pressed={!held}
+          aria-describedby="tuner-holding"
+          onclick={() => held && hold(null)}
+        >
+          Auto
+        </button>
+        <span id="tuner-holding">
+          {#if held}Held to the {held.number} string, {held.name}{:else}Picks the string nearest the note heard{/if}
+        </span>
+      </p>
       <div class="input">
         <span>Listens on</span>
         <InputPicker {inputs} {named} label="Input to listen on" legend="Listen on" instead={usedInstead} note={null} />
@@ -443,27 +461,45 @@
     font-size: var(--text-xs);
     font-weight: 400;
   }
-  /* The string held: its peg filled with the accent, as a picked chip is. */
-  .peg.held {
+  /* The string it's tuning, held or picked under Auto: its peg filled with
+     the accent, as a picked chip is. */
+  .peg.pressed {
     border-color: var(--accent);
     background: var(--accent);
   }
-  .peg.held .note,
-  .peg.held .which {
+  .peg.pressed:not(.faded) .note,
+  .peg.pressed:not(.faded) .which {
     color: var(--accent-text);
   }
   @media (hover: hover) {
-    .peg.held:hover:not(:disabled) {
+    .peg.pressed:hover:not(:disabled) {
       border-color: color-mix(in srgb, var(--accent) 85%, var(--text));
       background: color-mix(in srgb, var(--accent) 85%, var(--text));
     }
   }
-  /* What it's held to, and Release beside it. */
+  /* The string of the note last heard, under Auto: muted with the readout,
+     a tint of the accent edged in a deeper one, its note and number left
+     as an unpressed peg's. */
+  .peg.pressed.faded {
+    border-color: color-mix(in srgb, var(--accent) 40%, transparent);
+    background: color-mix(in srgb, var(--accent) 12%, transparent);
+  }
+  @media (hover: hover) {
+    .peg.pressed.faded:hover:not(:disabled) {
+      border-color: color-mix(in srgb, var(--accent) 40%, transparent);
+      background: color-mix(in srgb, var(--accent) 24%, transparent);
+    }
+  }
+  /* Auto, and beside it what picks the string: the Tuner, or the string held. */
   .holding {
     display: flex;
     flex-wrap: wrap;
-    align-items: baseline;
-    gap: var(--space-2);
+    align-items: center;
+    gap: var(--space-2) var(--space-3);
+  }
+  .holding > span {
+    min-width: 0;
+    color: var(--text-muted);
   }
   /* What's heard, centred between the pegs: Last heard over the note kept,
      the note, its string, the wave and how far off it is, each holding its
