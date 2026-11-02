@@ -131,7 +131,7 @@ A word whose ending sounds like another's: perfect when its last stressed vowel 
 _Avoid_: Slant rhyme (say near Rhyme)
 
 **Chord Finder**:
-A built-in reference for Chords: look up how to play one, name one from the notes placed on an Instrument, and get Chords that go well with a Chord or a Key. A Voicing can be heard there, its notes together (strummed, on the guitar) or one at a time. A guitar Voicing found there can be copied, to write it with a Chord as a Song Voicing. It has its own page and isn't opened from a Song. The user picks the Instrument, the same one the Chord Chart draws, and on the guitar the tuning; the last ones picked are kept on each device. It has no capo: a Chord names the shape fingered, so a capo changes nothing about how it is played. It holds nothing of the user's. The app titles its page and navigation label Chords.
+A built-in reference for Chords: look up how to play one, name one from the notes placed on an Instrument, and get Chords that go well with a Chord or a Key. A Voicing can be heard there, its notes together (strummed, on the guitar) or one at a time. A guitar Voicing found there can be copied, to write it with a Chord as a Song Voicing. It has its own page and isn't opened from a Song. The user picks the Instrument, the same one the Chord Chart draws, and on the guitar the Tuning, the same one the Tuner tunes to; the last ones picked are kept on each device. It has no capo: a Chord names the shape fingered, so a capo changes nothing about how it is played. It holds nothing of the user's. The app titles its page and navigation label Chords.
 _Avoid_: Chord Library (a library holds the user's things, like the Beat Library)
 
 **Voicing**:
@@ -149,6 +149,13 @@ _Avoid_: Chord strip, chord diagrams, chords used
 **Instrument**:
 What a Voicing is played on: the guitar or the piano. Each device plays one, the guitar until another is picked, and both the Chord Finder and the Chord Chart show it; changing it in either changes it for both.
 _Avoid_: Keyboard (say piano)
+
+**Tuning**:
+The notes a guitar's six strings are tuned to, low to high: a named one, like Drop D or DADGAD, or any six notes. Written without octaves, each string is taken to be in the octave nearest its note in standard tuning, the lower one when two are as near. A Song has one, among its Details, for its Chords; apart from any Song, each device has one, which the Chord Finder and the Tuner both use, standard until another is picked, and changing it in either changes it for both. A Tuning that can't be read gets no diagram and can't be tuned to rather than a guess.
+_Avoid_: Tune
+
+**Tuner**:
+A built-in tool for tuning a guitar to the device's Tuning: it listens on an Input and shows the note it hears, which string's note is nearest and how far sharp or flat it is, and it plays a string's note to tune to by ear. Playing a string's note also holds the Tuner to that string, however far off it's heard, for a string too far off to be nearest its own note, as it can be when changing Tuning. The note to tune to is always at A = 440 Hz. It's guitar-only, whatever the device's Instrument, and has its own page, like the Chord Finder's, opened from neither a Song nor the Chord Finder. The Input it listens on is its own, the one recorded from until another is picked there, and the last one picked is kept on each device.
 
 **Snapshot**:
 A copy of a Song's Lyric Sheet and Scrapbook as they were, which Bandmate takes on its own: before each editing session, the first change to them 10 minutes or more after the one before, unless nothing has changed since the newest one; just before deleting a Scrapbook Section or an Alternate, naming it; and before every restore. Restoring one makes the Lyric Sheet and Scrapbook the Snapshot's, keeping what was there as a Snapshot first; a Line still there keeps its Cue as it is now, and a Line brought back gets the Cue it had. Snapshots are thinned as they age, each time one is taken: every one from the last day stays, then the newest of each day for the month before, then the newest of each week, a day being the date on the Device whose change took it. The user can Keep one, and a kept Snapshot is never thinned. Snapshots can't be named, renamed or deleted by hand.
