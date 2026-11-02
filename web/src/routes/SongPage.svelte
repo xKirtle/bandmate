@@ -854,7 +854,7 @@
     border-color: transparent;
     background: transparent;
     font-size: var(--text-2xl);
-    font-weight: 700;
+    font-weight: 600;
     line-height: 1.2;
   }
   h1.title,
@@ -1218,7 +1218,7 @@
       gap: var(--space-2);
       min-height: var(--control);
       padding: 0 var(--space-3);
-      font-weight: 700;
+      font-weight: 600;
       cursor: pointer;
       user-select: none;
     }

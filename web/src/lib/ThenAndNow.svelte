@@ -161,7 +161,7 @@
     margin: 0 0 var(--space-1);
     color: var(--text-muted);
     font-size: var(--text-md);
-    font-weight: 700;
+    font-weight: 600;
   }
   p {
     margin: 0;

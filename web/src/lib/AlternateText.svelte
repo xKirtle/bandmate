@@ -300,7 +300,7 @@
     color: var(--accent-text);
     font: inherit;
     font-size: var(--text-sm);
-    font-weight: 700;
+    font-weight: 600;
     cursor: pointer;
   }
   /* Takes no height, so however tall its field, the rows stay as tall as

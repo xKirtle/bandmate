@@ -2655,7 +2655,7 @@
     background: none;
     color: var(--text-muted);
     font-size: calc(0.75 * var(--timeline-rem));
-    font-weight: 700;
+    font-weight: 600;
     cursor: pointer;
   }
   .toggle[aria-pressed='true'] {
