@@ -24,9 +24,7 @@ const clearly = 0.1;
  * lowest note: 4096 samples at 48 kHz holds nearly four of a B♭1.
  */
 export function detectPitch(samples: Float32Array, sampleRate: number): number | null {
-  let energy = 0;
-  for (const s of samples) energy += s * s;
-  if (Math.sqrt(energy / samples.length) < quietest) return null;
+  if (loudness(samples) < quietest) return null;
 
   const maxLag = Math.min(Math.ceil(sampleRate / lowest), Math.floor(samples.length / 2));
   const minLag = Math.floor(sampleRate / highest);
@@ -57,6 +55,13 @@ export function detectPitch(samples: Float32Array, sampleRate: number): number |
   const curve = before - 2 * at + after;
   const shift = curve > 0 ? (before - after) / (2 * curve) : 0;
   return sampleRate / (lag + shift);
+}
+
+/** How loud samples are: their RMS, 1 for a full-scale square wave. */
+export function loudness(samples: Float32Array): number {
+  let energy = 0;
+  for (const s of samples) energy += s * s;
+  return Math.sqrt(energy / samples.length);
 }
 
 /** How long a reading counts towards what's shown, in ms. */
@@ -93,4 +98,56 @@ function median(values: number[]): number {
   const sorted = [...values].sort((a, b) => a - b);
   const middle = sorted.length >> 1;
   return sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
+}
+
+/** How much louder than where a note fades it must be for its reading to be kept: four times, 12 dB. */
+const wellAbove = 4;
+/** How many of a note's readings are weighed, the latest: half a minute's, read every 50 ms. */
+const weighed = 600;
+
+/**
+ * Where a note landed, kept once it fades so it can still be read: the
+ * pitch shown at its last reading taken while it was well above its fade,
+ * 12 dB louder than its last reading, so the slight flat sag of a dying
+ * string's tail isn't what's kept. Where it stops short rather than fading,
+ * nothing being 12 dB louder, it's the pitch shown at its last reading. It's
+ * kept till the next note shows, or it's forgotten.
+ */
+export class LastHeard {
+  /** The note's readings so far: the pitch shown at each, and how loud it was. */
+  #note: { pitch: number; level: number }[] = [];
+  #kept: number | null = null;
+
+  /**
+   * Takes a reading: the pitch heard in it or null, the pitch shown then,
+   * steadied, or null, and how loud it was (see `loudness`). Returns the
+   * pitch kept, while nothing's shown once a note has faded, else null.
+   */
+  hear(heard: number | null, shown: number | null, level: number): number | null {
+    if (shown !== null) {
+      this.#kept = null;
+      if (heard !== null) {
+        // A note run straight into another isn't the one that fades: its readings go.
+        const before = this.#note.at(-1);
+        if (before && Math.abs(1200 * Math.log2(shown / before.pitch)) >= together) this.#note = [];
+        this.#note.push({ pitch: shown, level });
+        if (this.#note.length > weighed) this.#note.shift();
+      }
+      return null;
+    }
+    // The note's last reading, where it faded.
+    const faded = this.#note.at(-1);
+    if (faded) {
+      const above = this.#note.filter((r) => r.level >= wellAbove * faded.level);
+      this.#kept = (above.at(-1) ?? faded).pitch;
+      this.#note = [];
+    }
+    return this.#kept;
+  }
+
+  /** Forgets the note kept, and the one being heard. */
+  forget() {
+    this.#note = [];
+    this.#kept = null;
+  }
 }

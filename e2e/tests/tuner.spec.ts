@@ -509,7 +509,7 @@ test("tapping a string holds the Tuner to it, however far off it's heard, till i
   await expect(tuner.card).toContainText("5th string, A2");
 });
 
-test("the Tuner shows nothing heard in silence or noise, not a note", async ({
+test("the Tuner shows nothing heard in silence, and never catches a note in noise", async ({
   page,
 }) => {
   const mic = await fakeMicrophone(page);
@@ -523,11 +523,8 @@ test("the Tuner shows nothing heard in silence or noise, not a note", async ({
   await expect(tuner.way).toHaveCount(0);
   await expect(tuner.card.locator(".badge")).toHaveCount(0);
 
-  await mic.play(hz(50));
-  await expect(tuner.card).toContainText("4th string, D3");
+  // Noise, however loud, never catches a note.
   await mic.hiss();
-  await expect(tuner.card).toContainText("Nothing heard");
-  // And stays so, never catching a note in the noise.
   for (let i = 0; i < 10; i++) {
     await page.waitForTimeout(100);
     await expect(tuner.meter).toHaveAttribute(
@@ -535,6 +532,112 @@ test("the Tuner shows nothing heard in silence or noise, not a note", async ({
       "Nothing heard",
     );
   }
+
+  // Nor does it once a note's been heard: the note kept stays.
+  await mic.play(hz(50));
+  await expect(tuner.card).toContainText("4th string, D3");
+  await mic.hiss();
+  await expect(tuner.meter).toHaveAttribute(
+    "aria-valuetext",
+    "Last heard: In tune",
+  );
+  for (let i = 0; i < 10; i++) {
+    await page.waitForTimeout(100);
+    await expect(tuner.meter).toHaveAttribute(
+      "aria-valuetext",
+      "Last heard: In tune",
+    );
+    await expect(tuner.card).toContainText("4th string, D3");
+  }
+});
+
+test("once a note fades, the Tuner keeps where it landed, muted and labelled Last heard, the wave at rest, till the next note, Stop, a string held or released, or another Tuning", async ({
+  page,
+}) => {
+  const mic = await fakeMicrophone(page);
+  await page.goto("/tuner");
+  const tuner = listening(page);
+  const readout = tuner.card.locator(".readout");
+  const label = tuner.card.locator(".last-heard");
+  const colour = (where: ReturnType<Page["locator"]>) =>
+    where.evaluate((e) => getComputedStyle(e).color);
+  const atRest = await colour(tuner.meter);
+  const muted = await colour(readout.locator(".nearest"));
+  const peg = (name: string) =>
+    page.getByRole("button", { name: `Hear the ${name}` });
+
+  /** Plays a note till it shows, then stops it, as a string's dying away does. */
+  async function pluck(frequency: number, shows: string | RegExp) {
+    await mic.play(frequency);
+    await expect(tuner.meter).toHaveAttribute("aria-valuetext", shows);
+    await mic.hush();
+  }
+
+  await tuner.listen.click();
+  // Before any note, nothing heard, and no label.
+  await expect(tuner.card).toContainText("Nothing heard");
+  await expect(label).toHaveText("");
+
+  // An A2 a little sharp, faded: kept, its cents and way to tune still there.
+  await pluck(hz(45, 20), /^\d+ cents sharp, tune down$/);
+  await expect(label).toHaveText("Last heard");
+  await expect(tuner.meter).toHaveAttribute(
+    "aria-valuetext",
+    /^Last heard: (19|20|21) cents sharp, tune down$/,
+  );
+  await expect(tuner.card).toContainText("5th string, A2");
+  await expect(tuner.way).toHaveText("Tune down");
+  await expect(tuner.card).not.toContainText("Nothing heard");
+  // All of it muted, and the wave still, in its colour at rest.
+  await expect(readout.locator(".heard .note")).toHaveText("A2");
+  expect(await colour(readout.locator(".heard .note"))).toBe(muted);
+  expect(await colour(tuner.way)).toBe(muted);
+  await expect.poll(() => colour(tuner.meter)).toBe(atRest);
+  expect(await drifts(page)).toBe(0);
+
+  // In tune, faded: kept with In tune, muted too.
+  await pluck(hz(45), "In tune");
+  await expect(tuner.meter).toHaveAttribute(
+    "aria-valuetext",
+    "Last heard: In tune",
+  );
+  await expect(tuner.card.locator(".badge")).toHaveText("In tune");
+  expect(await colour(tuner.card.locator(".badge"))).toBe(muted);
+  await expect.poll(() => colour(tuner.meter)).toBe(atRest);
+
+  // The next note heard takes its place, no longer Last heard.
+  await mic.play(hz(50, -20));
+  await expect(tuner.meter).toHaveAttribute(
+    "aria-valuetext",
+    /^\d+ cents flat, tune up$/,
+  );
+  await expect(label).toHaveText("");
+  await mic.hush();
+  await expect(tuner.meter).toHaveAttribute("aria-valuetext", /^Last heard: /);
+  await expect(tuner.card).toContainText("4th string, D3");
+
+  // Holding a string lets go of it…
+  await peg("6th string, E2").click();
+  await expect(tuner.meter).toHaveAttribute("aria-valuetext", "Nothing heard");
+  await expect(label).toHaveText("");
+  // …and so does releasing it…
+  await pluck(hz(40, 10), /^\d+ cents sharp, tune down$/);
+  await expect(label).toHaveText("Last heard");
+  await tuner.card.getByRole("button", { name: "Release" }).click();
+  await expect(tuner.meter).toHaveAttribute("aria-valuetext", "Nothing heard");
+  // …another Tuning…
+  await pluck(hz(45), "In tune");
+  await expect(label).toHaveText("Last heard");
+  await pickTuning(page, "Drop D");
+  await expect(tuner.meter).toHaveAttribute("aria-valuetext", "Nothing heard");
+  // …and Stop, listening again starting from nothing heard.
+  await pluck(hz(45), "In tune");
+  await expect(label).toHaveText("Last heard");
+  await tuner.stop.click();
+  await expect(label).toHaveText("");
+  await expect(readout.locator(".heard")).toHaveText("");
+  await tuner.listen.click();
+  await expect(tuner.card).toContainText("Nothing heard");
 });
 
 test("leaving the Tuner stops it listening", async ({ page }) => {
@@ -585,7 +688,7 @@ async function drifts(page: Page) {
   return (moved % 1) - (moved % 1 > 0.5 ? 1 : 0);
 }
 
-test("the wave drifts one way flat and the other sharp, and stands still in tune or with nothing heard", async ({
+test("the wave drifts one way flat and the other sharp, and stands still in tune, with nothing heard, or on the note last heard", async ({
   page,
 }) => {
   const mic = await fakeMicrophone(page);
@@ -596,7 +699,10 @@ test("the wave drifts one way flat and the other sharp, and stands still in tune
 
   await tuner.listen.click();
   await mic.play(hz(45, 20));
-  await expect(tuner.meter).toHaveAttribute("aria-valuetext", /sharp, tune down$/);
+  await expect(tuner.meter).toHaveAttribute(
+    "aria-valuetext",
+    /sharp, tune down$/,
+  );
   expect(await drifts(page)).toBeGreaterThan(0.05);
 
   await mic.play(hz(45, -20));
@@ -609,8 +715,12 @@ test("the wave drifts one way flat and the other sharp, and stands still in tune
 
   await mic.play(hz(45, -20));
   await expect(tuner.meter).toHaveAttribute("aria-valuetext", /flat, tune up$/);
+  // Faded, the note kept is still flat, but the wave stands still: it's not heard now.
   await mic.hush();
-  await expect(tuner.meter).toHaveAttribute("aria-valuetext", "Nothing heard");
+  await expect(tuner.meter).toHaveAttribute(
+    "aria-valuetext",
+    /^Last heard: .*flat, tune up$/,
+  );
   expect(await drifts(page)).toBe(0);
 });
 

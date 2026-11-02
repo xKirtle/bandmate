@@ -11,7 +11,10 @@
   // else the one whose note is nearest, how many cents sharp or flat of it
   // the note is, which way to tune to it, with an arrow and words, and a wave
   // that drifts as a strobe tuner's does, until Stop is pressed or the page is
-  // left. Its Input is picked under the headstock, from the Inputs connected,
+  // left. Once a note fades, it keeps showing where it landed, muted and
+  // labelled Last heard, the wave at rest, until the next note is heard, or
+  // listening stops, a string is held or released, or another Tuning is
+  // picked. Its Input is picked under the headstock, from the Inputs connected,
   // as the Timeline's mic button lists them: the Input recorded from until
   // another is picked, and the Input recorded from again wherever the one
   // picked isn't connected.
@@ -25,7 +28,7 @@
   import { inputName, sameInput } from '../lib/inputSettings';
   import { reducedMotion } from '../lib/motion';
   import { OpenedInput } from '../lib/openedInput.svelte';
-  import { detectPitch, SteadyPitch } from '../lib/pitch';
+  import { detectPitch, LastHeard, loudness, SteadyPitch } from '../lib/pitch';
   import { input } from '../lib/sharedInput.svelte';
   import { leftHanded } from '../lib/sharedLeftHanded.svelte';
   import { tunerInput } from '../lib/sharedTunerInput.svelte';
@@ -61,14 +64,21 @@
 
   function keep() {
     tuningError = '';
-    // Another Tuning's strings aren't the ones held to: it lets go.
-    if (tuning !== deviceTuning.value) held = null;
+    // Another Tuning's strings aren't the ones held to, or the ones the note
+    // kept was read against: it lets go of both.
+    if (tuning !== deviceTuning.value) hold(null);
     deviceTuning.set(tuning);
+  }
+
+  /** Holds the Tuner to a string, or releases it with null: the note kept was read against another, so it goes. */
+  function hold(string: TunerString | null) {
+    held = string;
+    forgetLastHeard();
   }
 
   /** Plays a string's note and holds the Tuner to that string. */
   function playAndHold(string: TunerString) {
-    held = string;
+    hold(string);
     hear([string.heard], tunerSound);
   }
 
@@ -99,7 +109,21 @@
 
   // The pitch heard, steadied, in Hz; null for nothing heard.
   let pitch = $state<number | null>(null);
-  const reading = $derived(pitch !== null && strings ? tunerReading(pitch, strings, held) : null);
+  // Where the last note landed, in Hz, kept once it's faded, while nothing's
+  // heard; null for none.
+  const lastHeard = new LastHeard();
+  let kept = $state<number | null>(null);
+  function forgetLastHeard() {
+    lastHeard.forget();
+    kept = null;
+  }
+  // What's shown: the note heard, else the one kept, read against the strings.
+  const shown = $derived(pitch ?? kept);
+  const reading = $derived(shown !== null && strings ? tunerReading(shown, strings, held) : null);
+  // Whether what's shown is the note kept, Last heard, rather than one heard now.
+  const showingKept = $derived(pitch === null && kept !== null);
+  // The reading of a note heard now: null on the note kept, as on nothing heard.
+  const live = $derived(showingKept ? null : reading);
 
   // Read every so often while the Input is open, and nothing once it isn't.
   $effect(() => {
@@ -110,11 +134,15 @@
       // While the audio's suspended, e.g. in a background tab, the samples
       // stand still: nothing's heard, rather than the last note held.
       const running = audioContext().state === 'running' && !document.hidden;
-      pitch = steady.hear(running ? detectPitch(level.samples(), level.sampleRate) : null, performance.now());
+      const samples = level.samples();
+      const detected = running ? detectPitch(samples, level.sampleRate) : null;
+      pitch = steady.hear(detected, performance.now());
+      kept = lastHeard.hear(detected, pitch, loudness(samples));
     }, every);
     return () => {
       clearInterval(timer);
       pitch = null;
+      forgetLastHeard();
     };
   });
 
@@ -145,8 +173,9 @@
   );
   // Which way to turn to the note, off it: up when flat, down when sharp.
   const way = $derived(tunerWay(reading));
-  // What the meter says to a screen reader: how far off, with the way to tune.
-  const meterText = $derived(way ? `${howFarOff}, tune ${way}` : howFarOff);
+  // What the meter says to a screen reader: how far off, with the way to
+  // tune, and for the note kept, that it's the one last heard.
+  const meterText = $derived(`${showingKept ? 'Last heard: ' : ''}${way ? `${howFarOff}, tune ${way}` : howFarOff}`);
 
   // The wave, in its drawing's own units: a wavelength is this wide, two
   // show at once, and it swings this far either side of its middle.
@@ -164,9 +193,9 @@
   /** How far the wave has drifted, in wavelengths, 0 to 1: it carries on from there, so it never jumps. */
   let drifted = $state(0);
   // Drifts while a string is heard off its note: flat one way, sharp the
-  // other, faster the further off. In tune, with nothing heard, or under
-  // reduced motion, it stands still where it is.
-  const drift = $derived(tunerDrift(reading));
+  // other, faster the further off. In tune, with nothing heard, on the note
+  // kept, or under reduced motion, it stands still where it is.
+  const drift = $derived(tunerDrift(live));
   $effect(() => {
     const speed = drift;
     if (!speed || reducedMotion()) return;
@@ -231,7 +260,10 @@
             </li>
           {/each}
         </ul>
-        <div class="readout">
+        <div class="readout" class:kept={showingKept}>
+          <p class="last-heard">
+            {#if showingKept}Last heard{/if}
+          </p>
           <p class="heard">
             {#if reading}
               <span class="note">{reading.heard}</span>
@@ -246,8 +278,8 @@
           </p>
           <div
             class="wave"
-            class:hearing={reading}
-            class:in-tune={reading?.inTune}
+            class:hearing={live}
+            class:in-tune={live?.inTune}
             role="meter"
             aria-label="Cents sharp or flat"
             aria-valuemin={-reach}
@@ -281,7 +313,7 @@
       {#if held}
         <p class="holding">
           <span>Held to the {held.number} string, {held.name}</span>
-          <button type="button" class="button quiet" onclick={() => (held = null)}>Release</button>
+          <button type="button" class="button quiet" onclick={() => hold(null)}>Release</button>
         </p>
       {:else}
         <p class="muted">Tap a peg to hear its string's note and hold the Tuner to that string.</p>
@@ -430,9 +462,9 @@
     align-items: baseline;
     gap: var(--space-2);
   }
-  /* What's heard, centred between the pegs: the note, its string, the wave
-     and how far off it is, each holding its line while empty, so nothing
-     jumps as it's heard. */
+  /* What's heard, centred between the pegs: Last heard over the note kept,
+     the note, its string, the wave and how far off it is, each holding its
+     line while empty, so nothing jumps as it's heard. */
   .readout {
     display: flex;
     grid-row: 1;
@@ -451,6 +483,11 @@
   .heard .note {
     font-weight: 700;
     font-variant-numeric: tabular-nums;
+  }
+  .listen .last-heard {
+    min-height: 1lh;
+    color: var(--text-muted);
+    font-size: var(--text-xs);
   }
   .listen .nothing,
   .listen .nearest,
@@ -510,5 +547,16 @@
   .tuned {
     background: var(--finished-bg);
     color: var(--finished-fg);
+  }
+  /* The note kept, Last heard: all of it muted, the In tune badge outlined
+     as a Tag is, so it doesn't read as what's heard now. */
+  .kept .heard .note,
+  .kept .way {
+    color: var(--text-muted);
+  }
+  .kept .tuned {
+    border: 1px solid var(--border);
+    background: none;
+    color: var(--text-muted);
   }
 </style>
