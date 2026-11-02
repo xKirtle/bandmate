@@ -1,39 +1,9 @@
-// The Chord Finder's tuning and the Key Suggest suggests from. The user picks
-// them on the Finder's page, and the last ones picked are kept on this
-// device, like hiding a Song's Chords: standard tuning and C major until
-// picked here. Its Instrument is the device's (deviceInstrument.ts).
+// The Key the Chord Finder's Suggest suggests from. The user picks it on the
+// Finder's page, and the last one picked is kept on this device, like hiding
+// a Song's Chords: C major until picked here. Its Instrument is the device's
+// (deviceInstrument.ts), and so is its Tuning (deviceTuning.ts).
 
-import { keys, tunings, tuningText } from './chordFinder';
-
-/** Where the Chord Finder's tuning is kept on this device. */
-export const finderTuningKey = 'bandmate.chordFinder.tuning';
-/** Where the Chord Finder kept its capo on this device, before the Chord Finder dropped its capo. */
-const formerCapoKey = 'bandmate.chordFinder.capo';
-const standard = tunings[0];
-
-/**
- * The tuning last picked on this device, as a Song's Details write it, or
- * standard tuning. Reading it also deletes a capo kept from before the
- * Chord Finder dropped its capo.
- */
-export function readFinderTuning(storage: Storage | undefined): string {
-  try {
-    storage?.removeItem(formerCapoKey);
-    return tuningText(storage?.getItem(finderTuningKey) ?? '') ?? standard;
-  } catch {
-    return standard;
-  }
-}
-
-/** Keeps the tuning picked on this device, forgetting it once back to standard tuning. */
-export function storeFinderTuning(storage: Storage | undefined, tuning: string) {
-  try {
-    if (tuning === standard) storage?.removeItem(finderTuningKey);
-    else storage?.setItem(finderTuningKey, tuning);
-  } catch {
-    // Not kept, e.g. in a private window; the choice still applies until reload.
-  }
-}
+import { keys } from './chordFinder';
 
 /** Where the Key the Chord Finder's Suggest suggests from is kept on this device. */
 export const finderKeyKey = 'bandmate.chordFinder.key';

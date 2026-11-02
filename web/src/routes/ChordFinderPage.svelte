@@ -1,24 +1,26 @@
 <script lang="ts">
   // The Chord Finder's own page, the one place it's offered: the user picks
-  // the Instrument, the guitar until picked, and on the guitar the tuning,
+  // the Instrument, the guitar until picked, and on the guitar the Tuning,
   // standard tuning until picked, and the Key Suggest suggests from, C major
   // until picked. The last ones picked are kept on this device. The
   // Instrument is the device's, the one the Chord Chart draws and the Reading
-  // menu and Settings pick too.
+  // menu and Settings pick too, and so is the Tuning, the one the Tuner tunes
+  // to.
   // The piano has no tuning, so the field hides while it's picked.
   import ChordFinder from '../lib/ChordFinder.svelte';
   import { instruments, readTuning, standard, type FinderContext } from '../lib/chordFinder';
   import { instrumentText } from '../lib/deviceInstrument';
   import { deviceStorage } from '../lib/deviceStorage';
-  import { readFinderKey, readFinderTuning, storeFinderKey, storeFinderTuning } from '../lib/finderSetup';
+  import { readFinderKey, storeFinderKey } from '../lib/finderSetup';
   import Picker from '../lib/Picker.svelte';
   import { instrument as deviceInstrument, pickInstrument } from '../lib/sharedInstrument.svelte';
+  import { deviceTuning } from '../lib/sharedTuning.svelte';
   import Toasts from '../lib/Toasts.svelte';
   import TuningField from '../lib/TuningField.svelte';
   import { unheard, unheardToasts } from '../lib/unheard.svelte';
 
   const instrument = $derived(deviceInstrument.value);
-  let tuning = $state(readFinderTuning(deviceStorage()));
+  let tuning = $state(deviceTuning.value);
   let tuningError = $state('');
   let suggestKey = $state(readFinderKey(deviceStorage()));
 
@@ -31,7 +33,7 @@
 
   function keep() {
     tuningError = '';
-    storeFinderTuning(deviceStorage(), tuning);
+    deviceTuning.set(tuning);
   }
 </script>
 
