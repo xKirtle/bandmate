@@ -46,7 +46,7 @@
   --piano-white-keys: 15;
   /* The Tuner's headstock: its widest, each round peg, and the wave between
      the pegs, as tall as it's drawn. */
-  --tuner-headstock: 20rem;
+  --tuner-headstock: 28rem;
   --tuner-peg: 3.25rem;
   --tuner-wave: 2rem;
 
