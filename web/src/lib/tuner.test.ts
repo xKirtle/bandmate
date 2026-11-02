@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { tunerDrift, tunerPeg, tunerReading, tunerStrings } from './tuner';
+import { tunerDrift, tunerPeg, tunerReading, tunerStrings, tunerWay } from './tuner';
 
 /** The strings as the Tuner names them, low to high: E2, A2. */
 const named = (tuning: string) => tunerStrings(tuning)?.map((s) => s.name);
@@ -184,5 +184,32 @@ describe('how fast the wave drifts', () => {
     expect(drift(6)).toBeCloseTo(0.24, 6);
     expect(drift(50)).toBeCloseTo(2, 6);
     expect(drift(-120)).toBeCloseTo(-2, 6);
+  });
+});
+
+describe('which way to tune', () => {
+  const standard = tunerStrings('Standard')!;
+  /** The way to tune an A2 heard so many cents off in standard tuning. */
+  const way = (cents: number) => tunerWay(tunerReading(hz(45, cents), standard));
+
+  it('is up when flat, and down when sharp, to the note', () => {
+    expect(way(-12)).toBe('up');
+    expect(way(-6)).toBe('up');
+    expect(way(12)).toBe('down');
+    expect(way(6)).toBe('down');
+    expect(way(-120)).toBe('up');
+  });
+
+  it('is none in tune, within 5 cents either way, or with nothing heard', () => {
+    expect(way(0)).toBeNull();
+    expect(way(4)).toBeNull();
+    expect(way(-4)).toBeNull();
+    expect(tunerWay(null)).toBeNull();
+  });
+
+  it('is to the note of the string held, however far off', () => {
+    // A G2 is under the 5th string's A2, nearest it, but over the 6th's E2.
+    expect(tunerWay(tunerReading(hz(43), standard))).toBe('up');
+    expect(tunerWay(tunerReading(hz(43), standard, standard[0]))).toBe('down');
   });
 });

@@ -373,6 +373,8 @@ function listening(page: Page) {
     listen: card.getByRole("button", { name: "Listen", exact: true }),
     stop: card.getByRole("button", { name: "Stop", exact: true }),
     meter: card.getByRole("meter", { name: "Cents sharp or flat" }),
+    /** Which way to tune, with its arrow. */
+    way: card.locator(".way"),
   };
 }
 
@@ -404,13 +406,20 @@ test("the Tuner listens on the Input recorded from, showing the note heard, the 
   await expect(tuner.card).toContainText("5th string, A2");
   await expect(tuner.meter).toHaveAttribute(
     "aria-valuetext",
-    /^1[1-3] cents sharp$/,
+    /^1[1-3] cents sharp, tune down$/,
   );
+  // Sharp, it says to tune down, under the cents, with an arrow.
+  await expect(tuner.card.locator(".off")).toContainText(
+    /1[1-3] cents sharp\s+Tune down/,
+  );
+  await expect(tuner.way).toHaveText("Tune down");
+  await expect(tuner.way.locator("svg.lucide-arrow-down")).toBeVisible();
 
-  // Tuned down to it, it's in tune.
+  // Tuned down to it, it's in tune, with no arrow.
   await mic.play(hz(45));
   await expect(tuner.meter).toHaveAttribute("aria-valuetext", "In tune");
   await expect(tuner.card).toContainText("In tune");
+  await expect(tuner.way).toHaveCount(0);
 
   // A low E tuned well flat, past E♭, is still the 6th string's.
   await mic.play(hz(39, -20));
@@ -418,8 +427,10 @@ test("the Tuner listens on the Input recorded from, showing the note heard, the 
   await expect(tuner.card).toContainText("6th string, E2");
   await expect(tuner.meter).toHaveAttribute(
     "aria-valuetext",
-    /^1(19|20|21) cents flat$/,
+    /^1(19|20|21) cents flat, tune up$/,
   );
+  await expect(tuner.way).toHaveText("Tune up");
+  await expect(tuner.way.locator("svg.lucide-arrow-up")).toBeVisible();
 
   // Measured against the Tuning's strings: in Drop D, a D2 is in tune.
   await mic.play(hz(38));
@@ -450,8 +461,9 @@ test("tapping a string holds the Tuner to it, however far off it's heard, till i
   await expect(tuner.card).toContainText("5th string, A2");
   await expect(tuner.meter).toHaveAttribute(
     "aria-valuetext",
-    /^(199|200|201) cents flat$/,
+    /^(199|200|201) cents flat, tune up$/,
   );
+  await expect(tuner.way).toHaveText("Tune up");
 
   // …but held to the 6th, it's measured against E2, however far off.
   await peg("6th string, E2").click();
@@ -460,8 +472,9 @@ test("tapping a string holds the Tuner to it, however far off it's heard, till i
   await expect(tuner.card).toContainText("6th string, E2");
   await expect(tuner.meter).toHaveAttribute(
     "aria-valuetext",
-    /^(299|300|301) cents sharp$/,
+    /^(299|300|301) cents sharp, tune down$/,
   );
+  await expect(tuner.way).toHaveText("Tune down");
   // Tapping it again plays it again, and it stays held.
   await peg("6th string, E2").click();
   await expect(peg("6th string, E2")).toHaveAttribute("aria-current", "true");
@@ -473,8 +486,9 @@ test("tapping a string holds the Tuner to it, however far off it's heard, till i
   await expect(tuner.card).toContainText("4th string, D3");
   await expect(tuner.meter).toHaveAttribute(
     "aria-valuetext",
-    /^(699|700|701) cents flat$/,
+    /^(699|700|701) cents flat, tune up$/,
   );
+  await expect(tuner.way).toHaveText("Tune up");
 
   // Released, it's the nearest string again.
   await release.click();
@@ -505,6 +519,9 @@ test("the Tuner shows nothing heard in silence or noise, not a note", async ({
   await mic.hush();
   await expect(tuner.card).toContainText("Nothing heard");
   await expect(tuner.meter).toHaveAttribute("aria-valuetext", "Nothing heard");
+  // Neither the way to tune nor In tune shows.
+  await expect(tuner.way).toHaveCount(0);
+  await expect(tuner.card.locator(".badge")).toHaveCount(0);
 
   await mic.play(hz(50));
   await expect(tuner.card).toContainText("4th string, D3");
@@ -579,11 +596,11 @@ test("the wave drifts one way flat and the other sharp, and stands still in tune
 
   await tuner.listen.click();
   await mic.play(hz(45, 20));
-  await expect(tuner.meter).toHaveAttribute("aria-valuetext", /sharp$/);
+  await expect(tuner.meter).toHaveAttribute("aria-valuetext", /sharp, tune down$/);
   expect(await drifts(page)).toBeGreaterThan(0.05);
 
   await mic.play(hz(45, -20));
-  await expect(tuner.meter).toHaveAttribute("aria-valuetext", /flat$/);
+  await expect(tuner.meter).toHaveAttribute("aria-valuetext", /flat, tune up$/);
   expect(await drifts(page)).toBeLessThan(-0.05);
 
   await mic.play(hz(45));
@@ -591,7 +608,7 @@ test("the wave drifts one way flat and the other sharp, and stands still in tune
   expect(await drifts(page)).toBe(0);
 
   await mic.play(hz(45, -20));
-  await expect(tuner.meter).toHaveAttribute("aria-valuetext", /flat$/);
+  await expect(tuner.meter).toHaveAttribute("aria-valuetext", /flat, tune up$/);
   await mic.hush();
   await expect(tuner.meter).toHaveAttribute("aria-valuetext", "Nothing heard");
   expect(await drifts(page)).toBe(0);
@@ -606,10 +623,10 @@ test("with reduced motion asked for, the wave stands still, and how far off stil
   const tuner = listening(page);
   await tuner.listen.click();
   await mic.play(hz(45, 20));
-  await expect(tuner.card).toContainText(/\d+ cents sharp/);
+  await expect(tuner.card).toContainText(/\d+ cents sharp\s+Tune down/);
   expect(await drifts(page)).toBe(0);
   await mic.play(hz(45, -20));
-  await expect(tuner.card).toContainText(/\d+ cents flat/);
+  await expect(tuner.card).toContainText(/\d+ cents flat\s+Tune up/);
   expect(await drifts(page)).toBe(0);
   await mic.play(hz(45));
   await expect(tuner.card.locator(".badge")).toHaveText("In tune");
@@ -864,3 +881,39 @@ test("listening on the Input recorded from in place of one picked, unplugging th
     "Input to listen on: Default input",
   );
 });
+
+for (const width of [320, 1280]) {
+  test(`at ${width}px, how far off and the way to tune fit between the pegs, the wave holding still as they change`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height: 700 });
+    const mic = await fakeMicrophone(page);
+    await page.goto("/tuner");
+    const tuner = listening(page);
+    const off = tuner.card.locator(".off");
+    const readout = tuner.card.locator(".readout");
+    const waveTop = async () => (await tuner.meter.boundingBox())!.y;
+    const before = await waveTop();
+    await tuner.listen.click();
+    for (const [cents, said] of [
+      [-45, /^45 cents flat\s+Tune up$/],
+      [45, /^45 cents sharp\s+Tune down$/],
+      [0, /^In tune$/],
+    ] as const) {
+      await mic.play(hz(45, cents));
+      await expect(off).toHaveText(said);
+      // Each line inside the room between the pegs, unbroken: one line tall.
+      const room = (await readout.boundingBox())!;
+      for (const line of await off.locator("> span").all()) {
+        const box = (await line.boundingBox())!;
+        expect(box.x).toBeGreaterThanOrEqual(room.x);
+        expect(box.x + box.width).toBeLessThanOrEqual(room.x + room.width);
+        expect(box.height).toBeLessThan(30);
+      }
+      expect(await waveTop()).toBe(before);
+    }
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth),
+    ).toBeLessThanOrEqual(width);
+  });
+}

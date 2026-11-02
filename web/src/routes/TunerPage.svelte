@@ -9,11 +9,14 @@
   // the device's Instrument. Once Listen is pressed, it listens on its own
   // Input, showing between the pegs the note it hears, the string held or
   // else the one whose note is nearest, how many cents sharp or flat of it
-  // the note is, and a wave that drifts as a strobe tuner's does, until Stop is
+  // the note is, which way to tune to it, with an arrow and words, and a wave
+  // that drifts as a strobe tuner's does, until Stop is
   // pressed or the page is left. Its Input is picked under the headstock,
   // from the Inputs connected, as the Timeline's mic button lists them: the
   // Input recorded from until another is picked, and the Input recorded from
   // again wherever the one picked isn't connected.
+  import ArrowDown from '@lucide/svelte/icons/arrow-down';
+  import ArrowUp from '@lucide/svelte/icons/arrow-up';
   import { untrack } from 'svelte';
   import { listenProblem } from '../lib/capture';
   import { hear, prepareToHear } from '../lib/hear';
@@ -28,7 +31,15 @@
   import { tunerInput } from '../lib/sharedTunerInput.svelte';
   import { deviceTuning } from '../lib/sharedTuning.svelte';
   import Toasts from '../lib/Toasts.svelte';
-  import { tunerDrift, tunerPeg, tunerReading, tunerSound, tunerStrings, type TunerString } from '../lib/tuner';
+  import {
+    tunerDrift,
+    tunerPeg,
+    tunerReading,
+    tunerSound,
+    tunerStrings,
+    tunerWay,
+    type TunerString,
+  } from '../lib/tuner';
   import TuningField from '../lib/TuningField.svelte';
   import { audioContext } from '../lib/timelinePlayer';
   import { unheard, unheardToasts } from '../lib/unheard.svelte';
@@ -132,6 +143,8 @@
         ? 'In tune'
         : `${Math.abs(cents)} ${Math.abs(cents) === 1 ? 'cent' : 'cents'} ${cents > 0 ? 'sharp' : 'flat'}`,
   );
+  // Which way to turn to the note, off it: up when flat, down when sharp.
+  const way = $derived(tunerWay(reading));
 
   // The wave, in its drawing's own units: a wavelength is this wide, two
   // show at once, and it swings this far either side of its middle.
@@ -231,14 +244,14 @@
           </p>
           <div
             class="wave"
-            class:heard={reading}
+            class:hearing={reading}
             class:in-tune={reading?.inTune}
             role="meter"
             aria-label="Cents sharp or flat"
             aria-valuemin={-reach}
             aria-valuemax={reach}
             aria-valuenow={Math.max(-reach, Math.min(reach, cents))}
-            aria-valuetext={howFarOff}
+            aria-valuetext={way ? `${howFarOff}, tune ${way}` : howFarOff}
           >
             <svg viewBox="0 0 {2 * wavelength} {waveHeight}" preserveAspectRatio="none" aria-hidden="true">
               <path d={wavePath} transform="translate({drifted * wavelength} 0)" vector-effect="non-scaling-stroke" />
@@ -247,7 +260,19 @@
           {#if reading?.inTune}
             <p class="off"><span class="badge tuned">In tune</span></p>
           {:else}
-            <p class="off tabular">{reading ? howFarOff : ''}</p>
+            <!-- How far off, and under it which way to tune: the words say it
+                 so the arrow can't be read as where the pitch sits. -->
+            <p class="off tabular">
+              {#if reading}
+                <span>{howFarOff}</span>
+                {#if way}
+                  <span class="way">
+                    {#if way === 'up'}<ArrowUp aria-hidden="true" />{:else}<ArrowDown aria-hidden="true" />{/if}
+                    Tune {way}
+                  </span>
+                {/if}
+              {/if}
+            </p>
           {/if}
         </div>
       </div>
@@ -432,6 +457,27 @@
     color: var(--text-muted);
     font-size: var(--text-sm);
   }
+  /* How far off over the way to tune, or the In tune badge: two lines held
+     whichever shows, as the room between a phone's pegs fits no more than
+     one a line, so the wave above never jumps as a string comes in tune. */
+  .listen .off {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 2lh;
+  }
+  .off > span {
+    white-space: nowrap;
+  }
+  /* The way to tune, in --text: what to do, so it reads over the muted cents. */
+  .way {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+    color: var(--text);
+    font-weight: 600;
+  }
   /* The wave: at rest in the border's colour, muted while a note's heard,
      and in the finished Status's colour in tune. */
   .wave {
@@ -442,7 +488,7 @@
     color: var(--border);
     transition: color var(--duration-base) var(--ease);
   }
-  .wave.heard {
+  .wave.hearing {
     color: var(--text-muted);
   }
   .wave.in-tune {
