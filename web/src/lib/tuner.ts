@@ -4,6 +4,7 @@
 // recorded samples (ADR 0030), always at A = 440 Hz. The Tuner is a guitar's
 // whatever the device's Instrument, so it plays the guitar however that's set.
 
+import { commonNote } from './chordTheory';
 import { guitar, stringNumber } from './guitar';
 import { guitarTuningStrings, standardTuning } from './guitarTuning';
 import type { HeardNote, InstrumentSound } from './instrument';
@@ -34,6 +35,44 @@ export function tunerStrings(tuning: string): TunerString[] | null {
       heard: { midi: pitch, string },
     })) ?? null
   );
+}
+
+/** How far either way of a string's note it's in tune, in cents: under 5. */
+export const inTuneWithin = 5;
+
+/** What the Tuner reads from a note it hears. */
+export interface TunerReading {
+  /** The note heard, the nearest to its pitch, with its octave: as the Tuning writes it where it's the string's, else C# or Eb. */
+  heard: string;
+  /** The string whose note is nearest. */
+  string: TunerString;
+  /** How far sharp of that string's note it is, in cents: flat below 0. */
+  cents: number;
+  /** Whether it's in tune: within 5 cents of the string's note, either way. */
+  inTune: boolean;
+}
+
+/** How many cents sharp of a MIDI note a frequency is, at A = 440 Hz. */
+function centsFrom(frequency: number, midi: number): number {
+  return 1200 * Math.log2(frequency / 440) - 100 * (midi - 69);
+}
+
+/**
+ * What the Tuner reads from a frequency heard, in Hz, tuned to a Tuning's
+ * strings: the string whose note is nearest by pitch, the lower where two
+ * are as near, and how far sharp or flat of it the note is.
+ */
+export function tunerReading(frequency: number, strings: readonly TunerString[]): TunerReading {
+  // The lower string wins a tie, however the arithmetic rounds it.
+  const nearer = (a: TunerString, b: TunerString) =>
+    Math.abs(centsFrom(frequency, b.heard.midi)) < Math.abs(centsFrom(frequency, a.heard.midi)) - 1e-6 ? b : a;
+  const string = strings.reduce(nearer);
+  const cents = centsFrom(frequency, string.heard.midi);
+  const midi = Math.round(69 + 12 * Math.log2(frequency / 440));
+  const named = strings.find((s) => s.heard.midi === midi);
+  const common = commonNote(midi);
+  const heard = named ? named.name : common + octave(common, midi);
+  return { heard, string, cents, inTune: Math.abs(cents) < inTuneWithin };
 }
 
 /**

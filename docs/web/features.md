@@ -37,7 +37,11 @@ The **Chords** page, in the side bar, helps with chords away from any song, on g
 
 ## Tuner
 
-The **Tuner** page, in the side bar, tunes your guitar by ear. Pick the tuning to tune to under **Tuning**, a named one or six notes of your own: it's the same one the Chords page uses, so after tuning to Open G, Chords shows Open G shapes, and the other way round. Your device remembers it.
+The **Tuner** page, in the side bar, tunes your guitar, by eye or by ear. Pick the tuning to tune to under **Tuning**, a named one or six notes of your own: it's the same one the Chords page uses, so after tuning to Open G, Chords shows Open G shapes, and the other way round. Your device remembers it.
+
+<img src="@screenshots/tuner.png" alt="The Tuner listening in standard tuning: it hears an A2 a few cents sharp of the 5th string, the needle just right of the middle">
+
+Press **Listen** and play a string. The Tuner shows the note it hears, the string whose note is nearest, and how many cents sharp or flat of it you are: tune until it says **In tune**, within 5 cents. It listens on the [input you record from](/song#record). If it can't listen, it says why: allow the microphone in the browser's site settings, connect an input, or open Bandmate on `localhost` or over HTTPS, as for [recording](/song#record).
 
 Tap a string to hear its note, on the recorded guitar, and tap it again to hear it again. Each note is at A = 440 Hz, in the octave that string is tuned to: in Drop D, the low string plays the D below the low E. It's always a guitar, even with the piano picked for Chords.
 
