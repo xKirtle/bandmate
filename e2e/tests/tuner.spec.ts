@@ -96,6 +96,18 @@ for (const width of [1280, 320]) {
     }
     // A 3+3 headstock: the low strings down the left, the high ones down the right.
     expect(await headstock(page)).toEqual(rightHanded);
+    // Auto under it, and its hint, held to a string or not.
+    const auto = page.getByRole("button", { name: "Auto", exact: true });
+    for (const tap of [null, strings(page).first()]) {
+      await tap?.click();
+      for (const box of [
+        (await auto.boundingBox())!,
+        (await page.locator(".holding > span").boundingBox())!,
+      ]) {
+        expect(box.x).toBeGreaterThanOrEqual(0);
+        expect(box.x + box.width).toBeLessThanOrEqual(width);
+      }
+    }
     expect(
       await page.evaluate(() => document.documentElement.scrollWidth),
     ).toBeLessThanOrEqual(width);
@@ -375,6 +387,8 @@ function listening(page: Page) {
     meter: card.getByRole("meter", { name: "Cents sharp or flat" }),
     /** Which way to tune, with its arrow. */
     way: card.locator(".way"),
+    /** Auto: on while no string is held, the Tuner picking the nearest. */
+    auto: card.getByRole("button", { name: "Auto", exact: true }),
   };
 }
 
@@ -444,7 +458,7 @@ test("the Tuner listens on the Input recorded from, showing the note heard, the 
   await expect(tuner.listen).toBeVisible();
 });
 
-test("tapping a string holds the Tuner to it, however far off it's heard, till it's released or another Tuning is picked", async ({
+test("tapping a string holds the Tuner to it, however far off it's heard, and turns Auto off, till Auto is tapped or another Tuning is picked", async ({
   page,
 }) => {
   const mic = await fakeMicrophone(page);
@@ -452,23 +466,36 @@ test("tapping a string holds the Tuner to it, however far off it's heard, till i
   const tuner = listening(page);
   const peg = (name: string) =>
     page.getByRole("button", { name: `Hear the ${name}` });
-  const release = tuner.card.getByRole("button", { name: "Release" });
-  await expect(release).toHaveCount(0);
+  const pressed = strings(page).and(page.locator("[aria-current]"));
+  // Auto is on from the start, and says what it does.
+  await expect(tuner.auto).toHaveAttribute("aria-pressed", "true");
+  await expect(tuner.auto).toHaveAccessibleDescription(
+    "Picks the string nearest the note heard",
+  );
+  await expect(tuner.card.getByRole("button", { name: "Release" })).toHaveCount(
+    0,
+  );
 
   await tuner.listen.click();
   // A low E tuned up to G2 is nearer the 5th string's A2…
   await mic.play(hz(43));
   await expect(tuner.card).toContainText("5th string, A2");
+  await expect(pressed).toHaveAccessibleName("Hear the 5th string, A2");
   await expect(tuner.meter).toHaveAttribute(
     "aria-valuetext",
     /^(199|200|201) cents flat, tune up$/,
   );
   await expect(tuner.way).toHaveText("Tune up");
 
-  // …but held to the 6th, it's measured against E2, however far off.
+  // …but held to the 6th, it's measured against E2, however far off, and Auto's off.
   await peg("6th string, E2").click();
-  await expect(peg("6th string, E2")).toHaveAttribute("aria-current", "true");
+  await expect(pressed).toHaveAccessibleName("Hear the 6th string, E2");
+  await expect(tuner.auto).toHaveAttribute("aria-pressed", "false");
+  await expect(tuner.auto).toHaveAccessibleDescription(
+    "Held to the 6th string, E2",
+  );
   await expect(tuner.card).toContainText("Held to the 6th string, E2");
+  await expect(tuner.card).not.toContainText("Picks the string nearest");
   await expect(tuner.card).toContainText("6th string, E2");
   await expect(tuner.meter).toHaveAttribute(
     "aria-valuetext",
@@ -477,36 +504,104 @@ test("tapping a string holds the Tuner to it, however far off it's heard, till i
   await expect(tuner.way).toHaveText("Tune down");
   // Tapping it again plays it again, and it stays held.
   await peg("6th string, E2").click();
-  await expect(peg("6th string, E2")).toHaveAttribute("aria-current", "true");
+  await expect(pressed).toHaveAccessibleName("Hear the 6th string, E2");
+  await expect(tuner.auto).toHaveAttribute("aria-pressed", "false");
 
   // Tapping another string holds that one instead.
   await peg("4th string, D3").click();
-  await expect(peg("4th string, D3")).toHaveAttribute("aria-current", "true");
-  await expect(peg("6th string, E2")).not.toHaveAttribute("aria-current");
-  await expect(tuner.card).toContainText("4th string, D3");
+  await expect(pressed).toHaveAccessibleName("Hear the 4th string, D3");
+  await expect(tuner.card).toContainText("Held to the 4th string, D3");
   await expect(tuner.meter).toHaveAttribute(
     "aria-valuetext",
     /^(699|700|701) cents flat, tune up$/,
   );
   await expect(tuner.way).toHaveText("Tune up");
 
-  // Released, it's the nearest string again.
-  await release.click();
-  await expect(release).toHaveCount(0);
-  await expect(strings(page).and(page.locator("[aria-current]"))).toHaveCount(
-    0,
+  // Auto lets go of it: the nearest string again.
+  await tuner.auto.click();
+  await expect(tuner.auto).toHaveAttribute("aria-pressed", "true");
+  await expect(tuner.card).toContainText(
+    "Picks the string nearest the note heard",
   );
+  await expect(tuner.card).not.toContainText("Held to");
   await expect(tuner.card).toContainText("5th string, A2");
+  await expect(pressed).toHaveAccessibleName("Hear the 5th string, A2");
+  // Tapped again, it stays on, with no string held.
+  await tuner.auto.click();
+  await expect(tuner.auto).toHaveAttribute("aria-pressed", "true");
+  await expect(pressed).toHaveAccessibleName("Hear the 5th string, A2");
 
-  // Picking another Tuning releases it too.
+  // Picking another Tuning turns Auto on too.
   await peg("6th string, E2").click();
   await expect(tuner.card).toContainText("Held to the 6th string, E2");
   await pickTuning(page, "Drop D");
-  await expect(release).toHaveCount(0);
-  await expect(strings(page).and(page.locator("[aria-current]"))).toHaveCount(
-    0,
-  );
+  await expect(tuner.auto).toHaveAttribute("aria-pressed", "true");
+  await expect(tuner.card).not.toContainText("Held to");
   await expect(tuner.card).toContainText("5th string, A2");
+  await expect(pressed).toHaveAccessibleName("Hear the 5th string, A2");
+});
+
+test("under Auto, the peg of the string nearest the note heard shows pressed, in the accent as a held one is, none with nothing heard, and muted on Last heard", async ({
+  page,
+}) => {
+  const mic = await fakeMicrophone(page);
+  await page.goto("/tuner");
+  const tuner = listening(page);
+  const peg = (name: string) =>
+    page.getByRole("button", { name: `Hear the ${name}` });
+  const pressed = strings(page).and(page.locator("[aria-current]"));
+  const fill = (where: ReturnType<Page["locator"]>) =>
+    where.evaluate((e) => getComputedStyle(e).backgroundColor);
+  const unpressed = await fill(peg("6th string, E2"));
+
+  // Nothing heard, no peg pressed, before listening and while it listens.
+  await expect(pressed).toHaveCount(0);
+  await tuner.listen.click();
+  await mic.hush();
+  await expect(tuner.card).toContainText("Nothing heard");
+  await expect(pressed).toHaveCount(0);
+
+  // Playing the 6th string, its peg lights up, filled as a held peg is.
+  await mic.play(hz(40, 8));
+  await expect(pressed).toHaveAccessibleName("Hear the 6th string, E2");
+  // Filled once its colour's faded in.
+  await expect.poll(() => fill(peg("6th string, E2"))).not.toBe(unpressed);
+  await page.waitForTimeout(300);
+  const lit = await fill(peg("6th string, E2"));
+  // The 4th string's moves it there.
+  await mic.play(hz(50, -8));
+  await expect(pressed).toHaveAccessibleName("Hear the 4th string, D3");
+  await expect.poll(() => fill(peg("4th string, D3"))).toBe(lit);
+  await expect.poll(() => fill(peg("6th string, E2"))).toBe(unpressed);
+
+  // Faded to Last heard, it stays marked, muted: neither lit nor as the rest.
+  await mic.hush();
+  await expect(tuner.meter).toHaveAttribute("aria-valuetext", /^Last heard: /);
+  await expect(pressed).toHaveAccessibleName("Hear the 4th string, D3");
+  await expect.poll(() => fill(peg("4th string, D3"))).not.toBe(lit);
+  await page.waitForTimeout(300);
+  expect(await fill(peg("4th string, D3"))).not.toBe(unpressed);
+  expect(await fill(peg("4th string, D3"))).not.toBe(lit);
+  // The next note heard lights its own.
+  await mic.play(hz(45));
+  await expect(pressed).toHaveAccessibleName("Hear the 5th string, A2");
+  await expect.poll(() => fill(peg("5th string, A2"))).toBe(lit);
+  await expect.poll(() => fill(peg("4th string, D3"))).toBe(unpressed);
+
+  // Held, the held peg is lit as it is, even on Last heard, once the
+  // pointer that tapped it has moved off it.
+  await peg("6th string, E2").click();
+  await page.mouse.move(0, 0);
+  await mic.hush();
+  await mic.play(hz(40));
+  await mic.hush();
+  await expect(tuner.meter).toHaveAttribute("aria-valuetext", /^Last heard: /);
+  await expect.poll(() => fill(peg("6th string, E2"))).toBe(lit);
+
+  // Stopped, under Auto, nothing's pressed.
+  await tuner.auto.click();
+  await tuner.stop.click();
+  await expect(pressed).toHaveCount(0);
 });
 
 test("the Tuner shows nothing heard in silence, and never catches a note in noise", async ({
@@ -551,7 +646,7 @@ test("the Tuner shows nothing heard in silence, and never catches a note in nois
   }
 });
 
-test("once a note fades, the Tuner keeps where it landed, muted and labelled Last heard, the wave at rest, till the next note, Stop, a string held or released, or another Tuning", async ({
+test("once a note fades, the Tuner keeps where it landed, muted and labelled Last heard, the wave at rest, till the next note, Stop, a string held, Auto, or another Tuning", async ({
   page,
 }) => {
   const mic = await fakeMicrophone(page);
@@ -620,10 +715,10 @@ test("once a note fades, the Tuner keeps where it landed, muted and labelled Las
   await peg("6th string, E2").click();
   await expect(tuner.meter).toHaveAttribute("aria-valuetext", "Nothing heard");
   await expect(label).toHaveText("");
-  // …and so does releasing it…
+  // …and so does letting go of it with Auto…
   await pluck(hz(40, 10), /^\d+ cents sharp, tune down$/);
   await expect(label).toHaveText("Last heard");
-  await tuner.card.getByRole("button", { name: "Release" }).click();
+  await tuner.auto.click();
   await expect(tuner.meter).toHaveAttribute("aria-valuetext", "Nothing heard");
   // …another Tuning…
   await pluck(hz(45), "In tune");
