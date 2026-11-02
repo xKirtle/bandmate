@@ -111,6 +111,33 @@ describe('what the Tuner reads from a note heard', () => {
   });
 });
 
+describe('what the Tuner reads, held to a string', () => {
+  /** What it reads tuned to a Tuning, held to the string at that place low to high (0 is the low string). */
+  function heldTo(tuning: string, held: number, frequency: number) {
+    const strings = tunerStrings(tuning)!;
+    const reading = tunerReading(frequency, strings, strings[held]);
+    return { ...reading, string: reading.string.number, cents: Math.round(reading.cents * 10) / 10 || 0 };
+  }
+
+  it('measures against the held string, however near another string’s note it is', () => {
+    // Changing to Drop D: the low E, still at E2, is held to its D2, 200 cents sharp of it.
+    expect(heldTo('Drop D', 0, hz(40))).toEqual({ heard: 'E2', string: '6th', cents: 200, inTune: false });
+    // A low E tuned up past F♯ to G2 is nearer A2, the 5th's, but held to the 6th it's 300 cents sharp of E2.
+    expect(heldTo('Standard', 0, hz(43))).toEqual({ heard: 'G2', string: '6th', cents: 300, inTune: false });
+    // Flat, as far off as it is.
+    expect(heldTo('Standard', 5, hz(55))).toEqual({ heard: 'G3', string: '1st', cents: -900, inTune: false });
+  });
+
+  it('is in tune on the held string’s note, within 5 cents', () => {
+    expect(heldTo('Drop D', 0, hz(38, 3))).toMatchObject({ string: '6th', inTune: true });
+  });
+
+  it('is the nearest string with none held', () => {
+    expect(tunerReading(hz(43), tunerStrings('Standard')!, null).string.number).toBe('5th');
+    expect(tunerReading(hz(43), tunerStrings('Standard')!).string.number).toBe('5th');
+  });
+});
+
 describe('where each string’s peg is on the headstock', () => {
   /** Each side's pegs, top to bottom, by string name, in standard tuning. */
   const sides = (leftHanded: boolean) => {

@@ -45,6 +45,8 @@ Press **Listen** and play a string. Between the pegs, the Tuner shows the note i
 
 Tap a peg to hear its string's note, on the recorded guitar, and tap it again to hear it again. Each note is at A = 440 Hz, in the octave that string is tuned to: in Drop D, the low string plays the D below the low E. It's always a guitar, even with the piano picked for Chords.
 
+Tapping a peg also holds the Tuner to that string: its peg fills in, and under the headstock it says **Held to** that string. While it's held, the Tuner measures what it hears against that string's note, however far off, rather than against the nearest string's. That's for changing to a tuning far from the one you're in, where a string can start nearer its neighbour's note than its own: in Drop C, the low E is nearer the 5th string's G than its own C. Tap the string you're tuning, and the cents count down to its note from wherever it is. Tap another peg to hold that string instead, or press **Release** to go back to the nearest string. Picking another tuning releases it too.
+
 ## Beats
 
 The **Beats** page, in the side bar, is your Beat Library: the music you write to, kept in one place and used in any song.

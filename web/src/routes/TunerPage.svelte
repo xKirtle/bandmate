@@ -3,11 +3,13 @@
   // in the Chord Finder, the same one, and a guitar's 3+3 headstock, each
   // string's note on the peg that tunes it, mirrored on a left-handed device.
   // Tapping a peg plays its string's note from the guitar's recorded samples,
-  // ringing once, and tapping it again plays it again. It's a guitar's
-  // whatever the device's Instrument. Once Listen is pressed, it listens on
-  // its own Input, showing between the pegs the note it hears, the string
-  // whose note is nearest and how many cents sharp or flat of it the note
-  // is, and a wave that drifts as a strobe tuner's does, until Stop is
+  // ringing once, and tapping it again plays it again. Tapping it also holds
+  // the Tuner to that string, marked as held, until it's released, another
+  // string is tapped, or another Tuning is picked. It's a guitar's whatever
+  // the device's Instrument. Once Listen is pressed, it listens on its own
+  // Input, showing between the pegs the note it hears, the string held or
+  // else the one whose note is nearest, how many cents sharp or flat of it
+  // the note is, and a wave that drifts as a strobe tuner's does, until Stop is
   // pressed or the page is left. Its Input is picked under the headstock,
   // from the Inputs connected, as the Timeline's mic button lists them: the
   // Input recorded from until another is picked, and the Input recorded from
@@ -26,7 +28,7 @@
   import { tunerInput } from '../lib/sharedTunerInput.svelte';
   import { deviceTuning } from '../lib/sharedTuning.svelte';
   import Toasts from '../lib/Toasts.svelte';
-  import { tunerDrift, tunerPeg, tunerReading, tunerSound, tunerStrings } from '../lib/tuner';
+  import { tunerDrift, tunerPeg, tunerReading, tunerSound, tunerStrings, type TunerString } from '../lib/tuner';
   import TuningField from '../lib/TuningField.svelte';
   import { audioContext } from '../lib/timelinePlayer';
   import { unheard, unheardToasts } from '../lib/unheard.svelte';
@@ -41,9 +43,22 @@
   // A note that couldn't be heard here is this page's to say: leaving it goes.
   $effect(() => () => unheard.dismiss());
 
+  // The string the Tuner's held to, one of the Tuning's, kept raw so it's
+  // that very string, told apart from the others by identity: null for none,
+  // the nearest string read instead.
+  let held = $state.raw<TunerString | null>(null);
+
   function keep() {
     tuningError = '';
+    // Another Tuning's strings aren't the ones held to: it lets go.
+    if (tuning !== deviceTuning.value) held = null;
     deviceTuning.set(tuning);
+  }
+
+  /** Plays a string's note and holds the Tuner to that string. */
+  function playAndHold(string: TunerString) {
+    held = string;
+    hear([string.heard], tunerSound);
   }
 
   // The Inputs to pick the Tuner's from, the Input recorded from used
@@ -73,7 +88,7 @@
 
   // The pitch heard, steadied, in Hz; null for nothing heard.
   let pitch = $state<number | null>(null);
-  const reading = $derived(pitch !== null && strings ? tunerReading(pitch, strings) : null);
+  const reading = $derived(pitch !== null && strings ? tunerReading(pitch, strings, held) : null);
 
   // Read every so often while the Input is open, and nothing once it isn't.
   $effect(() => {
@@ -189,9 +204,11 @@
               <button
                 type="button"
                 class="button peg"
+                class:held={held === s}
                 aria-label="Hear the {s.number} string, {s.name}"
-                title="Hear the {s.number} string"
-                onclick={() => hear([s.heard], tunerSound)}
+                aria-current={held === s ? 'true' : undefined}
+                title="Hear the {s.number} string, and hold the Tuner to it"
+                onclick={() => playAndHold(s)}
               >
                 <span class="note">{s.name}</span>
                 <span class="which">{s.number}</span>
@@ -234,7 +251,14 @@
           {/if}
         </div>
       </div>
-      <p class="muted">Tap a peg to hear its string's note.</p>
+      {#if held}
+        <p class="holding">
+          <span>Held to the {held.number} string, {held.name}</span>
+          <button type="button" class="button quiet" onclick={() => (held = null)}>Release</button>
+        </p>
+      {:else}
+        <p class="muted">Tap a peg to hear its string's note and hold the Tuner to that string.</p>
+      {/if}
       <div class="input">
         <span>Listens on</span>
         <InputPicker {inputs} {named} label="Input to listen on" legend="Listen on" instead={usedInstead} note={null} />
@@ -356,6 +380,28 @@
     color: var(--text-muted);
     font-size: var(--text-xs);
     font-weight: 400;
+  }
+  /* The string held: its peg filled with the accent, as a picked chip is. */
+  .peg.held {
+    border-color: var(--accent);
+    background: var(--accent);
+  }
+  .peg.held .note,
+  .peg.held .which {
+    color: var(--accent-text);
+  }
+  @media (hover: hover) {
+    .peg.held:hover:not(:disabled) {
+      border-color: color-mix(in srgb, var(--accent) 85%, var(--text));
+      background: color-mix(in srgb, var(--accent) 85%, var(--text));
+    }
+  }
+  /* What it's held to, and Release beside it. */
+  .holding {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: var(--space-2);
   }
   /* What's heard, centred between the pegs: the note, its string, the wave
      and how far off it is, each holding its line while empty, so nothing

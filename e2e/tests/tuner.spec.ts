@@ -433,6 +433,68 @@ test("the Tuner listens on the Input recorded from, showing the note heard, the 
   await expect(tuner.listen).toBeVisible();
 });
 
+test("tapping a string holds the Tuner to it, however far off it's heard, till it's released or another Tuning is picked", async ({
+  page,
+}) => {
+  const mic = await fakeMicrophone(page);
+  await page.goto("/tuner");
+  const tuner = listening(page);
+  const peg = (name: string) =>
+    page.getByRole("button", { name: `Hear the ${name}` });
+  const release = tuner.card.getByRole("button", { name: "Release" });
+  await expect(release).toHaveCount(0);
+
+  await tuner.listen.click();
+  // A low E tuned up to G2 is nearer the 5th string's A2…
+  await mic.play(hz(43));
+  await expect(tuner.card).toContainText("5th string, A2");
+  await expect(tuner.meter).toHaveAttribute(
+    "aria-valuetext",
+    /^(199|200|201) cents flat$/,
+  );
+
+  // …but held to the 6th, it's measured against E2, however far off.
+  await peg("6th string, E2").click();
+  await expect(peg("6th string, E2")).toHaveAttribute("aria-current", "true");
+  await expect(tuner.card).toContainText("Held to the 6th string, E2");
+  await expect(tuner.card).toContainText("6th string, E2");
+  await expect(tuner.meter).toHaveAttribute(
+    "aria-valuetext",
+    /^(299|300|301) cents sharp$/,
+  );
+  // Tapping it again plays it again, and it stays held.
+  await peg("6th string, E2").click();
+  await expect(peg("6th string, E2")).toHaveAttribute("aria-current", "true");
+
+  // Tapping another string holds that one instead.
+  await peg("4th string, D3").click();
+  await expect(peg("4th string, D3")).toHaveAttribute("aria-current", "true");
+  await expect(peg("6th string, E2")).not.toHaveAttribute("aria-current");
+  await expect(tuner.card).toContainText("4th string, D3");
+  await expect(tuner.meter).toHaveAttribute(
+    "aria-valuetext",
+    /^(699|700|701) cents flat$/,
+  );
+
+  // Released, it's the nearest string again.
+  await release.click();
+  await expect(release).toHaveCount(0);
+  await expect(strings(page).and(page.locator("[aria-current]"))).toHaveCount(
+    0,
+  );
+  await expect(tuner.card).toContainText("5th string, A2");
+
+  // Picking another Tuning releases it too.
+  await peg("6th string, E2").click();
+  await expect(tuner.card).toContainText("Held to the 6th string, E2");
+  await pickTuning(page, "Drop D");
+  await expect(release).toHaveCount(0);
+  await expect(strings(page).and(page.locator("[aria-current]"))).toHaveCount(
+    0,
+  );
+  await expect(tuner.card).toContainText("5th string, A2");
+});
+
 test("the Tuner shows nothing heard in silence or noise, not a note", async ({
   page,
 }) => {

@@ -67,7 +67,7 @@ export const inTuneWithin = 5;
 export interface TunerReading {
   /** The note heard, the nearest to its pitch, with its octave: as the Tuning writes it where it's the string's, else C# or Eb. */
   heard: string;
-  /** The string whose note is nearest. */
+  /** The string measured against: the one held, else the one whose note is nearest. */
   string: TunerString;
   /** How far sharp of that string's note it is, in cents: flat below 0. */
   cents: number;
@@ -82,14 +82,19 @@ function centsFrom(frequency: number, midi: number): number {
 
 /**
  * What the Tuner reads from a frequency heard, in Hz, tuned to a Tuning's
- * strings: the string whose note is nearest by pitch, the lower where two
- * are as near, and how far sharp or flat of it the note is.
+ * strings: the string held, one of them, however far off it is, or with
+ * none held, the string whose note is nearest by pitch, the lower where two
+ * are as near; and how far sharp or flat of it the note is.
  */
-export function tunerReading(frequency: number, strings: readonly TunerString[]): TunerReading {
+export function tunerReading(
+  frequency: number,
+  strings: readonly TunerString[],
+  held: TunerString | null = null,
+): TunerReading {
   // The lower string wins a tie, however the arithmetic rounds it.
   const nearer = (a: TunerString, b: TunerString) =>
     Math.abs(centsFrom(frequency, b.heard.midi)) < Math.abs(centsFrom(frequency, a.heard.midi)) - 1e-6 ? b : a;
-  const string = strings.reduce(nearer);
+  const string = held ?? strings.reduce(nearer);
   const cents = centsFrom(frequency, string.heard.midi);
   const midi = Math.round(69 + 12 * Math.log2(frequency / 440));
   const named = strings.find((s) => s.heard.midi === midi);
