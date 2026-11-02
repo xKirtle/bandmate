@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { tunerDrift, tunerPeg, tunerReading, tunerStrings, tunerWay } from './tuner';
+import { tunerPeg, tunerReading, tunerStrings, tunerWaveHeight, tunerWavelength, tunerWay } from './tuner';
 
 /** The strings as the Tuner names them, low to high: E2, A2. */
 const named = (tuning: string) => tunerStrings(tuning)?.map((s) => s.name);
@@ -160,30 +160,43 @@ describe('where each string’s peg is on the headstock', () => {
   });
 });
 
-describe('how fast the wave drifts', () => {
-  /** The drift, in wavelengths a second, for an A2 heard so many cents off in standard tuning. */
-  const drift = (cents: number) => tunerDrift(tunerReading(hz(45, cents), tunerStrings('Standard')!));
+describe('the heard wave’s wavelength, against the target’s', () => {
+  /** The heard wave's wavelength, the target's being 1, for an A2 heard so many cents off in standard tuning. */
+  const wavelength = (cents: number) => tunerWavelength(tunerReading(hz(45, cents), tunerStrings('Standard')!));
 
-  it('stands still with nothing heard', () => {
-    expect(tunerDrift(null)).toBe(0);
+  it('is shorter by 1% each cent sharp, and longer by 1% each cent flat', () => {
+    expect(wavelength(12)).toBeCloseTo(0.88, 6);
+    expect(wavelength(-12)).toBeCloseTo(1.12, 6);
+    expect(wavelength(30)).toBeCloseTo(0.7, 6);
   });
 
-  it('stands still in tune, within 5 cents either way', () => {
-    expect(drift(0)).toBe(0);
-    expect(drift(4)).toBe(0);
-    expect(drift(-4)).toBe(0);
+  it('is the target’s in tune, within 5 cents either way, so it lies on it', () => {
+    expect(wavelength(0)).toBe(1);
+    expect(wavelength(4)).toBe(1);
+    expect(wavelength(-4)).toBe(1);
   });
 
-  it('drifts one way flat and the other sharp: a wavelength a second each 25 cents off', () => {
-    expect(drift(25)).toBeCloseTo(1, 6);
-    expect(drift(-25)).toBeCloseTo(-1, 6);
-    expect(drift(-12.5)).toBeCloseTo(-0.5, 6);
+  it('goes no further than 50 cents either way, as the meter does', () => {
+    expect(wavelength(50)).toBeCloseTo(0.5, 6);
+    expect(wavelength(120)).toBeCloseTo(0.5, 6);
+    expect(wavelength(-900)).toBeCloseTo(1.5, 6);
+  });
+});
+
+describe('the heard wave’s height, against the target’s', () => {
+  it('is the target’s for a string played loud, from a loudness of an eighth of full scale', () => {
+    expect(tunerWaveHeight(0.125)).toBe(1);
+    expect(tunerWaveHeight(0.6)).toBe(1);
   });
 
-  it('drifts faster the further off, up to two wavelengths a second from 50 cents', () => {
-    expect(drift(6)).toBeCloseTo(0.24, 6);
-    expect(drift(50)).toBeCloseTo(2, 6);
-    expect(drift(-120)).toBeCloseTo(-2, 6);
+  it('shrinks as the string fades, in step with how loud it is', () => {
+    expect(tunerWaveHeight(0.0625)).toBeCloseTo(0.5, 6);
+    expect(tunerWaveHeight(0.05)).toBeCloseTo(0.4, 6);
+  });
+
+  it('keeps to at least 15% of the target’s, so a quiet string still shows', () => {
+    expect(tunerWaveHeight(0.01)).toBeCloseTo(0.15, 6);
+    expect(tunerWaveHeight(0)).toBeCloseTo(0.15, 6);
   });
 });
 

@@ -103,20 +103,33 @@ export function tunerReading(
   return { heard, string, cents, inTune: Math.abs(cents) < inTuneWithin };
 }
 
-/** How far off a string is, in cents, for its wave to drift a wavelength a second. */
-const centsPerWave = 25;
-/** How far off it drifts fastest at, in cents: past it, the wave drifts no faster. */
-const fastestFrom = 50;
+/** How far sharp or flat the heard wave's wavelength goes, in cents: past it, no further. */
+const widestOff = 50;
 
 /**
- * How fast the Tuner's wave drifts, as a strobe tuner's does, in wavelengths
- * a second: flat drifts back (below 0), sharp forward, faster the further
- * off, up to two a second from 50 cents, and it stands still in tune or with
- * nothing heard.
+ * The Tuner's heard wave's wavelength, drawn over the target's, the target's
+ * being 1: shorter by 1% each cent sharp, longer by 1% each cent flat, so a
+ * few cents show, as to scale they'd look the same; no further than 50 cents
+ * either way, as the meter goes. In tune, it's the target's, lying on it.
  */
-export function tunerDrift(reading: TunerReading | null): number {
-  if (!reading || reading.inTune) return 0;
-  return Math.max(-fastestFrom, Math.min(fastestFrom, reading.cents)) / centsPerWave;
+export function tunerWavelength(reading: TunerReading): number {
+  if (reading.inTune) return 1;
+  return 1 - Math.max(-widestOff, Math.min(widestOff, reading.cents)) / 100;
+}
+
+/** How loud a string is, as `loudness` reads it, for its heard wave to be as tall as the target's. */
+const fullFrom = 1 / 8;
+/** How small the heard wave gets, against the target's, however quiet the string. */
+const smallest = 0.15;
+
+/**
+ * How tall the Tuner's heard wave is, the target's being 1, from how loud
+ * the string is (see `loudness`): as tall as the target's from an eighth of
+ * full scale, shrinking in step as the string fades, down to 15%, so a quiet
+ * one still shows.
+ */
+export function tunerWaveHeight(loudness: number): number {
+  return Math.max(smallest, Math.min(1, loudness / fullFrom));
 }
 
 /**
