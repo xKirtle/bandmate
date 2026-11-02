@@ -350,7 +350,10 @@
   .error {
     margin: calc(-1 * var(--space-2)) 0 var(--space-4);
   }
+  /* As wide as the headstock, at the left under the Tuning, however wide
+     the page: a wide window's page has no width of its own. */
   .card {
+    max-width: calc(var(--tuner-headstock) + 2 * var(--space-4));
     padding: var(--space-4);
   }
   .listen {
