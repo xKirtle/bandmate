@@ -96,18 +96,22 @@ for (const width of [1280, 320]) {
     }
     // A 3+3 headstock: the low strings down the left, the high ones down the right.
     expect(await headstock(page)).toEqual(rightHanded);
-    // Auto under it, and its hint, held to a string or not.
+    // Auto under it, and its hint, with Auto on and then held to a string.
     const auto = page.getByRole("button", { name: "Auto", exact: true });
-    for (const tap of [null, strings(page).first()]) {
-      await tap?.click();
+    const hint = page.locator(".holding > span");
+    const inWindow = async () => {
       for (const box of [
         (await auto.boundingBox())!,
-        (await page.locator(".holding > span").boundingBox())!,
+        (await hint.boundingBox())!,
       ]) {
         expect(box.x).toBeGreaterThanOrEqual(0);
         expect(box.x + box.width).toBeLessThanOrEqual(width);
       }
-    }
+    };
+    await inWindow();
+    await strings(page).first().click();
+    await expect(hint).toContainText("Held to");
+    await inWindow();
     expect(
       await page.evaluate(() => document.documentElement.scrollWidth),
     ).toBeLessThanOrEqual(width);

@@ -7,19 +7,19 @@
   // the Tuner to that string and turns Auto off, until Auto is tapped, another
   // string is tapped, or another Tuning is picked. With Auto on, it picks the
   // string nearest the note heard. Either way, the peg of the string it's
-  // tuning shows pressed. It's a guitar's whatever
-  // the device's Instrument. Once Listen is pressed, it listens on its own
-  // Input, showing between the pegs the note it hears, the string held or
-  // else the one whose note is nearest, how many cents sharp or flat of it
-  // the note is, which way to tune to it, with an arrow and words, and a wave
-  // that drifts as a strobe tuner's does, until Stop is pressed or the page is
-  // left. Once a note fades, it keeps showing where it landed, muted and
-  // labelled Last heard, its string's peg muted under Auto, the wave at rest,
-  // until the next note is heard, or listening stops, a string is held,
-  // Auto is tapped, or another Tuning is picked. Its Input is picked under the headstock, from the Inputs connected,
-  // as the Timeline's mic button lists them: the Input recorded from until
-  // another is picked, and the Input recorded from again wherever the one
-  // picked isn't connected.
+  // tuning shows pressed. It's a guitar's whatever the device's Instrument.
+  // Once Listen is pressed, it listens on its own Input, showing between the
+  // pegs the note it hears, the string held or else the one whose note is
+  // nearest, how many cents sharp or flat of it the note is, which way to
+  // tune to it, with an arrow and words, and a wave that drifts as a strobe
+  // tuner's does, until Stop is pressed or the page is left. Once a note
+  // fades, it keeps showing where it landed, muted and labelled Last heard,
+  // its string's peg muted under Auto, the wave at rest, until the next note
+  // is heard, or listening stops, a string is held, Auto is tapped, or
+  // another Tuning is picked. Its Input is picked under the headstock, from
+  // the Inputs connected, as the Timeline's mic button lists them: the Input
+  // recorded from until another is picked, and the Input recorded from again
+  // wherever the one picked isn't connected.
   import ArrowDown from '@lucide/svelte/icons/arrow-down';
   import ArrowUp from '@lucide/svelte/icons/arrow-up';
   import { untrack } from 'svelte';
@@ -72,7 +72,10 @@
     deviceTuning.set(tuning);
   }
 
-  /** Holds the Tuner to a string, turning Auto off, or lets go with null, Auto on: the note kept was read against another, so it goes. */
+  /**
+   * Holds the Tuner to a string, turning Auto off, or lets go with null,
+   * Auto on: the note kept was read against another, so it goes.
+   */
   function hold(string: TunerString | null) {
     held = string;
     forgetLastHeard();
@@ -130,7 +133,7 @@
   // Auto the one the note shown is read against, none with nothing heard.
   const tuned = $derived(held ?? reading?.string ?? null);
   // Under Auto, the string of the note kept, its peg muted as the rest of Last heard is.
-  const tunedKept = $derived(!held && showingKept);
+  const pegFaded = $derived(!held && showingKept);
 
   // Read every so often while the Input is open, and nothing once it isn't.
   $effect(() => {
@@ -256,7 +259,7 @@
                 type="button"
                 class="button peg"
                 class:pressed={tuned === s}
-                class:kept={tuned === s && tunedKept}
+                class:faded={tuned === s && pegFaded}
                 aria-label="Hear the {s.number} string, {s.name}"
                 aria-current={tuned === s ? 'true' : undefined}
                 title="Hear the {s.number} string, and hold the Tuner to it"
@@ -464,8 +467,8 @@
     border-color: var(--accent);
     background: var(--accent);
   }
-  .peg.pressed .note,
-  .peg.pressed .which {
+  .peg.pressed:not(.faded) .note,
+  .peg.pressed:not(.faded) .which {
     color: var(--accent-text);
   }
   @media (hover: hover) {
@@ -475,20 +478,14 @@
     }
   }
   /* The string of the note last heard, under Auto: muted with the readout,
-     a tint of the accent edged in a deeper one, its note and number as an
-     unpressed peg's. */
-  .peg.pressed.kept {
+     a tint of the accent edged in a deeper one, its note and number left
+     as an unpressed peg's. */
+  .peg.pressed.faded {
     border-color: color-mix(in srgb, var(--accent) 40%, transparent);
     background: color-mix(in srgb, var(--accent) 12%, transparent);
   }
-  .peg.pressed.kept .note {
-    color: var(--text);
-  }
-  .peg.pressed.kept .which {
-    color: var(--text-muted);
-  }
   @media (hover: hover) {
-    .peg.pressed.kept:hover:not(:disabled) {
+    .peg.pressed.faded:hover:not(:disabled) {
       border-color: color-mix(in srgb, var(--accent) 40%, transparent);
       background: color-mix(in srgb, var(--accent) 24%, transparent);
     }
