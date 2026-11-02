@@ -82,20 +82,19 @@ function centsFrom(frequency: number, midi: number): number {
 
 /**
  * What the Tuner reads from a frequency heard, in Hz, tuned to a Tuning's
- * strings: the string held, by its place low to high (0 is the low string),
- * however far off it is, or with none held, the string whose note is nearest
- * by pitch, the lower where two are as near; and how far sharp or flat of
- * it the note is.
+ * strings: the string held, one of them, however far off it is, or with
+ * none held, the string whose note is nearest by pitch, the lower where two
+ * are as near; and how far sharp or flat of it the note is.
  */
 export function tunerReading(
   frequency: number,
   strings: readonly TunerString[],
-  held: number | null = null,
+  held: TunerString | null = null,
 ): TunerReading {
   // The lower string wins a tie, however the arithmetic rounds it.
   const nearer = (a: TunerString, b: TunerString) =>
     Math.abs(centsFrom(frequency, b.heard.midi)) < Math.abs(centsFrom(frequency, a.heard.midi)) - 1e-6 ? b : a;
-  const string = (held !== null && strings[held]) || strings.reduce(nearer);
+  const string = held ?? strings.reduce(nearer);
   const cents = centsFrom(frequency, string.heard.midi);
   const midi = Math.round(69 + 12 * Math.log2(frequency / 440));
   const named = strings.find((s) => s.heard.midi === midi);

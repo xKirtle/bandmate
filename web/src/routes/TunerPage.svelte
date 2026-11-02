@@ -28,7 +28,7 @@
   import { tunerInput } from '../lib/sharedTunerInput.svelte';
   import { deviceTuning } from '../lib/sharedTuning.svelte';
   import Toasts from '../lib/Toasts.svelte';
-  import { tunerDrift, tunerPeg, tunerReading, tunerSound, tunerStrings } from '../lib/tuner';
+  import { tunerDrift, tunerPeg, tunerReading, tunerSound, tunerStrings, type TunerString } from '../lib/tuner';
   import TuningField from '../lib/TuningField.svelte';
   import { audioContext } from '../lib/timelinePlayer';
   import { unheard, unheardToasts } from '../lib/unheard.svelte';
@@ -43,9 +43,9 @@
   // A note that couldn't be heard here is this page's to say: leaving it goes.
   $effect(() => () => unheard.dismiss());
 
-  // The string the Tuner's held to, by its place low to high (0 is the low
-  // string): null for none, the nearest string read instead.
-  let held = $state<number | null>(null);
+  // The string the Tuner's held to, one of the Tuning's: null for none, the
+  // nearest string read instead.
+  let held = $state<TunerString | null>(null);
 
   function keep() {
     tuningError = '';
@@ -55,9 +55,9 @@
   }
 
   /** Plays a string's note and holds the Tuner to that string. */
-  function tap(string: number) {
+  function playAndHold(string: TunerString) {
     held = string;
-    hear([strings![string].heard], tunerSound);
+    hear([string.heard], tunerSound);
   }
 
   // The Inputs to pick the Tuner's from, the Input recorded from used
@@ -203,11 +203,11 @@
               <button
                 type="button"
                 class="button peg"
-                class:held={held === i}
+                class:held={held === s}
                 aria-label="Hear the {s.number} string, {s.name}"
-                aria-current={held === i ? 'true' : undefined}
+                aria-current={held === s ? 'true' : undefined}
                 title="Hear the {s.number} string, and hold the Tuner to it"
-                onclick={() => tap(i)}
+                onclick={() => playAndHold(s)}
               >
                 <span class="note">{s.name}</span>
                 <span class="which">{s.number}</span>
@@ -250,9 +250,9 @@
           {/if}
         </div>
       </div>
-      {#if held !== null && strings[held]}
+      {#if held}
         <p class="holding">
-          <span>Held to the {strings[held].number} string, {strings[held].name}</span>
+          <span>Held to the {held.number} string, {held.name}</span>
           <button type="button" class="button quiet" onclick={() => (held = null)}>Release</button>
         </p>
       {:else}

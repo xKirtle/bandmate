@@ -114,7 +114,8 @@ describe('what the Tuner reads from a note heard', () => {
 describe('what the Tuner reads, held to a string', () => {
   /** What it reads tuned to a Tuning, held to the string at that place low to high (0 is the low string). */
   function heldTo(tuning: string, held: number, frequency: number) {
-    const reading = tunerReading(frequency, tunerStrings(tuning)!, held);
+    const strings = tunerStrings(tuning)!;
+    const reading = tunerReading(frequency, strings, strings[held]);
     return { ...reading, string: reading.string.number, cents: Math.round(reading.cents * 10) / 10 || 0 };
   }
 
