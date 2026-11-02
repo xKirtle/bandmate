@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { tunerStrings } from './tuner';
+import { tunerReading, tunerStrings } from './tuner';
 
 /** The strings as the Tuner names them, low to high: E2, A2. */
 const named = (tuning: string) => tunerStrings(tuning)?.map((s) => s.name);
@@ -46,5 +46,67 @@ describe('the strings the Tuner tunes', () => {
   it('are none for a tuning that can’t be read, rather than a guess', () => {
     expect(tunerStrings('Nashville')).toBeNull();
     expect(tunerStrings('D A D G B')).toBeNull();
+  });
+});
+
+/** A note's frequency at A = 440 Hz, from its MIDI note number, so many cents sharp of it. */
+const hz = (midi: number, cents = 0) => 440 * 2 ** ((midi - 69 + cents / 100) / 12);
+
+/** What the Tuner reads from a frequency heard, tuned to a Tuning: its string by number, its cents to a tenth. */
+function read(tuning: string, frequency: number) {
+  const reading = tunerReading(frequency, tunerStrings(tuning)!);
+  return { ...reading, string: reading.string.number, cents: Math.round(reading.cents * 10) / 10 || 0 };
+}
+
+describe('what the Tuner reads from a note heard', () => {
+  it('is the nearest string, in tune on its note', () => {
+    expect(read('Standard', 110)).toEqual({ heard: 'A2', string: '5th', cents: 0, inTune: true });
+    expect(read('Standard', 329.63)).toEqual({ heard: 'E4', string: '1st', cents: 0, inTune: true });
+  });
+
+  it('is how many cents sharp or flat of the nearest string’s note it is, at A = 440 Hz', () => {
+    expect(read('Standard', hz(40, 12))).toEqual({ heard: 'E2', string: '6th', cents: 12, inTune: false });
+    expect(read('Standard', hz(55, -30))).toEqual({ heard: 'G3', string: '3rd', cents: -30, inTune: false });
+  });
+
+  it('is in tune within 5 cents either way, as shown rounded', () => {
+    expect(read('Standard', hz(45, 4.4)).inTune).toBe(true);
+    expect(read('Standard', hz(45, -4.4)).inTune).toBe(true);
+    expect(read('Standard', hz(45, 4.6)).inTune).toBe(false);
+    expect(read('Standard', hz(45, -4.6)).inTune).toBe(false);
+  });
+
+  it('names the note heard, which may not be the string’s', () => {
+    // A low E tuned down past E♭ is still nearest the 6th string.
+    expect(read('Standard', hz(39, -10))).toEqual({ heard: 'Eb2', string: '6th', cents: -110, inTune: false });
+    expect(read('Standard', hz(42))).toEqual({ heard: 'F#2', string: '6th', cents: 200, inTune: false });
+  });
+
+  it('names a note heard more than halfway to the next one by that one', () => {
+    expect(read('Standard', hz(40, 60))).toMatchObject({ heard: 'F2', string: '6th', cents: 60 });
+  });
+
+  it('measures against the Tuning’s strings: Drop D’s low D is in tune', () => {
+    expect(read('Drop D', hz(38))).toEqual({ heard: 'D2', string: '6th', cents: 0, inTune: true });
+    expect(read('Standard', hz(38))).toMatchObject({ heard: 'D2', string: '6th', cents: -200 });
+  });
+
+  it('names the note heard as the Tuning writes its string', () => {
+    expect(read('Half-step down', hz(49))).toEqual({ heard: 'Db3', string: '4th', cents: 0, inTune: true });
+    // A note that's no string's is spelt the common way.
+    expect(read('Half-step down', hz(49, 100))).toMatchObject({ heard: 'D3', string: '4th', cents: 100 });
+    expect(read('Half-step down', hz(37))).toMatchObject({ heard: 'C#2', string: '6th', cents: -200 });
+    expect(read('Open E', hz(56))).toMatchObject({ heard: 'G#3', string: '3rd' });
+  });
+
+  it('is whichever string’s note is nearer, by pitch', () => {
+    // B3 is the 2nd string's and E4 the 1st's: C4 is a semitone over B3, D4 two under E4.
+    expect(read('Standard', hz(60))).toMatchObject({ heard: 'C4', string: '2nd', cents: 100 });
+    expect(read('Standard', hz(62))).toMatchObject({ heard: 'D4', string: '1st', cents: -200 });
+  });
+
+  it('is the lower string where a note is as near two', () => {
+    // A2 and D3 are five semitones apart: halfway is 250 cents over A2.
+    expect(read('Standard', hz(45, 250))).toMatchObject({ string: '5th', cents: 250 });
   });
 });

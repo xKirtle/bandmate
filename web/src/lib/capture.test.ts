@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { openInput, samplesFrom, watchInputs } from './capture';
+import { listenProblem, openInput, samplesFrom, watchInputs } from './capture';
 
 describe('samplesFrom', () => {
   const batch = (frame: number, ...samples: number[]) => ({ frame, samples: new Float32Array(samples) });
@@ -68,5 +68,46 @@ describe('watchInputs', () => {
     watchInputs(changed)();
     await openInput(defaultInput);
     expect(changed).not.toHaveBeenCalled();
+  });
+});
+
+describe('why the Tuner can’t listen', () => {
+  afterEach(() => vi.unstubAllGlobals());
+  const defaultInput = { deviceId: '', label: '', channel: 0 };
+
+  /** What the Tuner says where opening the Input in a browser of these mediaDevices fails. */
+  async function said(mediaDevices: object | undefined): Promise<string> {
+    vi.stubGlobal('navigator', { mediaDevices });
+    return openInput(defaultInput).then(
+      () => 'opened',
+      (e) => listenProblem(e),
+    );
+  }
+  const refusing = (name: string) => ({
+    getUserMedia: () => Promise.reject(new DOMException('No', name)),
+  });
+
+  it('is the insecure site, where the browser offers no microphone', async () => {
+    expect(await said(undefined)).toBe(
+      'Listening needs a secure connection: open Bandmate over https or on localhost.',
+    );
+  });
+
+  it('is the microphone denied, as recording says', async () => {
+    expect(await said(refusing('NotAllowedError'))).toBe(
+      "Bandmate isn't allowed to use the microphone. Allow it in the browser's site settings.",
+    );
+  });
+
+  it('is no Input to listen on', async () => {
+    expect(await said(refusing('NotFoundError'))).toBe(
+      "There's no microphone or audio input to listen on. Connect one to tune.",
+    );
+  });
+
+  it('is what else went wrong, as recording says', async () => {
+    expect(await said(refusing('NotReadableError'))).toBe(
+      "The audio input is busy or unavailable. Check it isn't in use by another app.",
+    );
   });
 });

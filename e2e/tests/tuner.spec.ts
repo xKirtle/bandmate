@@ -199,3 +199,249 @@ test("a string whose samples didn’t load says so in a toast, and the next tap 
   await strings(page).first().click();
   await expect(toast).toHaveCount(0);
 });
+
+/** A note's frequency at A = 440 Hz, from its MIDI note number, so many cents sharp of it. */
+const hz = (midi: number, cents = 0) =>
+  440 * 2 ** ((midi - 69 + cents / 100) / 12);
+
+/**
+ * Gives the page a microphone that plays a plucked-string tone, its
+ * harmonics louder than its fundamental, at a frequency set with `play`,
+ * or noise or silence. Each input asked for is kept, by the device asked
+ * for or 'default', and `live` says how many are still open. One device,
+ * "scarlett", is listed as connected.
+ */
+async function fakeMicrophone(page: Page) {
+  await page.addInitScript(() => {
+    const w = window as unknown as Record<string, unknown>;
+    const asked: string[] = (w.asked = []);
+    const streams: MediaStream[] = [];
+    w.live = () =>
+      streams.filter((s) => s.getTracks().some((t) => t.readyState === "live"))
+        .length;
+    let context: AudioContext | undefined;
+    let tone: OscillatorNode | undefined;
+    let toneLevel: GainNode | undefined;
+    let noiseLevel: GainNode | undefined;
+    let sound = { frequency: 110, tone: 0, noise: 0 };
+    const apply = () => {
+      tone?.frequency.setValueAtTime(sound.frequency, 0);
+      toneLevel?.gain.setValueAtTime(sound.tone, 0);
+      noiseLevel?.gain.setValueAtTime(sound.noise, 0);
+    };
+    w.play = (frequency: number) => {
+      sound = { frequency, tone: 0.3, noise: 0 };
+      apply();
+    };
+    w.hiss = () => {
+      sound = { ...sound, tone: 0, noise: 0.5 };
+      apply();
+    };
+    w.hush = () => {
+      sound = { ...sound, tone: 0, noise: 0 };
+      apply();
+    };
+    navigator.mediaDevices.enumerateDevices = async () =>
+      [
+        {
+          kind: "audioinput",
+          deviceId: "scarlett",
+          groupId: "g",
+          label: "Scarlett Solo USB",
+        },
+      ] as MediaDeviceInfo[];
+    navigator.mediaDevices.getUserMedia = async (constraints) => {
+      const audio = constraints?.audio;
+      const exact =
+        typeof audio === "object"
+          ? (audio.deviceId as ConstrainDOMStringParameters)?.exact
+          : undefined;
+      asked.push(typeof exact === "string" ? exact : "default");
+      context ??= new AudioContext();
+      const out = context.createMediaStreamDestination();
+      tone = context.createOscillator();
+      tone.setPeriodicWave(
+        context.createPeriodicWave(
+          [0, 0.6, 1, 0.8, 0.5, 0.35, 0.2],
+          [0, 0, 0, 0, 0, 0, 0],
+        ),
+      );
+      toneLevel = context.createGain();
+      tone.connect(toneLevel).connect(out);
+      tone.start();
+      const noise = context.createBuffer(
+        1,
+        context.sampleRate,
+        context.sampleRate,
+      );
+      noise.getChannelData(0).forEach((_, i, data) => {
+        data[i] = Math.random() * 2 - 1;
+      });
+      const hiss = context.createBufferSource();
+      hiss.buffer = noise;
+      hiss.loop = true;
+      noiseLevel = context.createGain();
+      hiss.connect(noiseLevel).connect(out);
+      hiss.start();
+      apply();
+      streams.push(out.stream);
+      return out.stream;
+    };
+  });
+  const call = (name: string, ...args: number[]) =>
+    page.evaluate(
+      ({ name, args }) =>
+        (window as unknown as Record<string, (...a: number[]) => void>)[name](
+          ...args,
+        ),
+      { name, args },
+    );
+  return {
+    play: (frequency: number) => call("play", frequency),
+    hiss: () => call("hiss"),
+    hush: () => call("hush"),
+    asked: () =>
+      page.evaluate(() => (window as unknown as { asked: string[] }).asked),
+    live: () =>
+      page.evaluate(() => (window as unknown as { live: () => number }).live()),
+  };
+}
+
+/** The Tuner's listening card, and what it shows. */
+function listening(page: Page) {
+  const card = page.getByRole("region", {
+    name: "Play a string to see how far off it is",
+  });
+  return {
+    card,
+    listen: card.getByRole("button", { name: "Listen", exact: true }),
+    stop: card.getByRole("button", { name: "Stop", exact: true }),
+    meter: card.getByRole("meter", { name: "Cents sharp or flat" }),
+  };
+}
+
+test("the Tuner listens on the Input recorded from, showing the note heard, the nearest string and how far off it is", async ({
+  page,
+}) => {
+  const mic = await fakeMicrophone(page);
+  await page.addInitScript(() =>
+    localStorage.setItem(
+      "bandmate.input",
+      JSON.stringify({
+        deviceId: "scarlett",
+        label: "Scarlett Solo USB",
+        channel: 0,
+      }),
+    ),
+  );
+  await page.goto("/tuner");
+  const tuner = listening(page);
+  await expect(tuner.card).toContainText(
+    "Listens on the Input you record from.",
+  );
+  expect(await mic.asked()).toEqual([]);
+
+  await tuner.listen.click();
+  await mic.play(hz(45, 12));
+  expect(await mic.asked()).toEqual(["scarlett"]);
+  await expect(tuner.card).toContainText("A2");
+  await expect(tuner.card).toContainText("5th string, A2");
+  await expect(tuner.meter).toHaveAttribute(
+    "aria-valuetext",
+    /^1[1-3] cents sharp$/,
+  );
+
+  // Tuned down to it, it's in tune.
+  await mic.play(hz(45));
+  await expect(tuner.meter).toHaveAttribute("aria-valuetext", "In tune");
+  await expect(tuner.card).toContainText("In tune");
+
+  // A low E tuned well flat, past E♭, is still the 6th string's.
+  await mic.play(hz(39, -20));
+  await expect(tuner.card).toContainText("Eb2");
+  await expect(tuner.card).toContainText("6th string, E2");
+  await expect(tuner.meter).toHaveAttribute(
+    "aria-valuetext",
+    /^1(19|20|21) cents flat$/,
+  );
+
+  // Measured against the Tuning's strings: in Drop D, a D2 is in tune.
+  await mic.play(hz(38));
+  await pickTuning(page, "Drop D");
+  await expect(tuner.card).toContainText("6th string, D2");
+  await expect(tuner.meter).toHaveAttribute("aria-valuetext", "In tune");
+
+  // Stopped, it lets go of the Input.
+  await tuner.stop.click();
+  await expect.poll(mic.live).toBe(0);
+  await expect(tuner.listen).toBeVisible();
+});
+
+test("the Tuner shows nothing heard in silence or noise, not a note", async ({
+  page,
+}) => {
+  const mic = await fakeMicrophone(page);
+  await page.goto("/tuner");
+  const tuner = listening(page);
+  await tuner.listen.click();
+  await mic.hush();
+  await expect(tuner.card).toContainText("Nothing heard");
+  await expect(tuner.meter).toHaveAttribute("aria-valuetext", "Nothing heard");
+
+  await mic.play(hz(50));
+  await expect(tuner.card).toContainText("4th string, D3");
+  await mic.hiss();
+  await expect(tuner.card).toContainText("Nothing heard");
+  // And stays so, never catching a note in the noise.
+  for (let i = 0; i < 10; i++) {
+    await page.waitForTimeout(100);
+    await expect(tuner.meter).toHaveAttribute(
+      "aria-valuetext",
+      "Nothing heard",
+    );
+  }
+});
+
+test("leaving the Tuner stops it listening", async ({ page }) => {
+  const mic = await fakeMicrophone(page);
+  await page.goto("/tuner");
+  await listening(page).listen.click();
+  await mic.play(hz(45));
+  await expect.poll(mic.live).toBe(1);
+  await nav(page).getByRole("link", { name: "Chords" }).click();
+  await expect.poll(mic.live).toBe(0);
+});
+
+for (const [why, browser, said] of [
+  [
+    "the microphone is denied",
+    () => {
+      navigator.mediaDevices.getUserMedia = () =>
+        Promise.reject(new DOMException("Denied", "NotAllowedError"));
+    },
+    "Bandmate isn't allowed to use the microphone. Allow it in the browser's site settings.",
+  ],
+  [
+    "the site isn't secure",
+    () =>
+      Object.defineProperty(navigator, "mediaDevices", { value: undefined }),
+    "Listening needs a secure connection: open Bandmate over https or on localhost.",
+  ],
+  [
+    "there's no Input",
+    () => {
+      navigator.mediaDevices.getUserMedia = () =>
+        Promise.reject(new DOMException("None", "NotFoundError"));
+    },
+    "There's no microphone or audio input to listen on. Connect one to tune.",
+  ],
+] as const) {
+  test(`where ${why}, the Tuner says why it can't listen`, async ({ page }) => {
+    await page.addInitScript(browser);
+    await page.goto("/tuner");
+    const tuner = listening(page);
+    await tuner.listen.click();
+    await expect(tuner.card.getByRole("alert")).toHaveText(said);
+    await expect(tuner.listen).toBeVisible();
+  });
+}
