@@ -25,12 +25,6 @@
     tuningError = '';
     deviceTuning.set(tuning);
   }
-
-  /** A string as players name it, the high one 1st: the low string of six is the 6th. */
-  function stringName(string: number): string {
-    const n = 6 - string;
-    return n + (n === 1 ? 'st' : n === 2 ? 'nd' : n === 3 ? 'rd' : 'th');
-  }
 </script>
 
 <header class="bar">
@@ -56,17 +50,17 @@
     <section class="card strings" aria-labelledby="tuner-strings-heading">
       <h2 id="tuner-strings-heading">Tap a string to hear its note</h2>
       <ul>
-        {#each strings as s, string (string)}
+        {#each strings as s (s.number)}
           <li>
             <button
               type="button"
               class="button"
-              aria-label="Hear the {stringName(string)} string, {s.name}"
-              title="Hear the {stringName(string)} string"
+              aria-label="Hear the {s.number} string, {s.name}"
+              title="Hear the {s.number} string"
               onclick={() => hear([s.heard], tunerSound)}
             >
               <span class="note">{s.name}</span>
-              <span class="which">{stringName(string)}</span>
+              <span class="which">{s.number}</span>
             </button>
           </li>
         {/each}

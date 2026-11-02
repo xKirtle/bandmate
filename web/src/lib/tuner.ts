@@ -4,7 +4,7 @@
 // recorded samples (ADR 0030), always at A = 440 Hz. The Tuner is a guitar's
 // whatever the device's Instrument, so it plays the guitar however that's set.
 
-import { guitar } from './guitar';
+import { guitar, stringNumber } from './guitar';
 import { guitarTuningStrings, standardTuning } from './guitarTuning';
 import type { HeardNote, InstrumentSound } from './instrument';
 
@@ -12,6 +12,8 @@ import type { HeardNote, InstrumentSound } from './instrument';
 export interface TunerString {
   /** Its note and octave, as written in the Tuning: E2, G#3, Eb4. */
   name: string;
+  /** Its number, as players count them from the high string: the low string is the 6th. */
+  number: string;
   /** What tapping it plays: its note, on that string. */
   heard: HeardNote;
 }
@@ -28,6 +30,7 @@ export function tunerStrings(tuning: string): TunerString[] | null {
   return (
     guitarTuningStrings(tuning)?.map(({ note, pitch }, string) => ({
       name: note + octave(note, pitch),
+      number: stringNumber(string, 6),
       heard: { midi: pitch, string },
     })) ?? null
   );
